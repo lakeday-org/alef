@@ -331,7 +331,7 @@ fn cargo_manifest_versions(
         if ignored_path(workspace_root, &path, submodules) {
             continue;
         }
-        let Some(content) = std::fs::read_to_string(path).ok() else {
+        let Some(content) = std::fs::read_to_string(&path).ok() else {
             continue;
         };
         let Some(package) = toml::from_str::<toml::Value>(&content)
@@ -343,13 +343,55 @@ fn cargo_manifest_versions(
         let Some(name) = package.get("name").and_then(toml::Value::as_str) else {
             continue;
         };
-        let version = package
-            .get("version")
-            .and_then(toml::Value::as_str)
-            .unwrap_or(canonical);
-        versions.insert(name.to_string(), version.to_string());
+        if let Some(version) = cargo_package_version(&path, &package, canonical) {
+            versions.insert(name.to_string(), version);
+        }
     }
     versions
+}
+
+fn cargo_package_version(path: &Path, package: &toml::Table, canonical: &str) -> Option<String> {
+    if let Some(version) = package.get("version").and_then(toml::Value::as_str) {
+        return Some(version.to_string());
+    }
+    if package
+        .get("version")
+        .and_then(|value| value.get("workspace"))
+        .and_then(toml::Value::as_bool)
+        != Some(true)
+    {
+        return Some(canonical.to_string());
+    }
+    let directory = path.parent()?;
+    if let Some(workspace) = package.get("workspace").and_then(toml::Value::as_str) {
+        return workspace_package_version(&directory.join(workspace).join("Cargo.toml"));
+    }
+    for ancestor in directory.ancestors() {
+        let manifest = read_cargo_manifest(&ancestor.join("Cargo.toml"));
+        if let Some(manifest) = manifest
+            && manifest.get("workspace").is_some()
+        {
+            return manifest_workspace_version(&manifest);
+        }
+    }
+    None
+}
+
+fn read_cargo_manifest(path: &Path) -> Option<toml::Value> {
+    toml::from_str(&std::fs::read_to_string(path).ok()?).ok()
+}
+
+fn workspace_package_version(path: &Path) -> Option<String> {
+    manifest_workspace_version(&read_cargo_manifest(path)?)
+}
+
+fn manifest_workspace_version(manifest: &toml::Value) -> Option<String> {
+    manifest
+        .get("workspace")?
+        .get("package")?
+        .get("version")?
+        .as_str()
+        .map(str::to_string)
 }
 
 fn glob_under(workspace_root: &Path, directory: &str, suffix: &str, tracked: TrackedPaths<'_>) -> Vec<PathBuf> {

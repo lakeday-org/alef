@@ -10,7 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Elixir native lockfile synchronization uses each local crate's manifest version instead of
-  overwriting independently versioned path dependencies with the consumer workspace version.
+  overwriting independently versioned path dependencies with the consumer workspace version,
+  including crates inheriting versions from nested or explicitly selected Cargo workspaces.
+
+## [0.110.0] - 2026-10-11
+
+### Changed (BREAKING)
+
+- Generated C# e2e projects use `xunit.v3.mtp-off` 4.0.2 and `xunit.runner.visualstudio` 4.0.1,
+  replacing the deprecated xUnit v2 package. Test projects now emit `OutputType=Exe` and retain VSTest compatibility;
+  custom harness extensions using xUnit v2 APIs must migrate to xUnit v3.
+
+### Fixed
+
+- Split CLI adoption reports, validation diagnostics, extraction deduplication, Swift checksum
+  preparation, and TOML merge provenance into focused helpers, removing five lint-debt exemptions.
+
+- Guard non-serde Swift enum payload defaults after resolving transparent newtypes, and align Python runtime and Swift payload snapshot regressions with the generated output.
+
+- Validate migrated governance configuration with the pinned version 5 hook and normalize its formatting.
+
 - Scaffold migration and repair passes now honor `[workspace.ownership] user_owned`, so a
   declared create-once manifest is not rewritten after the guarded scaffold writer skips it.
 - Generated Python, Ruby, Elixir, WebAssembly, and Swift package manifests preserve configured
