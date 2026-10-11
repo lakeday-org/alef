@@ -92,9 +92,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
 "#;
 
+fn nif_versions() -> std::collections::HashMap<String, String> {
+    [
+        ("example_core".to_string(), "0.15.6-rc.3".to_string()),
+        ("example_nif".to_string(), "0.15.6-rc.3".to_string()),
+    ]
+    .into()
+}
+
 #[test]
 fn sync_cargo_lock_path_versions_bumps_only_sourceless_entries() {
-    let out = sync_cargo_lock_path_versions(NIF_CARGO_LOCK_SAMPLE, "0.15.6-rc.3").expect("lock updated");
+    let out = sync_cargo_lock_path_versions(NIF_CARGO_LOCK_SAMPLE, &nif_versions()).expect("lock updated");
     assert!(
         out.contains("version = 4"),
         "lock format version line must be preserved:\n{out}"
@@ -117,9 +125,9 @@ fn sync_cargo_lock_path_versions_bumps_only_sourceless_entries() {
 
 #[test]
 fn sync_cargo_lock_path_versions_is_idempotent() {
-    let first = sync_cargo_lock_path_versions(NIF_CARGO_LOCK_SAMPLE, "0.15.6-rc.3").unwrap();
+    let first = sync_cargo_lock_path_versions(NIF_CARGO_LOCK_SAMPLE, &nif_versions()).unwrap();
     assert!(
-        sync_cargo_lock_path_versions(&first, "0.15.6-rc.3").is_none(),
+        sync_cargo_lock_path_versions(&first, &nif_versions()).is_none(),
         "second call with same version must return None"
     );
 }
@@ -127,7 +135,7 @@ fn sync_cargo_lock_path_versions_is_idempotent() {
 #[test]
 fn sync_cargo_lock_path_versions_preserves_no_trailing_newline() {
     let no_newline = NIF_CARGO_LOCK_SAMPLE.trim_end_matches('\n');
-    let out = sync_cargo_lock_path_versions(no_newline, "0.15.6-rc.3").unwrap();
+    let out = sync_cargo_lock_path_versions(no_newline, &nif_versions()).unwrap();
     assert!(
         !out.ends_with('\n'),
         "absence of trailing newline must be preserved:\n{out:?}"
@@ -137,7 +145,7 @@ fn sync_cargo_lock_path_versions_preserves_no_trailing_newline() {
 #[test]
 fn sync_cargo_lock_path_versions_all_registry_returns_none() {
     let content = "version = 4\n\n[[package]]\nname = \"serde\"\nversion = \"1.0.219\"\nsource = \"registry+x\"\n";
-    assert!(sync_cargo_lock_path_versions(content, "9.9.9").is_none());
+    assert!(sync_cargo_lock_path_versions(content, &nif_versions()).is_none());
 }
 
 #[test]
@@ -215,6 +223,16 @@ fn sync_versions_bumps_kotlin_gradle_nif_lock_and_docs_badges() {
     std::fs::create_dir_all(root.join("packages/kotlin")).expect("mkdir packages/kotlin");
     std::fs::write(root.join("packages/kotlin/build.gradle.kts"), GRADLE_BUILD_SAMPLE).expect("write build.gradle.kts");
 
+    crate::test_support::write_file(
+        root,
+        "crates/core/Cargo.toml",
+        "[package]\nname = \"example_core\"\nversion = \"0.15.6-rc.3\"\n",
+    );
+    crate::test_support::write_file(
+        root,
+        "packages/elixir/native/example_nif/Cargo.toml",
+        "[package]\nname = \"example_nif\"\nversion = \"0.15.6-rc.3\"\n",
+    );
     std::fs::create_dir_all(root.join("packages/elixir/native/example_nif")).expect("mkdir native");
     std::fs::write(
         root.join("packages/elixir/native/example_nif/Cargo.lock"),
@@ -936,4 +954,83 @@ fn sync_versions_bumps_publish_false_rust_registry_test_app_package() {
         manifest.contains("publish = false"),
         "publish policy must be preserved: {manifest}"
     );
+}
+
+#[test]
+fn sync_cargo_lock_path_versions_preserves_independently_versioned_vendor() {
+    let content = format!("{NIF_CARGO_LOCK_SAMPLE}\n[[package]]\nname = \"browser-driver\"\nversion = \"0.9.2\"\n");
+    let out = sync_cargo_lock_path_versions(&content, &nif_versions()).expect("core bumped");
+    let parsed: toml::Value = toml::from_str(&out).expect("valid lock");
+    let driver = parsed["package"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|package| package["name"].as_str() == Some("browser-driver"))
+        .unwrap();
+    assert_eq!(driver["version"].as_str(), Some("0.9.2"));
+}
+
+#[test]
+fn sync_elixir_nif_cargo_locks_uses_each_local_manifest_version() {
+    use crate::core::config::NewAlefConfig;
+    use crate::test_support::{CwdGuard, git_add, git_init, write_file};
+    let tmp = tempfile::tempdir().expect("workspace");
+    let root = tmp.path();
+    write_file(
+        root,
+        "Cargo.toml",
+        "[workspace]\nmembers = []\n[workspace.package]\nversion = \"1.10.3\"\n",
+    );
+    for (path, name, version) in [
+        ("crates/core/Cargo.toml", "example_core", "1.10.3"),
+        ("packages/elixir/native/example_nif/Cargo.toml", "example_nif", "1.10.3"),
+        ("crates/helper/Cargo.toml", "helper", "2.7.0"),
+        ("vendor/browser/Cargo.toml", "browser-driver", "0.9.2"),
+    ] {
+        write_file(
+            root,
+            path,
+            &format!("[package]\nname = \"{name}\"\nversion = \"{version}\"\n"),
+        );
+    }
+    let content = format!(
+        "{NIF_CARGO_LOCK_SAMPLE}\n[[package]]\nname = \"browser-driver\"\nversion = \"0.9.2\"\n\n[[package]]\nname = \"helper\"\nversion = \"2.6.0\"\n"
+    );
+    let lock = write_file(root, "packages/elixir/native/example_nif/Cargo.lock", &content);
+    let cfg: NewAlefConfig =
+        toml::from_str("[workspace]\nlanguages = [\"elixir\"]\n[[crates]]\nname = \"example\"\nsources = []\n")
+            .expect("config");
+    let mut config = cfg.resolve().expect("resolved").remove(0);
+    config.workspace_root = Some(root.to_path_buf());
+    git_init(root);
+    git_add(
+        root,
+        &["Cargo.toml", "crates/core/Cargo.toml", "crates/helper/Cargo.toml"],
+    );
+    let _cwd = CwdGuard::enter(root);
+    let writable = crate::cli::git::IgnoreFilter::for_root(root);
+    let mut updated = Vec::new();
+    sync_elixir_nif_cargo_locks(&config, &writable, "1.10.3", &mut updated).expect("sync lock");
+    let first = std::fs::read_to_string(&lock).expect("lock");
+    let document: toml::Value = toml::from_str(&first).expect("valid lock");
+    let versions: std::collections::HashMap<_, _> = document["package"]
+        .as_array()
+        .expect("packages")
+        .iter()
+        .map(|package| {
+            (
+                package["name"].as_str().expect("name"),
+                package["version"].as_str().expect("version"),
+            )
+        })
+        .collect();
+    assert_eq!(versions["example_core"], "1.10.3");
+    assert_eq!(versions["example_nif"], "1.10.3");
+    assert_eq!(versions["helper"], "2.7.0");
+    assert_eq!(versions["browser-driver"], "0.9.2");
+    assert_eq!(versions["serde"], "1.0.219");
+    assert_eq!(updated.len(), 1);
+    sync_elixir_nif_cargo_locks(&config, &writable, "1.10.3", &mut updated).expect("second sync");
+    assert_eq!(std::fs::read_to_string(lock).expect("second lock"), first);
+    assert_eq!(updated.len(), 1);
 }

@@ -886,14 +886,17 @@ pub(super) fn remove_stale_kotlin_android_plugin(content: &str) -> Option<String
 /// Registry dependencies carry a `source = "registry+..."` (or `git+...`) key
 /// and an upstream-pinned version that must never be rewritten. Local crates —
 /// the consumer's own workspace members and the NIF crate itself — have NO
-/// `source` key and share the workspace version. We bump only those, leaving
-/// every registry/git entry untouched.
+/// `source` key, but can have independent versions. Resolve each from its manifest,
+/// preserving registry/git entries and local packages excluded from discovery. ~keep
 ///
 /// The lockfile is line-oriented and `cargo` rewrites it deterministically, so a
 /// targeted line rewrite (rather than a full TOML re-serialize) preserves the
 /// canonical formatting and avoids reordering. Returns the rewritten content
 /// when at least one local entry changed, else `None`.
-pub(super) fn sync_cargo_lock_path_versions(content: &str, new_version: &str) -> Option<String> {
+pub(super) fn sync_cargo_lock_path_versions(
+    content: &str,
+    versions: &std::collections::HashMap<String, String>,
+) -> Option<String> {
     let mut out = String::with_capacity(content.len());
     let mut changed = false;
 
@@ -906,8 +909,18 @@ pub(super) fn sync_cargo_lock_path_versions(content: &str, new_version: &str) ->
         }
         let is_package = block.first().is_some_and(|l| l.trim() == "[[package]]");
         let has_source = block.iter().any(|l| l.trim_start().starts_with("source = "));
+        let version = block.iter().find_map(|line| {
+            line.trim()
+                .strip_prefix("name = \"")
+                .and_then(|name| name.strip_suffix('"'))
+                .and_then(|name| versions.get(name))
+        });
         for line in block.iter() {
-            if is_package && !has_source && line.trim_start().starts_with("version = ") {
+            if is_package
+                && !has_source
+                && line.trim_start().starts_with("version = ")
+                && let Some(new_version) = version
+            {
                 let indent_len = line.len() - line.trim_start().len();
                 let indent = &line[..indent_len];
                 let rewritten = format!(r#"{indent}version = "{new_version}""#);

@@ -416,9 +416,11 @@ fn sync_elixir_nif_cargo_locks(
 ) -> anyhow::Result<()> {
     let elixir_pkg = config.package_dir(Language::Elixir);
     let nif_lock_glob = format!("{elixir_pkg}/native/*/Cargo.lock");
+    let root = config.workspace_root.clone().unwrap_or(std::env::current_dir()?);
+    let versions = crate::cli::commands::version_manifests::local_cargo_package_versions(&root, version);
     for entry in writable.glob(&nif_lock_glob) {
         if let Ok(content) = std::fs::read_to_string(&entry)
-            && let Some(new_content) = sync_cargo_lock_path_versions(&content, version)
+            && let Some(new_content) = sync_cargo_lock_path_versions(&content, &versions)
         {
             std::fs::write(&entry, &new_content).with_context(|| format!("failed to write {}", entry.display()))?;
             updated.push(entry.to_string_lossy().to_string());

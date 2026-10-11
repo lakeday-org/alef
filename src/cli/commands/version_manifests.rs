@@ -308,6 +308,18 @@ fn dependency_tables(manifest: &toml::Value) -> Vec<&toml::Table> {
     tables
 }
 
+pub(crate) fn local_cargo_package_versions(workspace_root: &Path, canonical: &str) -> HashMap<String, String> {
+    let writable = crate::cli::git::IgnoreFilter::for_root(workspace_root);
+    let root = glob::Pattern::escape(&workspace_root.to_string_lossy());
+    let allowed = writable.glob(&format!("{root}/**/Cargo.toml")).into_iter().collect();
+    cargo_manifest_versions(
+        workspace_root,
+        canonical,
+        &registered_submodule_paths(workspace_root),
+        Some(&allowed),
+    )
+}
+
 fn cargo_manifest_versions(
     workspace_root: &Path,
     canonical: &str,
