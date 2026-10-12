@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Zig snippet validation tests now require the missing-header diagnostic in the include-path
+  negative control, instead of accepting an unrelated unused-variable error in its fixture.
+
 ### Changed
 
 - Generated Elixir NIF crates now use Rustler 0.39. Consumers must retain Cargo's `panic = "unwind"` strategy, which Rustler requires for callback safety.

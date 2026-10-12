@@ -270,7 +270,7 @@ pub(crate) mod tests {
         let include = if with_include {
             "translate_c.addIncludePath(.{ .cwd_relative = ffi_include });\n"
         } else {
-            ""
+            "_ = ffi_include;\n"
         };
         format!(
             "const std = @import(\"std\");\n\
