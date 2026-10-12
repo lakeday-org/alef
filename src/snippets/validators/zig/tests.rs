@@ -290,7 +290,7 @@ fn a_snippet_compiles_against_the_include_path_its_manifest_declares() {
             Some(&declaring_session),
         )
         .expect("declaring session validates");
-    let (omitted_status, _) = ZigValidator
+    let (omitted_status, omitted_output) = ZigValidator
         .validate_in_session(
             &snippet,
             ValidationLevel::Compile,
@@ -308,6 +308,11 @@ fn a_snippet_compiles_against_the_include_path_its_manifest_declares() {
         omitted_status,
         SnippetStatus::Fail,
         "without a declared include directory the header cannot resolve"
+    );
+    let omitted_output = omitted_output.expect("the missing header has a diagnostic");
+    assert!(
+        omitted_output.contains("'fixture.h' not found"),
+        "the negative must fail at header lookup, not before it: {omitted_output}"
     );
     drop((declaring, omitting));
 }
