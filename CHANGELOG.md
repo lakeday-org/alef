@@ -9,8 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Opt-in `legacy_constructor_fields` preserves existing Python positional, Java record and Swift native constructors when defaulted boolean fields are added; Dart named constructors retain those defaults.
-- Opt-in `exception_base` relates generated error families while preserving existing shared typed exception classes and generic catches, with validation for unknown parents, cycles and incompatible shared classes.
+- Opt-in `legacy_constructor_fields` preserves existing Python positional, Java record, Swift native, PHP and WebAssembly constructors when defaulted boolean fields are added; Dart and Zig constructors retain those defaults.
+- Opt-in `exception_base` relates generated error families while preserving shared typed exception classes and generic catches, with validation for unknown parents, cycles and incompatible shared classes.
+
+## [0.110.1] - 2026-10-12
+
+### Changed
+
+- Generated Elixir NIF crates now use Rustler 0.39. Consumers must retain Cargo's `panic = "unwind"` strategy, which Rustler requires for callback safety.
+
+### Fixed
+
+- The generated Ruby `Gemfile` now declares `steep` only on Ruby 3.3 or newer. Steep 2.x needs Ruby 3.3, so the
+  unconditional pin made `bundle install` fail on older Ruby ABIs that a gem build stages first.
 
 ## [0.110.0] - 2026-10-11
 
@@ -21,8 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   custom harness extensions using xUnit v2 APIs must migrate to xUnit v3.
 
 ### Fixed
-
-- Preserve published PHP and WebAssembly positional constructor slots and default annotated Zig extension fields from Rust.
 
 - Split CLI adoption reports, validation diagnostics, extraction deduplication, Swift checksum
   preparation, and TOML merge provenance into focused helpers, removing five lint-debt exemptions.

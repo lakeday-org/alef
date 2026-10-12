@@ -29,9 +29,9 @@ fn surface() -> ApiSurface {
     serde_json::from_value(serde_json::json!({
         "crate_name": "fixture", "version": "0.1.0", "types": [], "functions": [], "enums": [],
         "errors": [
-            {"name": "CrawlError", "rust_path": "fixture::CrawlError", "doc": "", "variants": [
+            {"name": "RequestError", "rust_path": "fixture::RequestError", "doc": "", "variants": [
                 {"name": "TooManyRedirects", "message_template": "loop", "doc": "", "is_unit": true}]},
-            {"name": "SsrfError", "exception_base": "CrawlError", "rust_path": "fixture::SsrfError", "doc": "", "variants": [
+            {"name": "PolicyError", "exception_base": "RequestError", "rust_path": "fixture::PolicyError", "doc": "", "variants": [
                 {"name": "TooManyRedirects", "message_template": "loop", "doc": "", "is_unit": true},
                 {"name": "Denied", "message_template": "denied", "doc": "", "is_unit": true}]}
         ]
@@ -48,11 +48,11 @@ fn generated_python_preserves_both_generic_catches_and_the_specific_class() {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(
-        source.contains("create_exception!(_fixture, SsrfError, CrawlError)"),
+        source.contains("create_exception!(_fixture, PolicyError, RequestError)"),
         "{source}"
     );
     assert!(
-        source.contains("create_exception!(_fixture, TooManyRedirectsError, SsrfError)"),
+        source.contains("create_exception!(_fixture, TooManyRedirectsError, PolicyError)"),
         "{source}"
     );
     assert_eq!(
@@ -67,8 +67,8 @@ fn generated_python_preserves_both_generic_catches_and_the_specific_class() {
         .map(|file| file.content.as_str())
         .collect::<Vec<_>>()
         .join("\n");
-    assert!(stub.contains("class SsrfError(CrawlError): ..."));
-    assert!(stub.contains("class TooManyRedirectsError(SsrfError): ..."));
+    assert!(stub.contains("class PolicyError(RequestError): ..."));
+    assert!(stub.contains("class TooManyRedirectsError(PolicyError): ..."));
 }
 
 #[test]
@@ -82,8 +82,8 @@ fn generated_java_preserves_both_generic_catches_and_the_specific_class() {
             .content
             .as_str()
     };
-    assert!(content("SsrfErrorException.java").contains("extends CrawlErrorException"));
-    assert!(content("TooManyRedirectsException.java").contains("extends SsrfErrorException"));
+    assert!(content("PolicyErrorException.java").contains("extends RequestErrorException"));
+    assert!(content("TooManyRedirectsException.java").contains("extends PolicyErrorException"));
     assert_eq!(
         files
             .iter()
@@ -101,10 +101,10 @@ fn extractor_records_the_opt_in_error_parent() {
         &path,
         r#"
 #[derive(thiserror::Error)]
-pub enum CrawlError { #[error("loop")] TooManyRedirects }
+pub enum RequestError { #[error("loop")] TooManyRedirects }
 #[derive(thiserror::Error)]
-#[cfg_attr(alef, alef(exception_base = "CrawlError"))]
-pub enum SsrfError { #[error("loop")] TooManyRedirects }
+#[cfg_attr(alef, alef(exception_base = "RequestError"))]
+pub enum PolicyError { #[error("loop")] TooManyRedirects }
 "#,
     )
     .unwrap();
@@ -112,11 +112,11 @@ pub enum SsrfError { #[error("loop")] TooManyRedirects }
     assert_eq!(
         api.errors
             .iter()
-            .find(|error| error.name == "SsrfError")
+            .find(|error| error.name == "PolicyError")
             .unwrap()
             .exception_base
             .as_deref(),
-        Some("CrawlError")
+        Some("RequestError")
     );
 }
 
@@ -134,7 +134,7 @@ fn with_bases(bases: serde_json::Value) -> ApiSurface {
 #[test]
 fn unknown_exception_parent_is_rejected_before_emitting_code() {
     let error = Pyo3Backend
-        .generate_bindings(&with_bases(serde_json::json!({"SsrfError": "Missing"})), &config())
+        .generate_bindings(&with_bases(serde_json::json!({"PolicyError": "Missing"})), &config())
         .unwrap_err();
     assert!(error.to_string().contains("unknown exception parent"), "{error}");
 }
@@ -143,7 +143,7 @@ fn unknown_exception_parent_is_rejected_before_emitting_code() {
 fn cyclic_exception_parents_are_rejected_before_emitting_code() {
     let error = JavaBackend
         .generate_bindings(
-            &with_bases(serde_json::json!({"SsrfError": "CrawlError", "CrawlError": "SsrfError"})),
+            &with_bases(serde_json::json!({"PolicyError": "RequestError", "RequestError": "PolicyError"})),
             &config(),
         )
         .unwrap_err();
@@ -186,11 +186,11 @@ fn generated_java_runtime_keeps_legacy_and_new_generic_catches() {
 public class HierarchyProbe {
     public static void main(String[] args) {
         Object legacy = new TooManyRedirectsException("legacy");
-        if (!(legacy instanceof SsrfErrorException)) throw new AssertionError("legacy catch lost");
-        if (!(legacy instanceof CrawlErrorException)) throw new AssertionError("new generic catch lost");
+        if (!(legacy instanceof PolicyErrorException)) throw new AssertionError("legacy catch lost");
+        if (!(legacy instanceof RequestErrorException)) throw new AssertionError("new generic catch lost");
         Object denied = new DeniedException("denied");
-        if (!(denied instanceof SsrfErrorException)) throw new AssertionError("SSRF catch lost");
-        if (!(denied instanceof CrawlErrorException)) throw new AssertionError("root catch lost");
+        if (!(denied instanceof PolicyErrorException)) throw new AssertionError("policy catch lost");
+        if (!(denied instanceof RequestErrorException)) throw new AssertionError("root catch lost");
         System.out.println("HIERARCHY_ASSERTIONS=4");
     }
 }"#,
@@ -224,12 +224,12 @@ for callback in [m.throw_new, m.throw_legacy]:
     try:
         callback()
     except m.TooManyRedirectsError as error:
-        assert isinstance(error, m.SsrfError), 'legacy SsrfError catch lost'
-        assert isinstance(error, m.CrawlError), 'new CrawlError catch lost'
+        assert isinstance(error, m.PolicyError), 'legacy PolicyError catch lost'
+        assert isinstance(error, m.RequestError), 'new RequestError catch lost'
     else:
         raise AssertionError('error converter did not raise')
-assert isinstance(m.DeniedError('denied'), m.SsrfError)
-assert isinstance(m.DeniedError('denied'), m.CrawlError)
+assert isinstance(m.DeniedError('denied'), m.PolicyError)
+assert isinstance(m.DeniedError('denied'), m.RequestError)
 print('HIERARCHY_ASSERTIONS=6')
 "#;
     let output = std::process::Command::new("python3")
@@ -250,12 +250,12 @@ fn write_python_core(core: &std::path::Path) {
     )
     .unwrap();
     std::fs::write(core.join("src/lib.rs"), r#"
-#[derive(Debug)] pub enum CrawlError { TooManyRedirects }
-#[derive(Debug)] pub enum SsrfError { TooManyRedirects, Denied }
-impl std::fmt::Display for CrawlError { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "loop") } }
-impl std::fmt::Display for SsrfError { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "legacy") } }
-pub fn throw_new() -> Result<(), CrawlError> { Err(CrawlError::TooManyRedirects) }
-pub fn throw_legacy() -> Result<(), SsrfError> { Err(SsrfError::TooManyRedirects) }
+#[derive(Debug)] pub enum RequestError { TooManyRedirects }
+#[derive(Debug)] pub enum PolicyError { TooManyRedirects, Denied }
+impl std::fmt::Display for RequestError { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "loop") } }
+impl std::fmt::Display for PolicyError { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "legacy") } }
+pub fn throw_new() -> Result<(), RequestError> { Err(RequestError::TooManyRedirects) }
+pub fn throw_legacy() -> Result<(), PolicyError> { Err(PolicyError::TooManyRedirects) }
 "#).unwrap();
 }
 
@@ -269,7 +269,7 @@ fn write_python_binding(binding: &std::path::Path) {
     )
     .unwrap();
     let mut api = surface();
-    api.functions = [("throw_new", "CrawlError"), ("throw_legacy", "SsrfError")]
+    api.functions = [("throw_new", "RequestError"), ("throw_legacy", "PolicyError")]
         .into_iter()
         .map(|(name, error)| FunctionDef {
             name: name.to_string(),
@@ -321,8 +321,8 @@ fn generated_csharp_preserves_both_generic_catches_and_the_specific_class() {
             .content
             .as_str()
     };
-    assert!(content("SsrfErrorException.cs").contains(": CrawlErrorException"));
-    assert!(content("TooManyRedirectsException.cs").contains(": SsrfErrorException"));
+    assert!(content("PolicyErrorException.cs").contains(": RequestErrorException"));
+    assert!(content("TooManyRedirectsException.cs").contains(": PolicyErrorException"));
     assert_eq!(
         files
             .iter()
@@ -348,8 +348,8 @@ fn an_unannotated_error_keeps_its_original_exception_shape() {
         .map(|file| file.content.as_str())
         .collect::<Vec<_>>()
         .join("\n");
-    assert!(source.contains("create_exception!(_fixture, SsrfError, pyo3::exceptions::PyException)"));
-    assert!(source.contains("create_exception!(_fixture, TooManyRedirectsError, CrawlError)"));
+    assert!(source.contains("create_exception!(_fixture, PolicyError, pyo3::exceptions::PyException)"));
+    assert!(source.contains("create_exception!(_fixture, TooManyRedirectsError, RequestError)"));
 }
 
 #[test]
@@ -383,8 +383,8 @@ fn shared_exception_classes_reject_incompatible_introspection_constructor_layout
         .to_string();
     assert!(
         error.contains("incompatible exception introspection")
-            && error.contains("CrawlError")
-            && error.contains("SsrfError"),
+            && error.contains("RequestError")
+            && error.contains("PolicyError"),
         "{error}"
     );
 }
