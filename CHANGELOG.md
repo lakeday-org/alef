@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generated Kotlin projects use Gradle Versions Plugin 0.66.0, with matching generated-output snapshots.
 - Update the Rust syntax parser dependency to syn 3.0.9 ([#540](https://github.com/xberg-io/alef/pull/540)).
 
+### Fixed
+
+- Elixir native lockfile synchronization resolves each local crate version, including versions inherited from nested or explicitly selected Cargo workspaces, instead of overwriting independent path dependencies with the consumer version.
+
 ## [0.110.1] - 2026-10-12
 
 ### Changed
