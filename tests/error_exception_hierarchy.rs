@@ -349,7 +349,8 @@ fn an_unannotated_error_keeps_its_original_exception_shape() {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(source.contains("create_exception!(_fixture, PolicyError, pyo3::exceptions::PyException)"));
-    assert!(source.contains("create_exception!(_fixture, TooManyRedirectsError, RequestError)"));
+    // ~keep Flat emission is alphabetically first-wins: PolicyError precedes RequestError.
+    assert!(source.contains("create_exception!(_fixture, TooManyRedirectsError, PolicyError)"));
 }
 
 #[test]
