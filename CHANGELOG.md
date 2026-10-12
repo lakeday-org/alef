@@ -9,9 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Elixir native lockfile synchronization uses each local crate's manifest version instead of
-  overwriting independently versioned path dependencies with the consumer workspace version,
-  including crates inheriting versions from nested or explicitly selected Cargo workspaces.
+- Elixir native lockfile synchronization resolves each local crate version, including versions inherited from nested or explicitly selected Cargo workspaces, instead of overwriting independent path dependencies with the consumer version.
+
+## [0.110.1] - 2026-10-12
+
+### Changed
+
+- Generated Elixir NIF crates now use Rustler 0.39. Consumers must retain Cargo's `panic = "unwind"` strategy, which Rustler requires for callback safety.
+
+### Fixed
+
+- The generated Ruby `Gemfile` now declares `steep` only on Ruby 3.3 or newer. Steep 2.x needs Ruby 3.3, so the
+  unconditional pin made `bundle install` fail on older Ruby ABIs that a gem build stages first.
 
 ## [0.110.0] - 2026-10-11
 

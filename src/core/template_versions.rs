@@ -130,7 +130,7 @@ pub mod cargo {
     pub const TEMPFILE: &str = "3";
 
     // renovate: datasource=crate depName=rustler
-    pub const RUSTLER: &str = "0.38";
+    pub const RUSTLER: &str = "0.39";
 
     // renovate: datasource=crate depName=async-trait
     pub const ASYNC_TRAIT: &str = "0.1";
@@ -415,7 +415,7 @@ pub mod maven {
     pub const CENTRAL_PUBLISHING_PLUGIN: &str = "0.11.0";
 
     // renovate: datasource=maven depName=org.codehaus.mojo:versions-maven-plugin
-    pub const VERSIONS_MAVEN_PLUGIN: &str = "2.22.0";
+    pub const VERSIONS_MAVEN_PLUGIN: &str = "2.23.0";
 
     // renovate: datasource=maven depName=org.apache.maven.plugins:maven-enforcer-plugin
     pub const MAVEN_ENFORCER_PLUGIN: &str = "3.6.3";
@@ -640,7 +640,7 @@ pub mod cran {
 }
 
 pub mod precommit {
-    pub const ALEF_REV: &str = "v0.110.0";
+    pub const ALEF_REV: &str = "v0.110.1";
 
     /// Codegen format version — bumped only when output-affecting codegen
     /// changes require all generated files to be re-stamped. Unlike
