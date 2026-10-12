@@ -414,6 +414,7 @@ fn test_generate_docs_with_error_appears_in_lang_page_and_errors_md() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ConversionError".to_string(),
             rust_path: "mylib::ConversionError".to_string(),
             original_rust_path: String::new(),
@@ -495,6 +496,7 @@ fn test_function_with_since_renders_version_badge() {
             binding_excluded: false,
             binding_exclusion_reason: None,
             version: VersionAnnotation {
+                legacy_constructor_fields: Vec::new(),
                 since: Some("0.5.0".to_string()),
                 deprecated: None,
             },
@@ -545,6 +547,7 @@ fn test_function_deprecated_renders_warning_admonition() {
             binding_excluded: false,
             binding_exclusion_reason: None,
             version: VersionAnnotation {
+                legacy_constructor_fields: Vec::new(),
                 since: None,
                 deprecated: Some(DeprecationInfo {
                     since: Some("1.5.0".to_string()),
@@ -614,6 +617,7 @@ fn test_enum_variant_with_since_renders_inline_in_table() {
                     originally_had_data_fields: false,
                     cfg: None,
                     version: VersionAnnotation {
+                        legacy_constructor_fields: Vec::new(),
                         since: Some("0.5.0".to_string()),
                         deprecated: None,
                     },
@@ -632,6 +636,7 @@ fn test_enum_variant_with_since_renders_inline_in_table() {
                     originally_had_data_fields: false,
                     cfg: None,
                     version: VersionAnnotation {
+                        legacy_constructor_fields: Vec::new(),
                         since: None,
                         deprecated: Some(DeprecationInfo {
                             since: Some("0.5.0".to_string()),

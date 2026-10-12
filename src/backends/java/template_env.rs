@@ -2,6 +2,10 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "record_legacy_constructor.jinja",
+        include_str!("templates/record_legacy_constructor.jinja"),
+    ),
+    (
         "java_file_header.jinja",
         include_str!("templates/java_file_header.jinja"),
     ),

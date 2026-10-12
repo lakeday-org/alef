@@ -223,7 +223,16 @@ fn gen_type_init_stub(
         .filter(|f| f.cfg.as_deref().is_none_or(cfg_present_for_pyo3_stub))
         .filter(|f| bridge_field_name != Some(f.name.as_str()))
         .collect();
-    fields.sort_by_key(|f| f.optional as u8);
+    fields.sort_by_key(|f| {
+        (
+            typ.is_constructor_extension(f),
+            f.optional,
+            typ.legacy_constructor_fields()
+                .iter()
+                .position(|name| name == &f.name)
+                .unwrap_or(0),
+        )
+    });
 
     let mut bare_defaulted = vec![false; fields.len()];
     let mut suffix_defaulted = true;
@@ -280,6 +289,10 @@ fn gen_type_init_stub(
             }
         })
         .collect();
+
+    if let Some(index) = fields.iter().position(|field| typ.is_constructor_extension(field)) {
+        params.insert(index, "*".to_owned());
+    }
 
     // the PyO3 `#[new]` constructor accepts an additional `{kwarg_name}: {trait_name} = None`
     if let Some((kwarg_name, type_alias, trait_name)) = options_field_bridges.get(typ.name.as_str()) {

@@ -58,7 +58,19 @@ pub use constructor_param::php_field_can_be_constructor_param;
 
 /// Optionality that may reorder parameters without changing a serde-defaulted field's legacy slot. ~keep
 pub(crate) fn php_field_base_constructor_optional(typ: &TypeDef, field: &FieldDef, serde_available: bool) -> bool {
-    field.optional || (serde_available && typ.has_default && matches!(field.ty, TypeRef::Duration))
+    field.optional
+        || typ.constructor_extension_default(field).is_some()
+        || (serde_available && typ.has_default && matches!(field.ty, TypeRef::Duration))
+}
+
+/// Preserve the backend's published required-first order, then append annotated extensions. ~keep
+pub(crate) fn php_sort_constructor_fields(typ: &TypeDef, fields: &mut [&FieldDef], serde_available: bool) {
+    fields.sort_by_key(|field| {
+        (
+            typ.is_constructor_extension(field),
+            php_field_base_constructor_optional(typ, field, serde_available),
+        )
+    });
 }
 
 /// Return the fields that may be nullable in the final PHP constructor signature.
@@ -553,13 +565,9 @@ fn gen_struct_methods_impl(
                 });
 
             if has_representable_required {
-                // Stable sort ordinary required-before-optional fields to match PHP's parameter-order rule — and,
-                // critically, the PHPStan stub's own `ctor_fields.sort_by_key(...)` (`type_stubs.rs`).
-                // Without this, `new`'s parameter order follows raw field declaration order, which
-                // can interleave optional fields ahead of a later required one (e.g. `BatchObject`'s
-                // `output_file_id`/`error_file_id` precede `created_at`); a caller following the
-                // stub's required-first signature then passes positional args into the wrong runtime
-                // slots. ~keep
+                // PHP's published signature groups required fields first. Annotated additions must follow
+                // its complete prefix, including the optional tail. PHPStan uses the same ordering
+                // so positional callers see the same runtime and stub slots. ~keep
                 let mut ctor_fields: Vec<&FieldDef> = typ
                     .fields
                     .iter()
@@ -574,7 +582,7 @@ fn gen_struct_methods_impl(
                         )
                     })
                     .collect();
-                ctor_fields.sort_by_key(|f| php_field_base_constructor_optional(typ, f, has_serde));
+                php_sort_constructor_fields(typ, &mut ctor_fields, has_serde);
                 let optional_field_names = php_constructor_optional_field_names(typ, &ctor_fields, has_serde);
                 let effective_optional = |f: &FieldDef| optional_field_names.contains(f.name.as_str());
 

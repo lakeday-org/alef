@@ -1,1 +1,4 @@
+{% if constructor_default is not none %}
+    #[frb(default = {{ constructor_default }})]
+{% endif %}
     pub {{ field_name }}: {{ rust_ty }},

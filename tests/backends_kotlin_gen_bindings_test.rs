@@ -380,6 +380,7 @@ fn unit_error_variant_emits_sealed_class() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".into(),
             rust_path: "demo::ApiError".into(),
             original_rust_path: String::new(),
@@ -438,6 +439,7 @@ fn error_variant_with_fields_emits_data_class() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ParseError".into(),
             rust_path: "demo::ParseError".into(),
             original_rust_path: String::new(),
@@ -485,6 +487,7 @@ fn error_sealed_class_with_methods_emits_abstract_properties() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".into(),
             rust_path: "demo::ApiError".into(),
             original_rust_path: String::new(),
@@ -1502,6 +1505,7 @@ fn long_sealed_class_variant_emits_multi_line() {
 
 fn make_error_def(name: &str, variants: Vec<ErrorVariant>) -> ErrorDef {
     ErrorDef {
+        exception_base: None,
         name: name.to_string(),
         rust_path: format!("demo::{name}"),
         original_rust_path: String::new(),

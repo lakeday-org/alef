@@ -40,6 +40,7 @@ fn make_api_with_binding_excluded_error() -> ApiSurface {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".to_string(),
             rust_path: "demo::DemoError".to_string(),
             original_rust_path: String::new(),

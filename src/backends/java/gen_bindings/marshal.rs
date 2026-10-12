@@ -557,6 +557,7 @@ mod typed_error_tests {
     #[test]
     fn helper_maps_taxonomy_code_to_variant_exception() {
         let error = crate::core::ir::ErrorDef {
+            exception_base: None,
             name: "RequestError".to_string(),
             rust_path: "sample::RequestError".to_string(),
             variants: vec![crate::core::ir::ErrorVariant {
@@ -631,6 +632,7 @@ mod typed_error_tests {
     #[test]
     fn every_declared_exception_has_a_unique_reachable_dispatch_arm() {
         let error = crate::core::ir::ErrorDef {
+            exception_base: None,
             name: "RequestError".to_string(),
             rust_path: "sample::RequestError".to_string(),
             variants: vec![

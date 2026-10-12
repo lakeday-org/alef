@@ -249,6 +249,7 @@ fn test_enum_opaque_typedef_carries_doxygen_block() {
 fn test_error_type_with_methods_gets_opaque_typedef_in_cbindgen_toml() {
     let mut api = sample_api();
     api.errors.push(ErrorDef {
+        exception_base: None,
         name: "GraphQLError".to_string(),
         rust_path: "my_lib::GraphQLError".to_string(),
         original_rust_path: String::new(),
@@ -320,6 +321,7 @@ fn test_error_type_with_methods_gets_opaque_typedef_in_cbindgen_toml() {
 fn test_error_accessor_symbol_matches_c_consumer_method_symbol() {
     let mut api = sample_api();
     api.errors.push(ErrorDef {
+        exception_base: None,
         name: "GraphQLError".to_string(),
         rust_path: "my_lib::GraphQLError".to_string(),
         original_rust_path: String::new(),
@@ -386,6 +388,7 @@ fn test_error_accessor_symbol_matches_c_consumer_method_symbol() {
 fn test_error_accessor_symbol_unchanged_for_non_acronym_error_name() {
     let mut api = sample_api();
     api.errors.push(ErrorDef {
+        exception_base: None,
         name: "ConversionError".to_string(),
         rust_path: "my_lib::ConversionError".to_string(),
         original_rust_path: String::new(),
@@ -422,6 +425,7 @@ fn test_error_accessor_symbol_unchanged_for_non_acronym_error_name() {
 fn test_error_type_without_methods_does_not_get_typedef_in_cbindgen_toml() {
     let mut api = sample_api();
     api.errors.push(ErrorDef {
+        exception_base: None,
         name: "SilentError".to_string(),
         rust_path: "my_lib::SilentError".to_string(),
         original_rust_path: String::new(),

@@ -818,6 +818,7 @@ fn test_error_types() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ValidationError".to_string(),
             rust_path: "test_lib::ValidationError".to_string(),
             original_rust_path: String::new(),
@@ -4746,6 +4747,7 @@ fn test_opaque_async_method_with_vec_named_ref_param() {
         }],
         functions: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "Error".to_string(),
             rust_path: "test_lib::Error".to_string(),
             original_rust_path: String::new(),

@@ -59,6 +59,7 @@ fn streaming_literal_error_messages_retain_the_escaped_predicate() {
 #[test]
 fn streaming_known_variants_record_identity_and_status_gaps() {
     let errors = vec![ErrorDef {
+        exception_base: None,
         name: "ApiError".into(),
         variants: vec![ErrorVariant {
             name: "Authentication".into(),

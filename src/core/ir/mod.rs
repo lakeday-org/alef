@@ -20,3 +20,6 @@ pub use service::{
 };
 pub use surface::{ApiSurface, UnresolvedModuleDeclaration, UnsupportedPublicItem, cfg_feature_satisfied};
 pub use type_ref::{PrimitiveType, TypeRef};
+
+mod constructor_history;
+pub(crate) use constructor_history::validate_constructor_history;

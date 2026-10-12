@@ -171,6 +171,7 @@ fn test_error_types() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ProcessError".to_string(),
             rust_path: "test_lib::ProcessError".to_string(),
             original_rust_path: String::new(),
@@ -281,6 +282,7 @@ fn test_async_function() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "FetchError".to_string(),
             rust_path: "test_lib::FetchError".to_string(),
             original_rust_path: String::new(),
@@ -389,6 +391,7 @@ fn test_cfg_gated_async_function() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "EmbedError".to_string(),
             rust_path: "test_lib::EmbedError".to_string(),
             original_rust_path: String::new(),

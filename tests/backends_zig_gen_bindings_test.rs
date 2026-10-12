@@ -447,6 +447,7 @@ fn result_function_checks_last_error_code() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -693,6 +694,7 @@ fn error_set_emits_zig_error_with_pascal_case_tags() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -804,6 +806,7 @@ fn opaque_handle_with_no_methods_is_emitted() {
         functions: vec![get_language_fn],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -944,6 +947,7 @@ fn bool_return_in_error_union_emits_not_zero_conversion() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -1088,6 +1092,7 @@ fn error_set_includes_out_of_memory_and_return_type_is_single_error_set() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -1166,6 +1171,7 @@ fn demo_api_with_error_codes(codes: Option<(u32, u32)>) -> ApiSurface {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -1318,6 +1324,7 @@ fn string_param_fallible_defers_free_after_c_call() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -1745,6 +1752,7 @@ type = "CrawlStreamRequest"
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -1947,6 +1955,7 @@ type = "CrawlStreamRequest"
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -2130,6 +2139,7 @@ type = "BatchCrawlStreamRequest"
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),

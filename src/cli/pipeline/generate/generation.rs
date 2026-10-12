@@ -463,6 +463,7 @@ mod tests {
                 ..Default::default()
             }],
             errors: vec![crate::core::ir::ErrorDef {
+                exception_base: None,
                 name: "RustOnlyError".to_string(),
                 rust_path: "crate::RustOnlyError".to_string(),
                 original_rust_path: String::new(),
@@ -1049,6 +1050,7 @@ module_name = "test_lib"
                 },
             ],
             errors: vec![ErrorDef {
+                exception_base: None,
                 name: "ComponentError".to_string(),
                 rust_path: "hostlib::ComponentError".to_string(),
                 original_rust_path: String::new(),

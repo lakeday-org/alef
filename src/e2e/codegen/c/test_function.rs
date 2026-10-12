@@ -1761,6 +1761,7 @@ mod declared_error_variant_tests {
 
     fn error_def_with(variant_name: &str, error_code: Option<u32>) -> Vec<ErrorDef> {
         vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "lib::ApiError".to_string(),
             original_rust_path: String::new(),

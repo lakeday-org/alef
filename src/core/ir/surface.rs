@@ -552,6 +552,7 @@ mod tests {
         format.methods = vec![method("all", None), method("from_mime", Some("feature = \"mime\""))];
 
         let error = ErrorDef {
+            exception_base: None,
             name: "ClientError".to_string(),
             rust_path: "mylib::ClientError".to_string(),
             original_rust_path: String::new(),

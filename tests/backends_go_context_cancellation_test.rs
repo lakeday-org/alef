@@ -495,6 +495,7 @@ fn api() -> ApiSurface {
             ..FunctionDef::default()
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "CtxtestError".to_string(),
             rust_path: "test_lib::CtxtestError".to_string(),
             variants: vec![ErrorVariant {

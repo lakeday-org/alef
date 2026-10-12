@@ -321,6 +321,7 @@ fn fixture_api() -> ApiSurface {
             },
         ],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "HostError".to_string(),
             rust_path: "hostlib::HostError".to_string(),
             original_rust_path: String::new(),

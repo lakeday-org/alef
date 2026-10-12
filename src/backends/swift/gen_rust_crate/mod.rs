@@ -104,6 +104,10 @@ pub fn emit(api: &ApiSurface, config: &ResolvedCrateConfig) -> anyhow::Result<Ve
         .as_ref()
         .map(|c| c.exclude_fields.iter().cloned().collect())
         .unwrap_or_default();
+    let configured_features: HashSet<&str> = features.iter().map(String::as_str).collect();
+    for typ in api.types.iter().filter(|typ| !exclude_types.contains(&typ.name)) {
+        extern_block::validate_legacy_constructor_fields(typ, &exclude_fields, &configured_features)?;
+    }
     let license = config
         .scaffold
         .as_ref()

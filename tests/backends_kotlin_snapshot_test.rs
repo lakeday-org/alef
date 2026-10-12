@@ -170,6 +170,7 @@ fn make_basic_api() -> ApiSurface {
             version: Default::default(),
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".to_string(),
             rust_path: "demo::DemoError".to_string(),
             original_rust_path: String::new(),

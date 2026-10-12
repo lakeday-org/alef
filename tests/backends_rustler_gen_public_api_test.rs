@@ -1548,6 +1548,7 @@ fn test_wrapper_module_doc_uses_full_first_paragraph_summary() {
 
 fn make_error_with_methods() -> ErrorDef {
     ErrorDef {
+        exception_base: None,
         name: "DemoError".into(),
         rust_path: "demo::DemoError".into(),
         original_rust_path: String::new(),

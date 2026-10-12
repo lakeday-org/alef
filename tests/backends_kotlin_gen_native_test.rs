@@ -370,6 +370,7 @@ fn native_fallible_function_checks_error_code() {
         )],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".to_string(),
             rust_path: "demo::DemoError".to_string(),
             original_rust_path: String::new(),

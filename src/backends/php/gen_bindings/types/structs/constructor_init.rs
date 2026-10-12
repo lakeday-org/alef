@@ -304,6 +304,13 @@ pub(crate) fn gen_constructor_field_inits(
         }
         if php_field_can_be_constructor_param(&field.ty, enum_names, opaque_types, untagged_data_enum_names) {
             let php_param_name = crate::codegen::naming::to_php_name(&field.name);
+            if let Some(default) = typ.constructor_extension_default(field) {
+                field_inits.push(crate::backends::php::template_env::render(
+                    "php_constructor_extension_init.jinja",
+                    crate::alef_context! { field => &field.name, parameter => &php_param_name, default => default.to_string() },
+                ).trim_end().to_string());
+                continue;
+            }
             field_inits.push(representable_field_init(
                 &typ.name,
                 field,

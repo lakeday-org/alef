@@ -476,6 +476,7 @@ fn test_exception_stubs() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "LibError".to_string(),
             rust_path: "test_lib::LibError".to_string(),
             original_rust_path: String::new(),

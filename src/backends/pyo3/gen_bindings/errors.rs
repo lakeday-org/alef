@@ -552,6 +552,7 @@ mod tests {
         use crate::core::ir::{ErrorDef, ErrorVariant};
 
         let error = ErrorDef {
+            exception_base: None,
             name: "LibError".to_string(),
             rust_path: "lib::LibError".to_string(),
             original_rust_path: String::new(),
@@ -654,6 +655,7 @@ mod tests {
             doc: String::new(),
         };
         let make_error = |name: &str, variants: Vec<&str>| ErrorDef {
+            exception_base: None,
             name: name.to_string(),
             rust_path: format!("lib::{name}"),
             original_rust_path: String::new(),
@@ -810,6 +812,7 @@ mod tests {
 
         let mut api = empty_api();
         api.errors.push(ErrorDef {
+            exception_base: None,
             name: "LiterLlmError".to_string(),
             rust_path: "liter_llm::LiterLlmError".to_string(),
             original_rust_path: String::new(),
@@ -880,6 +883,7 @@ mod tests {
 
         let mut api = empty_api();
         api.errors.push(ErrorDef {
+            exception_base: None,
             name: "PlainError".to_string(),
             rust_path: "lib::PlainError".to_string(),
             original_rust_path: String::new(),

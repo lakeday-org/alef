@@ -82,6 +82,7 @@ pub(crate) fn emit_mirror_struct(out: &mut String, ty: &TypeDef, source_crate_na
             crate::alef_context! {
                 field_name => field.name.as_str(),
                 rust_ty => rust_ty,
+                constructor_default => ty.constructor_extension_default(field).map(|value| value.to_string()),
             },
         ));
     }
@@ -584,6 +585,7 @@ mod tests {
 
     fn duration_error(return_type: TypeRef) -> ErrorDef {
         ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "demo::ApiError".to_string(),
             original_rust_path: String::new(),

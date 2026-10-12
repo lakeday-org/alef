@@ -639,6 +639,7 @@ mod tests {
                 version: Default::default(),
             }],
             errors: vec![ErrorDef {
+                exception_base: None,
                 name: "Error".to_string(),
                 rust_path: "sample::Error".to_string(),
                 original_rust_path: String::new(),

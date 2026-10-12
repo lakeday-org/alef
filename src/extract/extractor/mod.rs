@@ -168,6 +168,8 @@ pub fn extract(
 
     paths::validate_no_private_path_leaks(&surface, crate_name, &private_module_paths)?;
 
+    crate::core::ir::validate_constructor_history(&surface)?;
+    crate::codegen::error_gen::validate_exception_hierarchy(&surface)?;
     Ok(surface)
 }
 
@@ -294,6 +296,8 @@ fn extract_items(
                     continue;
                 }
                 if let Some((mut td, serde_defaults)) = extract_struct(item_struct, crate_name, module_path) {
+                    td.version.legacy_constructor_fields =
+                        helpers::extract_legacy_constructor_fields(&item_struct.attrs)?;
                     defaults::fold_constant_default_functions(
                         &mut td.fields,
                         &free_functions,
@@ -320,7 +324,8 @@ fn extract_items(
                     continue;
                 }
                 if is_thiserror_enum(&item_enum.attrs) {
-                    if let Some(ed) = extract_error_enum(item_enum, crate_name, module_path) {
+                    if let Some(mut ed) = extract_error_enum(item_enum, crate_name, module_path) {
+                        ed.exception_base = helpers::extract_exception_base(&item_enum.attrs)?;
                         surface.errors.push(ed);
                     }
                 } else if let Some(ed) = extract_enum(item_enum, crate_name, module_path) {

@@ -625,6 +625,7 @@ mod declared_error_value_check_tests {
 
     fn error_def_with(variant_name: &str, error_code: Option<u32>) -> Vec<ErrorDef> {
         vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "lib::ApiError".to_string(),
             original_rust_path: String::new(),
@@ -925,6 +926,7 @@ mod dropped_field_marker_tests {
         };
         let config = crate::core::config::ResolvedCrateConfig::default();
         let errors = vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "lib::ApiError".to_string(),
             original_rust_path: String::new(),

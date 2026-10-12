@@ -227,6 +227,7 @@ mod tests {
             ..Default::default()
         }];
         let errors = [ErrorDef {
+            exception_base: None,
             name: "TreeSitterError".into(),
             rust_path,
             original_rust_path: String::new(),

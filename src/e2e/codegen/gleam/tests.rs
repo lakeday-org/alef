@@ -548,6 +548,7 @@ fn gleam_a_lone_error_assertion_renders_no_marker() {
 
 fn coded_authentication_variant() -> Vec<crate::core::ir::ErrorDef> {
     vec![crate::core::ir::ErrorDef {
+        exception_base: None,
         name: "ApiError".to_string(),
         rust_path: "lib::ApiError".to_string(),
         original_rust_path: String::new(),

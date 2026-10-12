@@ -745,12 +745,17 @@ impl Backend for Pyo3Backend {
 
         let module_name = config.python_module_name();
         let mut seen_exceptions = AHashSet::new();
-        for error in &api.errors {
-            builder.add_item(&crate::codegen::error_gen::gen_pyo3_error_types(
-                error,
+        for family in
+            crate::codegen::error_gen::exception_families(api, crate::codegen::error_gen::ExceptionNaming::Python)?
+        {
+            builder.add_item(&crate::codegen::error_gen::gen_pyo3_error_types_with_parent(
+                &family.error,
                 &module_name,
                 &mut seen_exceptions,
+                family.parent.as_deref(),
             ));
+        }
+        for error in &api.errors {
             builder.add_item(&crate::codegen::error_gen::gen_pyo3_error_converter(
                 error,
                 &core_import,

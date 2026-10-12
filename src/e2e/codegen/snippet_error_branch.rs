@@ -132,6 +132,7 @@ mod tests {
 
     fn errors_with(variants: Vec<ErrorVariant>) -> Vec<ErrorDef> {
         vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "lib::ApiError".to_string(),
             original_rust_path: String::new(),

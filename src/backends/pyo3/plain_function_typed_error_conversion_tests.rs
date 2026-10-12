@@ -50,6 +50,7 @@ fn surface() -> ApiSurface {
         crate_name: "test-lib".to_string(),
         version: "0.1.0".to_string(),
         errors: vec![ErrorDef {
+            exception_base: None,
             name: ERROR_NAME.to_string(),
             rust_path: format!("test_lib::{ERROR_NAME}"),
             original_rust_path: String::new(),

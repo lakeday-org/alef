@@ -326,6 +326,7 @@ mod tests {
 
     fn error(name: &str, variants: Vec<ErrorVariant>) -> ErrorDef {
         ErrorDef {
+            exception_base: None,
             name: name.to_string(),
             rust_path: format!("lib::{name}"),
             original_rust_path: String::new(),

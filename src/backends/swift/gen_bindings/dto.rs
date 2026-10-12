@@ -751,6 +751,7 @@ pub(super) fn emit_into_rust_direct_call(
         "swift_bridge_constructor_return.swift.jinja",
         crate::alef_context! {
             type_name => type_name,
+            constructor_suffix => if ty.legacy_constructor_fields().is_empty() { "" } else { ".new_with_fields" },
             args => args.join(", "),
         },
     ));

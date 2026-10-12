@@ -10,6 +10,6 @@ pub(crate) use enums::{
 #[allow(unused_imports)]
 pub(crate) use structs::{
     gen_opaque_struct_methods_with_exclude, gen_php_struct, gen_struct_methods, php_constructor_optional_field_names,
-    php_field_base_constructor_optional, ty_is_or_wraps_json,
+    php_sort_constructor_fields, ty_is_or_wraps_json,
 };
 pub use structs::{gen_struct_methods_with_exclude, is_php_prop_scalar, php_field_can_be_constructor_param};

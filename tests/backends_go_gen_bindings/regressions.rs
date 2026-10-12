@@ -390,6 +390,7 @@ fn test_opaque_error_type_uses_value_semantics() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "GraphQLError".to_string(),
             rust_path: "test_lib::GraphQLError".to_string(),
             original_rust_path: String::new(),

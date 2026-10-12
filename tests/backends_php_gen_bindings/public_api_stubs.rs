@@ -5,6 +5,7 @@ fn test_multiple_types_with_shared_error() {
     let backend = PhpBackend;
 
     let shared_error = ErrorDef {
+        exception_base: None,
         name: "SharedError".to_string(),
         rust_path: "test_lib::SharedError".to_string(),
         original_rust_path: String::new(),

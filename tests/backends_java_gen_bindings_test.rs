@@ -953,6 +953,7 @@ fn test_duplicate_error_variant_exception_classes_are_emitted_once() {
         enums: vec![],
         errors: vec![
             ErrorDef {
+                exception_base: None,
                 name: "GraphQLError".to_string(),
                 rust_path: "test_lib::GraphQLError".to_string(),
                 original_rust_path: String::new(),
@@ -964,6 +965,7 @@ fn test_duplicate_error_variant_exception_classes_are_emitted_once() {
                 version: Default::default(),
             },
             ErrorDef {
+                exception_base: None,
                 name: "SchemaError".to_string(),
                 rust_path: "test_lib::SchemaError".to_string(),
                 original_rust_path: String::new(),
@@ -1663,6 +1665,7 @@ fn test_tagged_union_newtype_variants_produce_valid_java() {
             version: Default::default(),
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "Error".to_string(),
             rust_path: "test_lib::Error".to_string(),
             original_rust_path: String::new(),
@@ -5355,6 +5358,7 @@ fn every_single_string_super_call_has_a_matching_parent_constructor() {
             ..Default::default()
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "XbergError".to_string(),
             rust_path: "test_lib::XbergError".to_string(),
             variants: vec![ErrorVariant {

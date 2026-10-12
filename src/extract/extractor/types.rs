@@ -376,6 +376,7 @@ pub(crate) fn extract_error_enum(item: &syn::ItemEnum, crate_name: &str, module_
         .collect();
 
     Some(ErrorDef {
+        exception_base: None,
         name,
         rust_path,
         original_rust_path: String::new(),

@@ -1,3 +1,5 @@
+mod hierarchy;
+pub use hierarchy::{ExceptionNaming, exception_families, validate_exception_hierarchy};
 mod host_langs;
 mod last_error_fields;
 mod napi_wasm;
@@ -11,7 +13,7 @@ pub(crate) use host_langs::{
 };
 pub use host_langs::{
     GoErrorMethodField, gen_csharp_error_types, gen_go_error_struct, gen_go_error_types, gen_go_sentinel_errors,
-    gen_java_error_types, go_error_method_fields, go_error_sentinel_name,
+    gen_java_error_types, gen_java_error_types_with_parent, go_error_method_fields, go_error_sentinel_name,
 };
 pub use last_error_fields::{LastErrorField, LastErrorFieldKind, last_error_field_kind, last_error_fields};
 pub use napi_wasm::{
@@ -25,8 +27,8 @@ pub use native::{
 };
 pub use pyo3::{
     converter_fn_name, gen_pyo3_error_converter, gen_pyo3_error_methods_impl, gen_pyo3_error_registration,
-    gen_pyo3_error_types, pyo3_error_has_methods, pyo3_error_info_field_specs, pyo3_error_info_fn_name,
-    pyo3_error_info_struct_name,
+    gen_pyo3_error_types, gen_pyo3_error_types_with_parent, pyo3_error_has_methods, pyo3_error_info_field_specs,
+    pyo3_error_info_fn_name, pyo3_error_info_struct_name,
 };
 pub use shared::{acronym_aware_snake_phrase, python_exception_name, strip_thiserror_placeholders};
 

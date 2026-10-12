@@ -109,6 +109,7 @@ fn render_function() -> FunctionDef {
 
 fn conversion_error() -> ErrorDef {
     ErrorDef {
+        exception_base: None,
         name: "ConversionError".to_string(),
         rust_path: "test_lib::ConversionError".to_string(),
         original_rust_path: String::new(),

@@ -27,7 +27,9 @@ pub(crate) fn emit_type(ty: &TypeDef, enums: &[EnumDef], config: &ResolvedCrateC
     for field in binding_fields(&ty.fields) {
         emit_cleaned_zig_doc(out, &field.doc, "    ");
         let ty_str = zig_field_type(&field.ty, field.optional);
-        let field_default = zig_field_default(field, enums);
+        let field_default = ty
+            .constructor_extension_default(field)
+            .map_or_else(|| zig_field_default(field, enums), |value| format!(" = {value}"));
         out.push_str(&crate::backends::zig::template_env::render(
             "type_field.jinja",
             crate::alef_context! {

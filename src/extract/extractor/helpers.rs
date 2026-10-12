@@ -1,4 +1,5 @@
 mod attributes;
+mod compatibility;
 mod enum_variants;
 mod field_types;
 mod fields;
@@ -17,6 +18,7 @@ pub(crate) use attributes::{
     has_field_attr, has_path_attribute, has_serde_untagged, is_pub, is_test_gated, is_thiserror_enum,
     parse_alef_transparent_string,
 };
+pub(crate) use compatibility::{extract_exception_base, extract_legacy_constructor_fields};
 pub(crate) use enum_variants::extract_enum_variant;
 pub(crate) use field_types::{
     build_rust_path, detect_core_wrapper, extract_field_type_rust_path, syn_type_is_boxed, unwrap_optional,

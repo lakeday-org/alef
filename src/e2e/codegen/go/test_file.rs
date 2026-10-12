@@ -385,6 +385,7 @@ mod fmt_import_tests {
 
         let fixture = error_fixture(Some(serde_json::Value::String("Authentication".to_string())));
         let errors = vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "lib::ApiError".to_string(),
             original_rust_path: String::new(),
@@ -411,6 +412,7 @@ mod fmt_import_tests {
 
         let fixture = error_fixture(Some(serde_json::Value::String("Authentication".to_string())));
         let errors = vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "lib::ApiError".to_string(),
             original_rust_path: String::new(),

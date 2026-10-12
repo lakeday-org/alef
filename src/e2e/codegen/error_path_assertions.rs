@@ -202,6 +202,7 @@ mod tests {
 
     fn error_def_with_methods(name: &str, method_names: &[&str]) -> crate::core::ir::ErrorDef {
         crate::core::ir::ErrorDef {
+            exception_base: None,
             name: name.to_string(),
             rust_path: format!("demo::{name}"),
             original_rust_path: String::new(),

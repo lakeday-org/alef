@@ -131,7 +131,8 @@ fn external_string_union_default_constructs_the_nested_unit_record() {
         &enum_defaults,
         &sealed_interfaces,
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
 
     assert!(emitted.contains("new OutputFormat.Plain()"), "got:\n{emitted}");
     assert!(!emitted.contains("OutputFormat.PLAIN"), "got:\n{emitted}");

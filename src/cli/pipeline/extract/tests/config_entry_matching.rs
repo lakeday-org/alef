@@ -224,6 +224,7 @@ fn unmatched_exclude_entries_stays_silent_when_every_entry_matches() {
 /// would be the wrong trade. Build the two fields these tests care about explicitly. ~keep
 fn make_errordef(name: &str, rust_path: &str) -> crate::core::ir::ErrorDef {
     crate::core::ir::ErrorDef {
+        exception_base: None,
         name: name.to_string(),
         rust_path: rust_path.to_string(),
         original_rust_path: String::new(),

@@ -233,6 +233,7 @@ fn typed_error_surface() -> (ApiSurface, ResolvedCrateConfig, HashMap<String, Ho
         // `PanicException`), which already extend the method exception, so the divergent-base
         // defect this file exists to catch (#454) was structurally unreachable. ~keep
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "SampleError".to_string(),
             rust_path: "sample::SampleError".to_string(),
             original_rust_path: String::new(),

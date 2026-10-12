@@ -656,6 +656,9 @@ pub struct EnumVariant {
 /// An error type (enum used in Result<T, E>).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorDef {
+    /// Opt-in generated exception parent from `alef(exception_base = "Parent")`. ~keep
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exception_base: Option<String>,
     pub name: String,
     pub rust_path: String,
     #[serde(default)]
@@ -1005,6 +1008,7 @@ mod tests {
     #[allow(dead_code)]
     fn error_def_field_coverage_witness(value: ErrorDef) {
         let ErrorDef {
+            exception_base: _,           // generated exception hierarchy metadata ~keep
             name: _,                     // identifier; every backend reads it directly
             rust_path: _,                // qualified path for From/Into codegen
             original_rust_path: _,       // From-impl target when core_import re-exports

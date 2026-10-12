@@ -431,6 +431,7 @@ mod tests {
 
     fn error_def_with_variant(error_name: &str, variant_name: &str) -> crate::core::ir::ErrorDef {
         crate::core::ir::ErrorDef {
+            exception_base: None,
             name: error_name.to_string(),
             rust_path: format!("lib::{error_name}"),
             original_rust_path: String::new(),
@@ -478,6 +479,7 @@ mod tests {
 
     fn error_def_with_status_code() -> crate::core::ir::ErrorDef {
         crate::core::ir::ErrorDef {
+            exception_base: None,
             name: "SampleError".to_string(),
             rust_path: "sample_llm::SampleError".to_string(),
             original_rust_path: String::new(),
@@ -519,6 +521,7 @@ mod tests {
     /// -correct changes have to compose in one `ErrorDef`.
     fn error_def_with_variant_and_status_code(error_name: &str, variant_name: &str) -> crate::core::ir::ErrorDef {
         crate::core::ir::ErrorDef {
+            exception_base: None,
             name: error_name.to_string(),
             rust_path: format!("lib::{error_name}"),
             original_rust_path: String::new(),

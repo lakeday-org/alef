@@ -100,6 +100,7 @@ fn render_binding(typ: &TypeDef) -> String {
         &AHashSet::new(),
         &HashSet::new(),
     )
+    .expect("valid record constructor")
 }
 
 /// A minimal, fully-populated fixture (`Fixture` has no `Default` impl) asserting `equals:

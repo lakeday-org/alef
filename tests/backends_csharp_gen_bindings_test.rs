@@ -809,6 +809,7 @@ fn test_fallible_unit_opaque_method_checks_last_error_code() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "SessionError".to_string(),
             rust_path: "test::SessionError".to_string(),
             original_rust_path: String::new(),
@@ -853,6 +854,7 @@ fn test_error_class_doc_strips_rust_idioms_and_sections() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "GraphQLError".to_string(),
             rust_path: "test::GraphQLError".to_string(),
             original_rust_path: String::new(),
@@ -1450,6 +1452,7 @@ fn test_duplicate_variant_names_across_error_enums_do_not_corrupt_files() {
         enums: vec![],
         errors: vec![
             ErrorDef {
+                exception_base: None,
                 name: "GraphQLError".to_string(),
                 rust_path: "sample_router::GraphQLError".to_string(),
                 original_rust_path: String::new(),
@@ -1472,6 +1475,7 @@ fn test_duplicate_variant_names_across_error_enums_do_not_corrupt_files() {
                 version: Default::default(),
             },
             ErrorDef {
+                exception_base: None,
                 name: "SchemaError".to_string(),
                 rust_path: "sample_router::SchemaError".to_string(),
                 original_rust_path: String::new(),
@@ -3709,6 +3713,7 @@ fn test_receiver_selfhandle_freed_on_named_param_failure() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "SomeError".to_string(),
             rust_path: "test::SomeError".to_string(),
             original_rust_path: String::new(),

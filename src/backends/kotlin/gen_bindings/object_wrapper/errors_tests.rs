@@ -12,6 +12,7 @@ fn field(name: &str, sensitive: bool) -> FieldDef {
 
 fn error_with(template: &str, fields: Vec<FieldDef>) -> ErrorDef {
     ErrorDef {
+        exception_base: None,
         name: "AuthError".to_string(),
         rust_path: "core::AuthError".to_string(),
         original_rust_path: String::new(),

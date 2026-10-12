@@ -345,6 +345,7 @@ mod render_r_error_check_tests {
 
     fn coded_variant(name: &str) -> Vec<ErrorDef> {
         vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "lib::ApiError".to_string(),
             original_rust_path: String::new(),

@@ -159,6 +159,7 @@ pub fn opaque_source() -> String {
 
 pub fn error_facade() -> (String, u32) {
     let error = ErrorDef {
+        exception_base: None,
         name: "RequestError".into(),
         rust_path: "test_lib::RequestError".into(),
         variants: vec![ErrorVariant {

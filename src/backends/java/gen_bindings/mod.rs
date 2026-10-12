@@ -403,7 +403,7 @@ impl Backend for JavaBackend {
                         &enum_defaults,
                         &sealed_interface_names,
                         &visible_type_names,
-                    ),
+                    )?,
                     generated_header: true,
                 });
             }
@@ -496,8 +496,15 @@ impl Backend for JavaBackend {
             .map(|(class_name, _code, _doc)| *class_name)
             .collect();
         let mut emitted_exception_names: AHashSet<String> = AHashSet::new();
-        for error in &api.errors {
-            for (class_name, content) in crate::codegen::error_gen::gen_java_error_types(error, &package, &main_class) {
+        for family in
+            crate::codegen::error_gen::exception_families(api, crate::codegen::error_gen::ExceptionNaming::Nominal)?
+        {
+            for (class_name, content) in crate::codegen::error_gen::gen_java_error_types_with_parent(
+                &family.error,
+                &package,
+                &main_class,
+                family.parent.as_deref(),
+            ) {
                 if infrastructure_exception_names.contains(class_name.as_str()) {
                     continue;
                 }

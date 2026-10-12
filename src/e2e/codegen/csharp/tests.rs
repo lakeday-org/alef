@@ -432,6 +432,7 @@ fn declared_error_value_check_skips_a_known_variant_c_sharp_cannot_substantiate(
 
     let fixture = fixture_with_declared_error("Authentication");
     let errors = vec![ErrorDef {
+        exception_base: None,
         name: "ApiError".to_string(),
         rust_path: "lib::ApiError".to_string(),
         original_rust_path: String::new(),

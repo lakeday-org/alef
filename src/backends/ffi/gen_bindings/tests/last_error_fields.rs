@@ -32,6 +32,7 @@ fn method(name: &str, return_type: TypeRef) -> MethodDef {
 fn sample_api() -> ApiSurface {
     ApiSurface {
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "SampleError".to_string(),
             rust_path: "sample::SampleError".to_string(),
             original_rust_path: String::new(),

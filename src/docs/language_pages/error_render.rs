@@ -118,6 +118,7 @@ mod tests {
 
     fn make_error(name: &str, variant_names: &[&str]) -> ErrorDef {
         ErrorDef {
+            exception_base: None,
             name: name.to_string(),
             rust_path: format!("mylib::{name}"),
             original_rust_path: String::new(),

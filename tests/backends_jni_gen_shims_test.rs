@@ -225,6 +225,7 @@ fn make_demo_api() -> ApiSurface {
             version: Default::default(),
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".to_string(),
             rust_path: "demo::DemoError".to_string(),
             original_rust_path: String::new(),
@@ -828,6 +829,7 @@ fn real_ir_shape_optional_ref_result_async() {
         functions: vec![create_client, unregister_fn],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".to_string(),
             rust_path: "demo::DemoError".to_string(),
             original_rust_path: String::new(),

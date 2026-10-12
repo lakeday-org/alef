@@ -1,1 +1,4 @@
-        fn new({{ params }}) -> {{ return_type }};
+{% if associated_type %}
+        #[swift_bridge(associated_to = {{ associated_type }})]
+{% endif %}
+        fn {{ constructor_name }}({{ params }}) -> {{ return_type }};

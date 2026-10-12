@@ -107,6 +107,7 @@ fn render_impl_default_record(typ: &TypeDef) -> String {
         &AHashSet::default(),
         &HashSet::default(),
     )
+    .expect("valid record constructor")
 }
 
 /// The defect: a `f32` field carrying a `0.7` default from `impl Default` was emitted as an
@@ -379,7 +380,8 @@ fn unresolved_default_wins_over_a_serde_default_enum_lookup() {
         &enum_defaults,
         &AHashSet::default(),
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
 
     assert!(
         !out.contains("Mode.Fast"),

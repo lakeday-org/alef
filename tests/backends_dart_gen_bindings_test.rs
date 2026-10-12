@@ -1143,6 +1143,7 @@ fn error_type_emits_sealed_class_hierarchy() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".into(),
             rust_path: "demo::ApiError".into(),
             original_rust_path: String::new(),
@@ -2084,6 +2085,7 @@ fn error_message_template_strips_placeholders_and_escapes_special_chars() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "PluginError".into(),
             rust_path: "demo::PluginError".into(),
             original_rust_path: String::new(),

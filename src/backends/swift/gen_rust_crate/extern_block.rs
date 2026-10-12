@@ -122,30 +122,50 @@ pub(crate) fn emit_extern_block_for_type(
         has_constructor_extern(ty, exclude_fields, configured_features, enum_kinds, parent_first_class);
 
     if emit_constructor {
-        let params: Vec<String> = constructor_fields
-            .iter()
-            .map(|f| {
-                let bridge_ty = bridge_type(&f.ty);
-                let bridge_ty = if f.optional && !needs_json_bridge(&f.ty) {
-                    format!("Option<{bridge_ty}>")
-                } else {
-                    bridge_ty
-                };
-                let name = swift_ident(&f.name.to_snake_case());
-                format!("{name}: {bridge_ty}")
-            })
-            .collect();
-        block.push_str(&crate::backends::swift::template_env::render(
-            "extern_init_attr.jinja",
-            crate::alef_context! {},
-        ));
-        block.push_str(&crate::backends::swift::template_env::render(
-            "extern_fn_new.jinja",
-            crate::alef_context! {
-                params => params.join(", "),
-                return_type => &ty.name,
-            },
-        ));
+        let mut constructors = vec![("new", constructor_fields.clone())];
+        if !ty.legacy_constructor_fields().is_empty() {
+            constructors[0].1 = ty
+                .legacy_constructor_fields()
+                .iter()
+                .map(|name| {
+                    *constructor_fields
+                        .iter()
+                        .find(|field| &field.name == name)
+                        .expect("validated constructor field")
+                })
+                .collect();
+            constructors.push(("new_with_fields", constructor_fields));
+        }
+        for (constructor_name, constructor_fields) in constructors {
+            let params: Vec<String> = constructor_fields
+                .iter()
+                .map(|f| {
+                    let bridge_ty = bridge_type(&f.ty);
+                    let bridge_ty = if f.optional && !needs_json_bridge(&f.ty) {
+                        format!("Option<{bridge_ty}>")
+                    } else {
+                        bridge_ty
+                    };
+                    let name = swift_ident(&f.name.to_snake_case());
+                    format!("{name}: {bridge_ty}")
+                })
+                .collect();
+            if constructor_name == "new" {
+                block.push_str(&crate::backends::swift::template_env::render(
+                    "extern_init_attr.jinja",
+                    crate::alef_context! {},
+                ));
+            }
+            block.push_str(&crate::backends::swift::template_env::render(
+                "extern_fn_new.jinja",
+                crate::alef_context! {
+                    params => params.join(", "),
+                    return_type => &ty.name,
+                    constructor_name => constructor_name,
+                    associated_type => if constructor_name == "new" { None } else { Some(&ty.name) },
+                },
+            ));
+        }
     }
 
     for field in &ty.fields {
@@ -765,3 +785,19 @@ mod foreign_enum_tests;
 
 #[cfg(test)]
 mod type_method_enum_tests;
+
+pub(crate) fn validate_legacy_constructor_fields(
+    typ: &TypeDef,
+    excluded: &HashSet<String>,
+    features: &HashSet<&str>,
+) -> anyhow::Result<()> {
+    let visible = constructor_fields(typ, excluded, features);
+    for name in typ.legacy_constructor_fields() {
+        anyhow::ensure!(
+            visible.iter().any(|field| field.name == *name),
+            "Swift legacy constructor field {}.{name} is not exposed",
+            typ.name
+        );
+    }
+    Ok(())
+}

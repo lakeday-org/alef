@@ -304,6 +304,7 @@ fn dts_declares_error_duration_methods_as_millisecond_numbers() {
     use crate::core::ir::{ErrorDef, MethodDef, ReceiverKind};
     let api = ApiSurface {
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "SampleError".to_string(),
             rust_path: "sample::SampleError".to_string(),
             original_rust_path: String::new(),

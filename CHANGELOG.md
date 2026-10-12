@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in `legacy_constructor_fields` preserves existing Python positional, Java record, Swift native, PHP and WebAssembly constructors when defaulted boolean fields are added; Dart and Zig constructors retain those defaults.
+- Opt-in `exception_base` relates generated error families while preserving shared typed exception classes and generic catches, with validation for unknown parents, cycles and incompatible shared classes. Unannotated families retain their established exception ownership.
+
 ### Changed
 
 - Update SHA-256 hashing to sha2 0.11.1, which corrects round-constant loads on AArch64.
@@ -16,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Elixir native lockfile synchronization resolves each local crate version, including versions inherited from nested or explicitly selected Cargo workspaces, instead of overwriting independent path dependencies with the consumer version.
+- Replace invariant-dependent unwraps in Java constructor compatibility and shared exception ownership with contextual generation errors, keeping valid output unchanged.
 
 ## [0.110.1] - 2026-10-12
 

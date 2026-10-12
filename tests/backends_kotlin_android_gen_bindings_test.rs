@@ -1407,6 +1407,7 @@ fn make_tuple_error_api() -> ApiSurface {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ConversionError".to_string(),
             rust_path: "demo::ConversionError".to_string(),
             original_rust_path: String::new(),
@@ -2287,6 +2288,7 @@ fn make_exclude_types_api() -> ApiSurface {
             version: Default::default(),
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "TowerError".into(),
             rust_path: "demo::TowerError".into(),
             original_rust_path: String::new(),
