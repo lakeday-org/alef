@@ -154,6 +154,7 @@ mod tests {
 
     fn request_error(error_code: Option<u32>) -> ErrorDef {
         ErrorDef {
+            exception_base: None,
             name: "RequestError".to_string(),
             rust_path: "sample::RequestError".to_string(),
             variants: vec![crate::core::ir::ErrorVariant {

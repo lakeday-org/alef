@@ -147,6 +147,7 @@ mod tests {
 
     fn error_def(name: &str, error_code: Option<u32>, methods: Vec<MethodDef>) -> Vec<ErrorDef> {
         vec![ErrorDef {
+            exception_base: None,
             name: name.to_string(),
             rust_path: format!("samplelib::{name}"),
             original_rust_path: String::new(),

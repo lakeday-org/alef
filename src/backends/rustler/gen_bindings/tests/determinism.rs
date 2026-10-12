@@ -75,6 +75,7 @@ fn free_function(name: &str, param_type: &str) -> FunctionDef {
 
 fn error_def(name: &str, variants: &[&str]) -> ErrorDef {
     ErrorDef {
+        exception_base: None,
         name: name.to_string(),
         rust_path: format!("my_crate::{name}"),
         original_rust_path: String::new(),

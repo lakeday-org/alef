@@ -863,6 +863,7 @@ fn generate_type_stubs_declares_error_duration_methods() {
         crate_name: "my-crate".to_string(),
         version: "1.0.0".to_string(),
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "SampleError".to_string(),
             rust_path: "sample::SampleError".to_string(),
             original_rust_path: String::new(),

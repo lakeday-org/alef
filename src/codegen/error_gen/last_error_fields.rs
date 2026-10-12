@@ -86,6 +86,7 @@ mod tests {
 
     fn error(name: &str, methods: Vec<MethodDef>) -> ErrorDef {
         ErrorDef {
+            exception_base: None,
             name: name.to_string(),
             rust_path: format!("sample::{name}"),
             original_rust_path: String::new(),

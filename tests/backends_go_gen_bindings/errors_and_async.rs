@@ -17,6 +17,7 @@ fn test_error_types() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "GoError".to_string(),
             rust_path: "test_lib::GoError".to_string(),
             original_rust_path: String::new(),
@@ -87,6 +88,7 @@ fn coded_error_keeps_the_native_message_and_still_matches_its_sentinel() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "GoError".to_string(),
             rust_path: "test_lib::GoError".to_string(),
             original_rust_path: String::new(),

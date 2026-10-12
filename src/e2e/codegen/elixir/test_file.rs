@@ -360,6 +360,7 @@ mod error_path_marker_tests {
         use crate::core::ir::{ErrorDef, ErrorVariant};
 
         let errors = vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "lib::ApiError".to_string(),
             original_rust_path: String::new(),

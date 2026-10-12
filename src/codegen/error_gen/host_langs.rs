@@ -181,6 +181,15 @@ pub(crate) fn to_pascal_case(s: &str) -> String {
 /// final fields, an extended constructor, and public getter methods for each
 /// whitelisted introspection method.  Variant classes delegate via `super(…)`.
 pub fn gen_java_error_types(error: &ErrorDef, package: &str, main_class: &str) -> Vec<(String, String)> {
+    gen_java_error_types_with_parent(error, package, main_class, None)
+}
+
+pub fn gen_java_error_types_with_parent(
+    error: &ErrorDef,
+    package: &str,
+    main_class: &str,
+    parent: Option<&str>,
+) -> Vec<(String, String)> {
     let mut files = Vec::with_capacity(error.variants.len() + 1);
 
     let base_name = format!("{}Exception", error.name);
@@ -214,6 +223,7 @@ pub fn gen_java_error_types(error: &ErrorDef, package: &str, main_class: &str) -
             package => package,
             base_name => base_name.as_str(),
             main_class => main_class,
+            base_parent => parent.map(|parent| format!("{parent}Exception")).unwrap_or_else(|| format!("{main_class}Exception")),
             doc => !error.doc.is_empty(),
             doc_lines => doc_lines,
             methods => method_infos.clone(),

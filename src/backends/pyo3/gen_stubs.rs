@@ -209,7 +209,7 @@ pub fn gen_stubs(
     trait_bridges: &[TraitBridgeConfig],
     config: &ResolvedCrateConfig,
     exclude_functions: &ahash::AHashSet<String>,
-) -> String {
+) -> anyhow::Result<String> {
     let header = hash::header(CommentStyle::Hash);
     let mut header_lines: Vec<String> = header.lines().map(str::to_string).collect();
     header_lines.push("".to_string());
@@ -373,9 +373,16 @@ pub fn gen_stubs(
     {
         let mut seen_exc: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut exc_lines: Vec<String> = Vec::new();
-        for error in &api.errors {
+        for family in
+            crate::codegen::error_gen::exception_families(api, crate::codegen::error_gen::ExceptionNaming::Python)?
+        {
+            let error = &family.error;
             if seen_exc.insert(error.name.clone()) {
-                exc_lines.push(format!("class {}(Exception): ...", error.name));
+                exc_lines.push(format!(
+                    "class {}({}): ...",
+                    error.name,
+                    family.parent.as_deref().unwrap_or("Exception")
+                ));
             }
             for variant in &error.variants {
                 let variant_name = crate::codegen::error_gen::python_exception_name(&variant.name, &error.name);
@@ -506,7 +513,7 @@ pub fn gen_stubs(
     }
     lines.extend(body_lines);
 
-    lines.join("\n")
+    Ok(lines.join("\n"))
 }
 
 /// Return true when `text` contains `word` as a standalone identifier (not as a substring of
@@ -617,7 +624,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default());
+        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default()).expect("valid stub surface");
         assert!(stub.contains("mode: Mode,"), "{stub}");
         assert!(stub.contains("maybe: Mode | None = None"), "{stub}");
         assert!(stub.contains("modes: list[Mode],"), "{stub}");
@@ -698,7 +705,7 @@ module_name = "test_lib"
             ..Default::default()
         };
 
-        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default());
+        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default()).expect("valid stub surface");
 
         assert!(
             stub.contains("providers: str | None"),
@@ -734,7 +741,7 @@ module_name = "test_lib"
             }],
             ..Default::default()
         };
-        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default());
+        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default()).expect("valid stub surface");
         assert!(stub.contains("label: str = ..."), "{stub}");
         assert!(!stub.contains("label: str | None"), "{stub}");
         assert!(stub.contains("optional: str | None = None"), "{stub}");
@@ -840,6 +847,7 @@ module_name = "test_lib"
 
         let api = ApiSurface {
             errors: vec![ErrorDef {
+                exception_base: None,
                 name: "LiterLlmError".to_string(),
                 rust_path: "liter_llm::LiterLlmError".to_string(),
                 original_rust_path: String::new(),
@@ -856,7 +864,7 @@ module_name = "test_lib"
             ..Default::default()
         };
 
-        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default());
+        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default()).expect("valid stub surface");
 
         assert!(
             stub.contains("class LiterLlmErrorInfo:"),
@@ -880,6 +888,7 @@ module_name = "test_lib"
 
         let api = ApiSurface {
             errors: vec![ErrorDef {
+                exception_base: None,
                 name: "LiterLlmError".to_string(),
                 rust_path: "liter_llm::LiterLlmError".to_string(),
                 original_rust_path: String::new(),
@@ -897,7 +906,7 @@ module_name = "test_lib"
             ..Default::default()
         };
 
-        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default());
+        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default()).expect("valid stub surface");
 
         assert!(stub.contains("    retry_after: int | None"), "{stub}");
     }
@@ -910,6 +919,7 @@ module_name = "test_lib"
 
         let api = ApiSurface {
             errors: vec![ErrorDef {
+                exception_base: None,
                 name: "PlainError".to_string(),
                 rust_path: "lib::PlainError".to_string(),
                 original_rust_path: String::new(),
@@ -923,7 +933,7 @@ module_name = "test_lib"
             ..Default::default()
         };
 
-        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default());
+        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default()).expect("valid stub surface");
 
         assert!(
             !stub.contains("PlainErrorInfo"),

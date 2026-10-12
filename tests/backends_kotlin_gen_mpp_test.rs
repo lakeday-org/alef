@@ -541,6 +541,7 @@ fn mpp_error_sealed_class_in_common_main() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".into(),
             rust_path: "demo::ApiError".into(),
             original_rust_path: String::new(),

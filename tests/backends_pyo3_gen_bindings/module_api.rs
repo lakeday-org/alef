@@ -543,6 +543,7 @@ fn test_error_types() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ProcessError".to_string(),
             rust_path: "test_lib::ProcessError".to_string(),
             original_rust_path: String::new(),
@@ -859,6 +860,7 @@ fn test_exceptions_py_reexports_native_classes() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "SampleLlmError".to_string(),
             rust_path: "test_lib::SampleLlmError".to_string(),
             original_rust_path: String::new(),

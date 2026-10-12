@@ -110,7 +110,7 @@ fn cfg_attr_walk_derives(attr: &syn::Attribute, mut predicate: impl FnMut(&syn::
 /// unconditionally. `cfg_attr` may nest (`cfg_attr(a, cfg_attr(b, serde(...)))`); nested
 /// `cfg_attr` lists are unwrapped recursively rather than surfaced to `visit`, so callers
 /// always see the "real" inner attributes regardless of nesting depth. ~keep
-fn cfg_attr_walk_inner_metas(attr: &syn::Attribute, visit: &mut impl FnMut(&syn::Meta)) {
+pub(super) fn cfg_attr_walk_inner_metas(attr: &syn::Attribute, visit: &mut impl FnMut(&syn::Meta)) {
     let Ok(meta_list) = attr.meta.require_list() else {
         return;
     };

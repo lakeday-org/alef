@@ -46,6 +46,7 @@ fn errors(with_error_type: bool) -> Vec<ErrorDef> {
         Vec::new()
     };
     vec![ErrorDef {
+        exception_base: None,
         name: "SampleError".to_string(),
         rust_path: "sample::SampleError".to_string(),
         original_rust_path: String::new(),

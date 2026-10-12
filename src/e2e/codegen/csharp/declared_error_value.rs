@@ -66,6 +66,7 @@ mod tests {
     /// given, mirroring how a real crate declares one error enum with several variants.
     fn api_error(variants: &[(&str, &str)]) -> ErrorDef {
         ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "lib::ApiError".to_string(),
             original_rust_path: String::new(),

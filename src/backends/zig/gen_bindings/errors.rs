@@ -161,6 +161,7 @@ mod tests {
     #[test]
     fn emit_error_set_emits_only_the_error_set() {
         let error = ErrorDef {
+            exception_base: None,
             name: "MyError".into(),
             rust_path: "x::MyError".into(),
             original_rust_path: String::new(),
@@ -205,6 +206,7 @@ mod tests {
     #[test]
     fn emit_error_set_declares_cancelled_exactly_once() {
         let make = |variants| ErrorDef {
+            exception_base: None,
             name: "MyError".into(),
             rust_path: "x::MyError".into(),
             original_rust_path: String::new(),
@@ -238,6 +240,7 @@ mod tests {
     #[test]
     fn emit_error_set_never_duplicates_an_explicit_unknown_ffi_error_variant() {
         let error = ErrorDef {
+            exception_base: None,
             name: "MyError".into(),
             rust_path: "x::MyError".into(),
             original_rust_path: String::new(),

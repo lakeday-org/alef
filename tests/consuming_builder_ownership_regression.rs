@@ -94,6 +94,7 @@ fn consuming_method() -> MethodDef {
 
 fn build_error() -> ErrorDef {
     ErrorDef {
+        exception_base: None,
         name: "BuildError".to_string(),
         rust_path: "neutral::BuildError".to_string(),
         original_rust_path: String::new(),

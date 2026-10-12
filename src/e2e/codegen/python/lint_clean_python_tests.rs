@@ -188,6 +188,7 @@ fn conftest_and_test_file_survive_a_realistic_ruff_lint_pass() {
     let fixture_refs: Vec<&Fixture> = fixtures.iter().collect();
     let config = ResolvedCrateConfig::default();
     let sample_error = crate::core::ir::ErrorDef {
+        exception_base: None,
         name: "SampleError".to_string(),
         rust_path: "mypackage::SampleError".to_string(),
         original_rust_path: String::new(),

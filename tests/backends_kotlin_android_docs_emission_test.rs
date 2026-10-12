@@ -264,6 +264,7 @@ fn module_free_function_facade_carries_kdoc() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -302,6 +303,7 @@ fn error_type_with_methods_emits_abstract_properties() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),

@@ -100,6 +100,7 @@ mod tests {
 
     fn error_with_methods(name: &str, methods: Vec<&str>) -> ErrorDef {
         ErrorDef {
+            exception_base: None,
             name: name.to_string(),
             rust_path: format!("demo::{name}"),
             original_rust_path: String::new(),

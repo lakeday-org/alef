@@ -88,6 +88,7 @@ fn error_sources() -> (String, String, u32) {
             ..Default::default()
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "RequestError".into(),
             rust_path: "test_lib::RequestError".into(),
             variants: vec![ErrorVariant {

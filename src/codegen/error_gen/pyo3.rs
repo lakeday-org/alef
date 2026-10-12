@@ -1,4 +1,13 @@
 pub fn gen_pyo3_error_types(error: &ErrorDef, module_name: &str, seen_exceptions: &mut AHashSet<String>) -> String {
+    gen_pyo3_error_types_with_parent(error, module_name, seen_exceptions, None)
+}
+
+pub fn gen_pyo3_error_types_with_parent(
+    error: &ErrorDef,
+    module_name: &str,
+    seen_exceptions: &mut AHashSet<String>,
+    parent: Option<&str>,
+) -> String {
     let mut variant_names = Vec::new();
     for variant in &error.variants {
         let variant_name = python_exception_name(&variant.name, &error.name);
@@ -16,6 +25,7 @@ pub fn gen_pyo3_error_types(error: &ErrorDef, module_name: &str, seen_exceptions
             module_name => module_name,
             error_name => error.name.as_str(),
             include_base => include_base,
+            base_parent => parent.unwrap_or("pyo3::exceptions::PyException"),
         },
     )
 }

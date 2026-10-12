@@ -218,6 +218,7 @@ mod tests {
 
     fn api() -> ApiSurface {
         let error = ErrorDef {
+            exception_base: None,
             name: "RequestError".to_string(),
             rust_path: "sample::RequestError".to_string(),
             original_rust_path: String::new(),

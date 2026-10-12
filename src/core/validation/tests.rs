@@ -586,6 +586,7 @@ fn api_surface_validation_checks_enum_and_error_variant_fields() {
             ..EnumDef::default()
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "SampleError".to_string(),
             rust_path: "sample_lib::SampleError".to_string(),
             original_rust_path: String::new(),
@@ -638,6 +639,7 @@ fn api_surface_validation_skips_binding_excluded_variant_fields() {
             ..EnumDef::default()
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "SampleError".to_string(),
             rust_path: "sample_lib::SampleError".to_string(),
             original_rust_path: String::new(),

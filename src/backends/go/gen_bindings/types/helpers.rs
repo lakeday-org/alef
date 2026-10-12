@@ -509,6 +509,7 @@ mod last_error_tests {
 
     fn error(name: &str, variants: &[(&str, Option<u32>)], methods: Vec<crate::core::ir::MethodDef>) -> ErrorDef {
         ErrorDef {
+            exception_base: None,
             name: name.to_string(),
             rust_path: format!("sample::{name}"),
             variants: variants

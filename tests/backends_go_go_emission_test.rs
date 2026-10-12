@@ -71,6 +71,7 @@ fn test_error_method_uses_pointer_receiver() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "TestError".to_string(),
             rust_path: "test_lib::TestError".to_string(),
             original_rust_path: String::new(),

@@ -242,6 +242,7 @@ fn render_wasm_excluded_category_emits_named_skip_cases_with_reasons() {
 #[test]
 fn real_generator_preserves_error_registry_for_variant_and_message_assertions() {
     let errors = vec![crate::core::ir::ErrorDef {
+        exception_base: None,
         name: "ApiError".into(),
         rust_path: "lib::ApiError".into(),
         original_rust_path: String::new(),

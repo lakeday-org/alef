@@ -415,6 +415,7 @@ mod typed_error_tests {
     #[test]
     fn native_function_maps_taxonomy_code_to_unit_variant() {
         let error = crate::core::ir::ErrorDef {
+            exception_base: None,
             name: "RequestError".to_string(),
             rust_path: "sample::RequestError".to_string(),
             variants: vec![crate::core::ir::ErrorVariant {
@@ -460,6 +461,7 @@ mod typed_error_tests {
     #[test]
     fn native_function_uses_generic_fallback_for_unnumbered_variant() {
         let error = crate::core::ir::ErrorDef {
+            exception_base: None,
             name: "RequestError".to_string(),
             rust_path: "sample::RequestError".to_string(),
             variants: vec![crate::core::ir::ErrorVariant {

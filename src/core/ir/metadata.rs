@@ -394,6 +394,9 @@ pub struct DeprecationInfo {
 /// Version annotation on an IR item.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct VersionAnnotation {
+    /// Explicit constructor history used to preserve compatibility while adding defaulted fields. ~keep
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub legacy_constructor_fields: Vec<String>,
     /// Version when this item was introduced (from `#[alef(since = "...")]`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub since: Option<String>,

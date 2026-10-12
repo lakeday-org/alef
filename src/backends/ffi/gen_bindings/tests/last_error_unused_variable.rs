@@ -40,6 +40,7 @@ fn error_param_is_underscore_prefixed_when_no_error_types_are_registered() {
 fn error_param_stays_named_when_error_types_are_registered() {
     let api = ApiSurface {
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "CoreError".to_string(),
             rust_path: "my_lib::CoreError".to_string(),
             original_rust_path: "CoreError".to_string(),

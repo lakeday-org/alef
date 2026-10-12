@@ -824,6 +824,7 @@ fn test_error_types() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ValidationError".to_string(),
             rust_path: "test_lib::ValidationError".to_string(),
             original_rust_path: String::new(),

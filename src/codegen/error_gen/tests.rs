@@ -71,6 +71,7 @@ fn named_field(name: &str) -> FieldDef {
 
 fn sample_error() -> ErrorDef {
     ErrorDef {
+        exception_base: None,
         name: "ConversionError".to_string(),
         rust_path: "sample_markup_rs::ConversionError".to_string(),
         original_rust_path: String::new(),
@@ -142,6 +143,7 @@ fn sample_method(name: &str, return_type: TypeRef) -> crate::core::ir::MethodDef
 
 fn error_with_methods() -> ErrorDef {
     ErrorDef {
+        exception_base: None,
         name: "SampleAppError".to_string(),
         rust_path: "sample_app::error::SampleAppError".to_string(),
         original_rust_path: String::new(),
@@ -260,6 +262,7 @@ fn test_gen_error_registration() {
 #[test]
 fn test_unit_variant_pattern() {
     let error = ErrorDef {
+        exception_base: None,
         name: "MyError".to_string(),
         rust_path: "my_crate::MyError".to_string(),
         original_rust_path: String::new(),
@@ -288,6 +291,7 @@ fn test_unit_variant_pattern() {
 #[test]
 fn test_struct_variant_pattern() {
     let error = ErrorDef {
+        exception_base: None,
         name: "MyError".to_string(),
         rust_path: "my_crate::MyError".to_string(),
         original_rust_path: String::new(),
@@ -328,6 +332,7 @@ fn test_struct_variant_pattern() {
 #[test]
 fn test_error_converter_match_arms_are_newline_separated_and_indented() {
     let error = ErrorDef {
+        exception_base: None,
         name: "MyError".to_string(),
         rust_path: "my_crate::MyError".to_string(),
         original_rust_path: String::new(),
@@ -566,6 +571,7 @@ fn test_gen_go_error_struct_with_methods() {
 fn test_gen_go_error_struct_no_field_method_collision() {
     use crate::core::ir::{ErrorDef, ErrorVariant, PrimitiveType, TypeRef};
     let error = ErrorDef {
+        exception_base: None,
         name: "ApiError".to_string(),
         rust_path: String::new(),
         original_rust_path: String::new(),
@@ -897,6 +903,7 @@ fn test_variant_display_message_struct_template_no_leak() {
 #[test]
 fn test_go_sentinels_no_placeholder_leak() {
     let error = ErrorDef {
+        exception_base: None,
         name: "SampleCrateError".to_string(),
         rust_path: "sample_crate::SampleCrateError".to_string(),
         original_rust_path: String::new(),

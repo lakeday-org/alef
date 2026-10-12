@@ -113,7 +113,16 @@ pub(super) fn replace_constructor_with_serde_rename(
         .filter(|f| !f.binding_excluded && (f.cfg.is_none() || never_skip_cfg_field_names.contains(&f.name)))
         .filter(|f| bridge_field_name.is_none() || f.name != bridge_field_name.unwrap())
         .collect();
-    sorted_fields.sort_by_key(|f| f.optional as u8);
+    sorted_fields.sort_by_key(|f| {
+        (
+            typ.is_constructor_extension(f),
+            f.optional,
+            typ.legacy_constructor_fields()
+                .iter()
+                .position(|name| name == &f.name)
+                .unwrap_or(0),
+        )
+    });
 
     let mut bare_defaulted = vec![false; sorted_fields.len()];
     let mut suffix_defaulted = true;
@@ -157,7 +166,7 @@ pub(super) fn replace_constructor_with_serde_rename(
             Some((param_name, b.type_alias.as_deref().unwrap_or("object")))
         });
 
-    let defaults: Vec<String> = sorted_fields
+    let mut defaults: Vec<String> = sorted_fields
         .iter()
         .enumerate()
         .map(|(idx, f)| {
@@ -181,6 +190,8 @@ pub(super) fn replace_constructor_with_serde_rename(
             }
         })
         .collect();
+
+    insert_constructor_keyword_only_marker(typ, &sorted_fields, &mut defaults);
 
     let assignments: Vec<String> = typ
         .fields
@@ -283,6 +294,12 @@ pub(super) fn replace_constructor_with_serde_rename(
     }
 
     impl_block.to_string()
+}
+
+fn insert_constructor_keyword_only_marker(typ: &TypeDef, fields: &[&FieldDef], defaults: &mut Vec<String>) {
+    if let Some(index) = fields.iter().position(|field| typ.is_constructor_extension(field)) {
+        defaults.insert(index, "*".to_owned());
+    }
 }
 
 #[cfg(test)]

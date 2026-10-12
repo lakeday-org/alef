@@ -37,6 +37,7 @@ prefix = "sample"
 "#,
     );
     let error = ErrorDef {
+        exception_base: None,
         name: "RequestError".to_string(),
         rust_path: "sample_lib::RequestError".to_string(),
         variants: vec![
@@ -72,6 +73,7 @@ prefix = "sample"
         errors: vec![
             error,
             ErrorDef {
+                exception_base: None,
                 name: "StorageError".to_string(),
                 rust_path: "sample_lib::StorageError".to_string(),
                 variants: vec![ErrorVariant {
@@ -153,6 +155,7 @@ prefix = "sample"
         crate_name: "sample-lib".to_string(),
         version: "1.0.0".to_string(),
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "Error".to_string(),
             rust_path: "sample_lib::error::Error".to_string(),
             variants: vec![ErrorVariant {
@@ -223,6 +226,7 @@ prefix = "sample"
     );
     let make_api = |codes: [u32; 2]| ApiSurface {
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "RequestError".to_string(),
             rust_path: "sample_lib::RequestError".to_string(),
             variants: codes

@@ -2232,6 +2232,7 @@ fn mirror_multi_line_rustdoc_emits_one_triple_slash_per_line() {
 #[test]
 fn mirror_error_introspection_uses_safe_from_conversion_not_transmute() {
     let error = ErrorDef {
+        exception_base: None,
         name: "AppError".to_string(),
         rust_path: "demo_crate::error::AppError".to_string(),
         original_rust_path: String::new(),
@@ -2375,6 +2376,7 @@ fn mirror_error_from_impl_handles_optional_string_duration_and_sanitized_fields(
     };
 
     let error = ErrorDef {
+        exception_base: None,
         name: "ApiErr".to_string(),
         rust_path: "demo_crate::ApiErr".to_string(),
         original_rust_path: String::new(),
@@ -2523,6 +2525,7 @@ fn mirror_error_from_impl_uses_tuple_syntax_for_tuple_variants() {
     };
 
     let error = ErrorDef {
+        exception_base: None,
         name: "GraphQLError".to_string(),
         rust_path: "demo_crate::GraphQLError".to_string(),
         original_rust_path: String::new(),

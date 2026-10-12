@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in `legacy_constructor_fields` preserves existing Python positional, Java record and Swift native constructors when defaulted boolean fields are added; Dart named constructors retain those defaults.
+- Opt-in `exception_base` relates generated error families while preserving existing shared typed exception classes and generic catches, with validation for unknown parents, cycles and incompatible shared classes.
+
 ## [0.110.0] - 2026-10-11
 
 ### Changed (BREAKING)

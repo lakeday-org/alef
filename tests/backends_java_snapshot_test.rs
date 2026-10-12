@@ -360,6 +360,7 @@ fn print_generated_java_code() {
             version: Default::default(),
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "Error".to_string(),
             rust_path: "sample_crate::Error".to_string(),
             original_rust_path: String::new(),

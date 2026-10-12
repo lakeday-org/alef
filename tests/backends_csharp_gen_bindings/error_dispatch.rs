@@ -9,6 +9,7 @@ fn error_api(name: &str) -> ApiSurface {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: name.to_string(),
             rust_path: format!("test::{name}"),
             original_rust_path: String::new(),

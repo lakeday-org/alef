@@ -767,6 +767,7 @@ fn absent_pyclasses_do_not_receive_conversions_or_stub_classes() {
             }
             "error" => {
                 api.errors.push(ErrorDef {
+                    exception_base: None,
                     name: type_name.to_string(),
                     rust_path: format!("test_lib::{type_name}"),
                     original_rust_path: String::new(),

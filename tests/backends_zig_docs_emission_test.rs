@@ -278,6 +278,7 @@ fn tagged_enum_variants_emit_zig_doc_comments() {
             version: Default::default(),
         }],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),

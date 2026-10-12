@@ -285,6 +285,7 @@ fn error_emits_custom_type() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "DemoError".into(),
             rust_path: "demo::DemoError".into(),
             original_rust_path: String::new(),
@@ -721,6 +722,7 @@ fn trait_bridge_response_shim_uses_typed_return_and_error() {
     let trait_type = make_trait_type("OcrBackend", vec![method]);
     let bridge_cfg = make_bridge_cfg("OcrBackend", "register_ocr_backend");
     let ocr_error = ErrorDef {
+        exception_base: None,
         name: "OcrError".into(),
         rust_path: "demo::OcrError".into(),
         original_rust_path: String::new(),
@@ -765,6 +767,7 @@ fn trait_bridge_response_shim_unit_return_emits_nil() {
     let trait_type = make_trait_type("MyTrait", vec![method]);
     let bridge_cfg = make_bridge_cfg("MyTrait", "register_my_trait");
     let my_error = ErrorDef {
+        exception_base: None,
         name: "MyError".into(),
         rust_path: "demo::MyError".into(),
         original_rust_path: String::new(),

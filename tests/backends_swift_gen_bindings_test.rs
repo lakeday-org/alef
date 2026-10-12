@@ -1167,6 +1167,7 @@ fn error_enum_conforms_to_error_protocol() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".into(),
             rust_path: "demo::ApiError".into(),
             original_rust_path: String::new(),
@@ -1228,6 +1229,7 @@ fn error_enum_named_error_is_renamed_to_module_error() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "Error".into(),
             rust_path: "demo_crate::Error".into(),
             original_rust_path: String::new(),
@@ -1281,6 +1283,7 @@ fn error_enum_with_methods_emits_extension_properties() {
         functions: vec![],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ApiError".into(),
             rust_path: "demo::ApiError".into(),
             original_rust_path: String::new(),
@@ -3240,6 +3243,7 @@ fn opaque_type_returned_from_free_function_emits_forwarder() {
         functions: vec![make_function("get_language", TypeRef::Named("Language".to_string()))],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "Error".to_string(),
             rust_path: "demo::Error".to_string(),
             original_rust_path: String::new(),

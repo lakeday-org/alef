@@ -1032,6 +1032,7 @@ fn test_error_types() {
         }],
         enums: vec![],
         errors: vec![ErrorDef {
+            exception_base: None,
             name: "ProcessError".to_string(),
             rust_path: "test_lib::ProcessError".to_string(),
             original_rust_path: String::new(),

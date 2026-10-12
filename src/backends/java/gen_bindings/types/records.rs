@@ -27,10 +27,11 @@ pub(crate) fn gen_record_type(
     enum_defaults: &ahash::AHashMap<String, crate::extract::default_value_for_enum::DefaultEnumVariant>,
     sealed_interface_names: &AHashSet<String>,
     visible_type_names: &std::collections::HashSet<&str>,
-) -> String {
+) -> anyhow::Result<String> {
     let visible_fields: Vec<_> = binding_fields(&typ.fields).collect();
     let mut fields_joined = String::with_capacity(visible_fields.len().saturating_mul(42));
     let mut field_decls: Vec<String> = Vec::with_capacity(visible_fields.len());
+    let mut parameter_decls = Vec::with_capacity(visible_fields.len());
 
     for (i, f) in visible_fields.iter().enumerate() {
         let is_complex = matches!(&f.ty, TypeRef::Named(n) if complex_enums.contains(n.as_str()));
@@ -126,6 +127,7 @@ pub(crate) fn gen_record_type(
             || is_unresolved_default
             || boxes_to_carry_literal_default(&f.ty, f.typed_default.as_ref());
 
+        parameter_decls.push(format!("{ftype} {jname}"));
         let mut decl = String::new();
 
         let field_type_name = match &resolved_ty {
@@ -252,6 +254,27 @@ pub(crate) fn gen_record_type(
                 type_name => &typ.name,
                 multiline_fields => "",
                 fields_joined => &fields_joined,
+            },
+        ));
+    }
+
+    if let Some(parameters) = legacy_constructor_parameters(typ, &visible_fields, &parameter_decls)? {
+        let arguments: Vec<_> = visible_fields
+            .iter()
+            .map(|field| {
+                if let Some(default) = typ.constructor_extension_default(field) {
+                    default.to_string()
+                } else {
+                    safe_java_field_name(&field.name)
+                }
+            })
+            .collect();
+        record_block.push_str(&crate::backends::java::template_env::render(
+            "record_legacy_constructor.jinja",
+            crate::alef_context! {
+                type_name => &typ.name,
+                parameters => parameters.join(", "),
+                arguments => arguments.join(", "),
             },
         ));
     }
@@ -385,5 +408,43 @@ pub(crate) fn gen_record_type(
     );
     out.push('\n');
     out.push_str(&record_block);
-    out
+    Ok(out)
+}
+
+fn legacy_constructor_parameters(
+    typ: &TypeDef,
+    fields: &[&crate::core::ir::FieldDef],
+    declarations: &[String],
+) -> anyhow::Result<Option<Vec<String>>> {
+    if typ.legacy_constructor_fields().is_empty() {
+        return Ok(None);
+    }
+    let parameters =
+        typ.legacy_constructor_fields()
+            .iter()
+            .map(|name| {
+                let index = fields.iter().position(|field| &field.name == name).ok_or_else(|| {
+                    anyhow::anyhow!("Java legacy constructor field {}.{name} is not exposed", typ.name)
+                })?;
+                Ok(declarations[index].clone())
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+    let types = |values: &[String]| {
+        values
+            .iter()
+            .map(|value| value.rsplit_once(' ').unwrap().0.to_string())
+            .collect::<Vec<_>>()
+    };
+    if types(&parameters) == types(declarations) {
+        anyhow::ensure!(
+            typ.legacy_constructor_fields()
+                .iter()
+                .map(String::as_str)
+                .eq(fields.iter().map(|field| field.name.as_str())),
+            "Java legacy constructor order for {} collides with the canonical record signature",
+            typ.name
+        );
+        return Ok(None);
+    }
+    Ok(Some(parameters))
 }

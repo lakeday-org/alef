@@ -27,7 +27,8 @@ fn single_word_builder_field_gets_json_property() {
         &ahash::AHashMap::default(),
         &AHashSet::default(),
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
     assert!(
         out.contains("@JsonProperty(\"model\")"),
         "single-word builder field must get @JsonProperty; got:\n{out}"
@@ -52,7 +53,8 @@ fn multiword_snake_case_field_gets_json_property_annotation() {
         &ahash::AHashMap::default(),
         &AHashSet::default(),
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
     assert!(
         out.contains("@JsonProperty(\"max_tokens\")"),
         "multi-word field max_tokens must have @JsonProperty(\"max_tokens\") annotation; got:\n{out}"
@@ -82,7 +84,8 @@ fn boxed_duration_compact_ctor_only_null_checks_not_zero() {
         &ahash::AHashMap::default(),
         &AHashSet::default(),
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
     assert!(
         out.contains("requestTimeout == null"),
         "expected null-check in compact ctor"
@@ -191,7 +194,8 @@ fn flatten_json_field_forces_builder_emission_below_auto_threshold() {
         &ahash::AHashMap::default(),
         &AHashSet::default(),
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
     assert!(
         out.contains("@JsonDeserialize(builder = ResponseTool.Builder.class)"),
         "flatten+Json type must emit Builder even with < 5 fields"
@@ -267,7 +271,8 @@ fn boxed_long_literal_defaults_compile_without_coercing_zero() {
             &ahash::AHashMap::default(),
             &AHashSet::default(),
             &HashSet::default(),
-        );
+        )
+        .expect("valid record constructor");
 
         assert!(
             !out.contains("maxRedirects == 0"),
@@ -308,7 +313,8 @@ fn duration_field_gets_wire_safe_converter_annotations() {
         &ahash::AHashMap::default(),
         &AHashSet::default(),
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
 
     assert!(
         out.contains("@JsonSerialize(using = DurationMillisSerializer.class)"),
@@ -346,7 +352,8 @@ fn duration_field_without_builder_has_no_builder_setter_annotation() {
         &ahash::AHashMap::default(),
         &AHashSet::default(),
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
 
     assert!(!out.contains("class Builder"), "builder must not be emitted:\n{out}");
     assert!(
@@ -374,7 +381,8 @@ fn duration_field_with_builder_annotates_the_setter_too() {
         &ahash::AHashMap::default(),
         &AHashSet::default(),
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
 
     assert!(out.contains("class Builder"), "builder must be emitted:\n{out}");
     assert!(
@@ -655,7 +663,8 @@ fn simple_enum_declaration_and_default_value_reference_agree_on_the_constant_nam
         &enum_defaults,
         &AHashSet::default(),
         &HashSet::default(),
-    );
+    )
+    .expect("valid record constructor");
 
     assert!(
         declaration.contains("INLINE(\"Inline\")"),

@@ -204,6 +204,7 @@ mod tests {
         use crate::core::ir::{MethodDef, ReceiverKind};
 
         let error = crate::core::ir::ErrorDef {
+            exception_base: None,
             name: "ApiError".to_string(),
             rust_path: "demo::ApiError".to_string(),
             original_rust_path: String::new(),

@@ -21,7 +21,7 @@ pub(super) fn generate_type_stubs(
         .unwrap_or_default();
     let active_trait_bridges: Vec<_> = config.trait_bridges_for(Language::Python).cloned().collect();
     let mut content =
-        crate::backends::pyo3::gen_stubs::gen_stubs(api, &active_trait_bridges, config, &stubs_exclude_functions);
+        crate::backends::pyo3::gen_stubs::gen_stubs(api, &active_trait_bridges, config, &stubs_exclude_functions)?;
     if super::managed_runtime::enabled(config) && super::managed_runtime::has_async(api) {
         content.push_str("\ndef shutdown_async_runtime() -> None:\n    \"\"\"Stop the idle async runtime and release its threads and descriptors.\"\"\"\n");
     }

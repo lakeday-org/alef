@@ -42,6 +42,7 @@ fn render_with_errors(assertions: Vec<crate::e2e::fixture::Assertion>, errors: &
 
 fn error_def_with(variant_name: &str, error_code: Option<u32>) -> Vec<crate::core::ir::ErrorDef> {
     vec![crate::core::ir::ErrorDef {
+        exception_base: None,
         name: "ApiError".to_string(),
         rust_path: "lib::ApiError".to_string(),
         original_rust_path: String::new(),

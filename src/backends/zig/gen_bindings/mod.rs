@@ -624,6 +624,7 @@ sources = ["src/lib.rs"]
 
     fn my_error_def() -> crate::core::ir::ErrorDef {
         crate::core::ir::ErrorDef {
+            exception_base: None,
             name: "MyError".to_string(),
             rust_path: "sample::MyError".to_string(),
             original_rust_path: String::new(),

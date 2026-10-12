@@ -230,7 +230,8 @@ fn a_lowered_fixed_size_array_renders_as_a_typed_list_in_generated_bindings() {
         &ahash::AHashMap::new(),
         &AHashSet::new(),
         &visible,
-    );
+    )
+    .expect("valid record constructor");
 
     assert!(
         rendered.contains("List<Point> corners"),

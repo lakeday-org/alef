@@ -1677,6 +1677,7 @@ fn render_error_fixture_for_language(lang: &str, fixture: &Fixture, errors: &[cr
 #[test]
 fn wasm_error_assertions_preserve_rejections_and_literal_messages() {
     let errors = vec![crate::core::ir::ErrorDef {
+        exception_base: None,
         name: "ApiError".into(),
         rust_path: "lib::ApiError".into(),
         original_rust_path: String::new(),
@@ -1764,6 +1765,7 @@ fn error_assertion_value_with_regex_metacharacters_is_escaped() {
 fn error_assertion_with_a_known_variant_node_cannot_substantiate_is_skipped() {
     let fixture = error_fixture("thing_fails_with_auth", Some(serde_json::json!("Authentication")));
     let errors = vec![crate::core::ir::ErrorDef {
+        exception_base: None,
         name: "ApiError".to_string(),
         rust_path: "lib::ApiError".to_string(),
         original_rust_path: String::new(),

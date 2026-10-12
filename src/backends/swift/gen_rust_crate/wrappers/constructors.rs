@@ -58,89 +58,37 @@ pub(crate) fn emit_type_wrapper(
             },
         ));
 
-        let constructor_fields = constructor_fields(ty, exclude_fields, configured_features);
-        let params: Vec<String> = constructor_fields
-            .iter()
-            .map(|f| {
-                let bridge_ty = bridge_type(&f.ty);
-                let bridge_ty = if f.optional && !needs_json_bridge(&f.ty) {
-                    format!("Option<{bridge_ty}>")
-                } else {
-                    bridge_ty
-                };
-                let name = swift_ident(&f.name.to_snake_case());
-                format!("{name}: {bridge_ty}")
-            })
-            .collect();
-
-        let all_primitive_fields = constructor_fields.iter().all(|f| matches!(f.ty, TypeRef::Primitive(_)));
-        let has_vec_non_primitive = constructor_fields.iter().any(|f| {
-            matches!(&f.ty, TypeRef::Vec(inner) if !matches!(inner.as_ref(), TypeRef::Primitive(_) | TypeRef::Bytes))
-        });
-        let has_non_serde_string_field = !ty.has_serde
-            && constructor_fields
+        let mut constructors = vec![("new", std::borrow::Cow::Borrowed(ty))];
+        if !ty.legacy_constructor_fields().is_empty() {
+            let mut legacy = ty.clone();
+            legacy.fields = ty
+                .legacy_constructor_fields()
                 .iter()
-                .any(|f| matches!(f.ty, TypeRef::String | TypeRef::Path | TypeRef::Json | TypeRef::Char));
-        let needs_default_construction = !all_primitive_fields
-            && (ty.has_serde
-                || has_vec_non_primitive
-                || has_non_serde_string_field
-                || ty.has_stripped_cfg_fields
-                || constructor_fields
-                    .iter()
-                    .any(|f| needs_json_bridge(&f.ty) || matches!(f.ty, TypeRef::Named(_))));
-
-        let enum_kinds = EnumKinds::with_reconstructible(enum_names, unit_enum_names, reconstructible_enum_names);
-        let parent_first_class = first_class_names.contains(ty.name.as_str());
-        if has_constructor_extern(ty, exclude_fields, configured_features, enum_kinds, parent_first_class) {
-            if !needs_default_construction && ty.has_default {
-                out.push_str("    #[allow(clippy::needless_update)]\n");
-            }
-            out.push_str(&crate::backends::swift::template_env::render(
-                "fn_new_signature.jinja",
-                crate::alef_context! {
-                    params => params.join(", "),
-                    name => &ty.name,
-                },
+                .map(|name| {
+                    ty.fields
+                        .iter()
+                        .find(|field| &field.name == name)
+                        .expect("validated constructor field")
+                        .clone()
+                })
+                .collect();
+            constructors[0].1 = std::borrow::Cow::Owned(legacy);
+            constructors.push(("new_with_fields", std::borrow::Cow::Borrowed(ty)));
+        }
+        for (constructor_name, constructor_type) in &constructors {
+            out.push_str(&emit_constructor(
+                constructor_type,
+                constructor_name,
+                &source_path,
+                type_paths,
+                enum_names,
+                unit_enum_names,
+                reconstructible_enum_names,
+                first_class_names.contains(ty.name.as_str()),
+                no_serde_names,
+                exclude_fields,
+                configured_features,
             ));
-
-            if needs_default_construction && ty.has_default {
-                let body = emit_default_construction_body(
-                    ty,
-                    &source_path,
-                    type_paths,
-                    enum_kinds,
-                    no_serde_names,
-                    exclude_fields,
-                    configured_features,
-                );
-                out.push_str(&body);
-            } else {
-                let field_inits = emit_direct_field_inits(
-                    ty,
-                    type_paths,
-                    enum_kinds,
-                    no_serde_names,
-                    exclude_fields,
-                    configured_features,
-                );
-                out.push_str(&crate::backends::swift::template_env::render(
-                    "struct_literal_open.jinja",
-                    crate::alef_context! {
-                        name => &ty.name,
-                        source_path => &source_path,
-                    },
-                ));
-                for init in &field_inits {
-                    out.push_str(init);
-                    out.push_str(",\n");
-                }
-                if ty.has_default {
-                    out.push_str("            ..Default::default()\n");
-                }
-                out.push_str("        })\n");
-            }
-            out.push_str("    }\n");
         }
 
         emit_getters(
@@ -158,6 +106,131 @@ pub(crate) fn emit_type_wrapper(
         out.push_str("}\n");
     }
 
+    out
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_constructor(
+    ty: &TypeDef,
+    constructor_name: &str,
+    source_path: &str,
+    type_paths: &HashMap<String, String>,
+    enum_names: &HashSet<&str>,
+    unit_enum_names: &HashSet<&str>,
+    reconstructible_enum_names: &HashSet<&str>,
+    parent_first_class: bool,
+    no_serde_names: &HashSet<&str>,
+    exclude_fields: &HashSet<String>,
+    configured_features: &HashSet<&str>,
+) -> String {
+    let enum_kinds = EnumKinds::with_reconstructible(enum_names, unit_enum_names, reconstructible_enum_names);
+    if !has_constructor_extern(ty, exclude_fields, configured_features, enum_kinds, parent_first_class) {
+        return String::new();
+    }
+    let fields = constructor_fields(ty, exclude_fields, configured_features);
+    let params: Vec<_> = fields
+        .iter()
+        .map(|field| {
+            let mapped = bridge_type(&field.ty);
+            let mapped = if field.optional && !needs_json_bridge(&field.ty) {
+                format!("Option<{mapped}>")
+            } else {
+                mapped
+            };
+            format!("{}: {mapped}", swift_ident(&field.name.to_snake_case()))
+        })
+        .collect();
+    let needs_default = constructor_needs_default(ty, &fields);
+    let mut out = String::new();
+    if !needs_default && ty.has_default {
+        out.push_str("    #[allow(clippy::needless_update)]\n");
+    }
+    out.push_str(&crate::backends::swift::template_env::render(
+        "fn_new_signature.jinja",
+        crate::alef_context! {
+            params => params.join(", "), name => &ty.name, constructor_name => constructor_name,
+        },
+    ));
+    out.push_str(&constructor_initialization(
+        ty,
+        source_path,
+        type_paths,
+        enum_kinds,
+        no_serde_names,
+        exclude_fields,
+        configured_features,
+        needs_default,
+    ));
+    out.push_str("    }\n");
+    out
+}
+
+fn constructor_needs_default(ty: &TypeDef, fields: &[&crate::core::ir::FieldDef]) -> bool {
+    let all_primitive = fields.iter().all(|field| matches!(field.ty, TypeRef::Primitive(_)));
+    let has_vec = fields.iter().any(|field| {
+        matches!(&field.ty, TypeRef::Vec(inner) if !matches!(inner.as_ref(), TypeRef::Primitive(_) | TypeRef::Bytes))
+    });
+    let has_string = !ty.has_serde
+        && fields.iter().any(|field| {
+            matches!(
+                field.ty,
+                TypeRef::String | TypeRef::Path | TypeRef::Json | TypeRef::Char
+            )
+        });
+    !all_primitive
+        && (ty.has_serde
+            || has_vec
+            || has_string
+            || ty.has_stripped_cfg_fields
+            || fields
+                .iter()
+                .any(|field| needs_json_bridge(&field.ty) || matches!(field.ty, TypeRef::Named(_))))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn constructor_initialization(
+    ty: &TypeDef,
+    source_path: &str,
+    type_paths: &HashMap<String, String>,
+    enum_kinds: EnumKinds<'_, '_>,
+    no_serde_names: &HashSet<&str>,
+    exclude_fields: &HashSet<String>,
+    configured_features: &HashSet<&str>,
+    needs_default: bool,
+) -> String {
+    if needs_default && ty.has_default {
+        return emit_default_construction_body(
+            ty,
+            source_path,
+            type_paths,
+            enum_kinds,
+            no_serde_names,
+            exclude_fields,
+            configured_features,
+        );
+    }
+    let field_inits = emit_direct_field_inits(
+        ty,
+        type_paths,
+        enum_kinds,
+        no_serde_names,
+        exclude_fields,
+        configured_features,
+    );
+    let mut out = crate::backends::swift::template_env::render(
+        "struct_literal_open.jinja",
+        crate::alef_context! {
+            name => &ty.name, source_path => source_path,
+        },
+    );
+    for init in &field_inits {
+        out.push_str(init);
+        out.push_str(",\n");
+    }
+    if ty.has_default {
+        out.push_str("            ..Default::default()\n");
+    }
+    out.push_str("        })\n");
     out
 }
 
