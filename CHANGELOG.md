@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Opt-in `legacy_constructor_fields` preserves existing Python positional, Java record, Swift native, PHP and WebAssembly constructors when defaulted boolean fields are added; Dart and Zig constructors retain those defaults.
 - Opt-in `exception_base` relates generated error families while preserving shared typed exception classes and generic catches, with validation for unknown parents, cycles and incompatible shared classes. Unannotated families retain their established exception ownership.
 
+### Fixed
+
+- Replace invariant-dependent unwraps in Java constructor compatibility and shared exception ownership with contextual generation errors, keeping valid output unchanged.
+
 ## [0.110.1] - 2026-10-12
 
 ### Changed

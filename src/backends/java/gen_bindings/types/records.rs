@@ -432,10 +432,18 @@ fn legacy_constructor_parameters(
     let types = |values: &[String]| {
         values
             .iter()
-            .map(|value| value.rsplit_once(' ').unwrap().0.to_string())
-            .collect::<Vec<_>>()
+            .map(|value| {
+                let (ty, _) = value.rsplit_once(' ').ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Java legacy constructor for {} has invalid parameter declaration {value:?}",
+                        typ.name
+                    )
+                })?;
+                Ok(ty.to_string())
+            })
+            .collect::<anyhow::Result<Vec<_>>>()
     };
-    if types(&parameters) == types(declarations) {
+    if types(&parameters)? == types(declarations)? {
         anyhow::ensure!(
             typ.legacy_constructor_fields()
                 .iter()
@@ -447,4 +455,69 @@ fn legacy_constructor_parameters(
         return Ok(None);
     }
     Ok(Some(parameters))
+}
+
+#[cfg(test)]
+mod legacy_constructor_parameter_tests {
+    use super::legacy_constructor_parameters;
+    use crate::core::ir::{FieldDef, TypeDef, VersionAnnotation};
+
+    fn options() -> TypeDef {
+        TypeDef {
+            name: "Options".into(),
+            fields: vec![
+                FieldDef {
+                    name: "enabled".into(),
+                    ..FieldDef::default()
+                },
+                FieldDef {
+                    name: "label".into(),
+                    ..FieldDef::default()
+                },
+            ],
+            version: VersionAnnotation {
+                legacy_constructor_fields: vec!["enabled".into()],
+                ..VersionAnnotation::default()
+            },
+            ..TypeDef::default()
+        }
+    }
+
+    #[test]
+    fn should_reject_malformed_java_legacy_constructor_declarations_with_type_context() {
+        let typ = options();
+        let fields = typ.fields.iter().collect::<Vec<_>>();
+        for declarations in [
+            vec!["boolean".into(), "String label".into()],
+            vec!["boolean enabled".into(), "String".into()],
+        ] {
+            let malformed = declarations
+                .iter()
+                .find(|value: &&String| !value.contains(' '))
+                .unwrap();
+            let error = legacy_constructor_parameters(&typ, &fields, &declarations)
+                .expect_err("malformed declaration returns an error rather than panicking");
+            assert_eq!(
+                error.to_string(),
+                format!("Java legacy constructor for Options has invalid parameter declaration {malformed:?}")
+            );
+        }
+    }
+
+    #[test]
+    fn should_keep_valid_java_legacy_constructor_parameters_unchanged() {
+        let typ = options();
+        let fields = typ.fields.iter().collect::<Vec<_>>();
+        let declarations = vec!["boolean enabled".into(), "@Nullable String label".into()];
+        assert_eq!(
+            legacy_constructor_parameters(&typ, &fields, &declarations).unwrap(),
+            Some(vec!["boolean enabled".into()])
+        );
+        let mut complete = typ.clone();
+        complete.version.legacy_constructor_fields.push("label".into());
+        assert_eq!(
+            legacy_constructor_parameters(&complete, &fields, &declarations).unwrap(),
+            None
+        );
+    }
 }

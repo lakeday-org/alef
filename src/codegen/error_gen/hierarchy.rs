@@ -93,7 +93,11 @@ fn variant_owners(api: &ApiSurface, naming: ExceptionNaming) -> anyhow::Result<B
         for variant in &error.variants {
             let class = class_name(&variant.name, &error.name, naming);
             if let Some(owner) = owners.get(&class) {
-                let owner_error = api.errors.iter().find(|error| error.name == *owner).unwrap();
+                let owner_error = api
+                    .errors
+                    .iter()
+                    .find(|error| error.name == *owner)
+                    .ok_or_else(|| anyhow::anyhow!("missing exception owner {owner} for shared class {class}"))?;
                 let layout = |error: &ErrorDef| {
                     error
                         .methods
