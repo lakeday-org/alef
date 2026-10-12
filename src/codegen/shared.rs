@@ -797,13 +797,7 @@ fn config_constructor_parts_inner(
         .filter(|f| !f.binding_excluded)
         .filter(|f| f.cfg.is_none() || never_skip_cfg_field_names.contains(&f.name))
         .collect();
-    sorted_fields.sort_by_key(|f| {
-        if optionalize_all_fields {
-            f.optional as u8
-        } else {
-            f.optional as u8
-        }
-    });
+    sorted_fields.sort_by_key(|field| (typ.is_constructor_extension(field), field.optional));
 
     let params: Vec<String> = sorted_fields
         .iter()

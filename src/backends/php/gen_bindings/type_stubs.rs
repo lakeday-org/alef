@@ -4,8 +4,8 @@ use crate::backends::php::gen_bindings::php_types::{
 };
 use crate::backends::php::gen_bindings::types::{
     enum_constant_entries, flat_field_name, is_labeled_string_enum, is_php_prop_scalar, is_tagged_data_enum,
-    is_untagged_data_enum, php_constructor_optional_field_names, php_field_base_constructor_optional,
-    php_field_can_be_constructor_param, ty_is_or_wraps_json, ty_references_untagged_data_enum,
+    is_untagged_data_enum, php_constructor_optional_field_names, php_field_can_be_constructor_param,
+    php_sort_constructor_fields, ty_is_or_wraps_json, ty_references_untagged_data_enum,
 };
 use crate::backends::php::naming::php_autoload_namespace;
 use crate::codegen::doc_emission::{DocTarget, sanitize_rust_idioms};
@@ -680,7 +680,7 @@ fn gen_struct_constructor_stub_params(
     let mut ctor_fields: Vec<&FieldDef> = binding_fields(&typ.fields)
         .filter(|f| is_constructor_param(f))
         .collect();
-    ctor_fields.sort_by_key(|f| php_field_base_constructor_optional(typ, f, serde_available));
+    php_sort_constructor_fields(typ, &mut ctor_fields, serde_available);
     let optional_field_names = php_constructor_optional_field_names(typ, &ctor_fields, serde_available);
 
     ctor_fields

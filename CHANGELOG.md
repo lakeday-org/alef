@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve published PHP and WebAssembly positional constructor slots and default annotated Zig extension fields from Rust.
+
 - Split CLI adoption reports, validation diagnostics, extraction deduplication, Swift checksum
   preparation, and TOML merge provenance into focused helpers, removing five lint-debt exemptions.
 
