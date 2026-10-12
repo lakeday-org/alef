@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.2] - 2026-10-12
+
+
 ### Added
 
 - Opt-in `legacy_constructor_fields` preserves existing Python positional, Java record, Swift native, PHP and WebAssembly constructors when defaulted boolean fields are added; Dart and Zig constructors retain those defaults.
@@ -14,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refresh compatible Cargo dependencies, including Schemars 1.2.3.
+- Update the CI Ruby setup action to 1.329.0.
 - Update SHA-256 hashing to sha2 0.11.1, which corrects round-constant loads on AArch64.
 - Generated Kotlin projects use Gradle Versions Plugin 0.66.0, with matching generated-output snapshots.
 - Update the Rust syntax parser dependency to syn 3.0.9 ([#540](https://github.com/xberg-io/alef/pull/540)).
