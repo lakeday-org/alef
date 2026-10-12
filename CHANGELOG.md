@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace invariant-dependent unwraps in Java constructor compatibility and shared exception ownership with contextual generation errors, keeping valid output unchanged.
 - Zig snippet validation negative controls now require the missing-header diagnostic, instead of accepting an unrelated unused-variable error.
 - Split build, setup, clean and test command defaults by language, removing four size-debt exemptions while preserving command configuration and shell quoting.
+- Allow CI to run manually so the current main commit can be verified after workflow re-enablement.
 
 ## [0.110.1] - 2026-10-12
 
