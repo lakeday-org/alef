@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Split build, setup, clean and test command defaults by language, removing four size-debt exemptions while preserving command configuration and shell quoting.
+
 ## [0.110.1] - 2026-10-12
 
 ### Changed
