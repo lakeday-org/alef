@@ -1,3 +1,5 @@
+mod commands;
+
 use super::extras::Language;
 use super::output::{ArgvRunConfig, ArgvStep, CleanConfig, StringOrVec};
 use super::tools::{LangContext, require_tool};
@@ -34,164 +36,25 @@ fn cd_and_run(output_dir: &str, command: &str, args: &[&str]) -> ArgvRunConfig {
 /// effectively always present on supported platforms.
 pub(crate) fn default_clean_config(lang: Language, output_dir: &str, _ctx: &LangContext) -> CleanConfig {
     match lang {
-        Language::Rust => CleanConfig {
-            precondition: Some(require_tool("cargo")),
-            before: None,
-            clean: Some(StringOrVec::Single("cargo clean".to_string())),
-            argv_clean: None,
-        },
-        Language::Python => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: None,
-            argv_clean: Some(cd_and_run(
-                output_dir,
-                "rm",
-                &[
-                    "-rf",
-                    "__pycache__",
-                    ".pytest_cache",
-                    ".mypy_cache",
-                    ".ruff_cache",
-                    "dist",
-                ],
-            )),
-        },
-        Language::Node | Language::Wasm => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: Some(StringOrVec::Single("rm -rf node_modules dist .turbo".to_string())),
-            argv_clean: None,
-        },
-        Language::Go => CleanConfig {
-            precondition: Some(require_tool("go")),
-            before: None,
-            clean: None,
-            argv_clean: Some(cd_and_run(output_dir, "go", &["clean", "-cache"])),
-        },
-        Language::Ruby => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: None,
-            argv_clean: Some(cd_and_run(output_dir, "rm", &["-rf", "tmp", "vendor", ".bundle"])),
-        },
-        Language::Php => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: None,
-            argv_clean: Some(cd_and_run(output_dir, "rm", &["-rf", "vendor", "var"])),
-        },
-        Language::Java => CleanConfig {
-            precondition: Some(require_tool("mvn")),
-            before: None,
-            clean: None,
-            argv_clean: Some(ArgvRunConfig {
-                work_dir: ".".to_owned(),
-                env: Vec::new(),
-                steps: vec![ArgvStep {
-                    command: "mvn".to_owned(),
-                    args: vec![
-                        "-f".to_owned(),
-                        format!("{output_dir}/pom.xml"),
-                        "clean".to_owned(),
-                        "--batch-mode".to_owned(),
-                        "--no-transfer-progress".to_owned(),
-                    ],
-                }],
-            }),
-        },
-        Language::Csharp => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: None,
-            argv_clean: None,
-        },
-        Language::Elixir => CleanConfig {
-            precondition: Some(require_tool("mix")),
-            before: None,
-            clean: None,
-            argv_clean: Some(ArgvRunConfig {
-                work_dir: output_dir.to_owned(),
-                env: Vec::new(),
-                steps: vec![
-                    ArgvStep {
-                        command: "mix".to_owned(),
-                        args: vec!["clean".to_owned()],
-                    },
-                    ArgvStep {
-                        command: "rm".to_owned(),
-                        args: vec!["-rf".to_owned(), "deps".to_owned(), "_build".to_owned()],
-                    },
-                ],
-            }),
-        },
-        Language::R => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: None,
-            argv_clean: Some(cd_and_run(output_dir, "rm", &["-rf", "src/rust/target"])),
-        },
-        Language::Ffi => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: None,
-            argv_clean: None,
-        },
-        Language::Kotlin => CleanConfig {
-            precondition: Some(require_tool("gradle")),
-            before: None,
-            clean: None,
-            argv_clean: Some(cd_and_run(output_dir, "gradle", &["clean"])),
-        },
-        Language::KotlinAndroid => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: None,
-            argv_clean: Some(ArgvRunConfig {
-                work_dir: output_dir.to_owned(),
-                env: Vec::new(),
-                steps: vec![ArgvStep {
-                    command: "./gradlew".to_owned(),
-                    args: vec!["clean".to_owned()],
-                }],
-            }),
-        },
-        Language::Swift => CleanConfig {
-            precondition: Some(require_tool("swift")),
-            before: None,
-            clean: Some(StringOrVec::Single("swift package clean".to_string())),
-            argv_clean: None,
-        },
-        Language::Dart => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: None,
-            argv_clean: None,
-        },
-        Language::Zig => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: Some(StringOrVec::Single("rm -rf zig-out zig-cache .zig-cache".to_string())),
-            argv_clean: None,
-        },
-        Language::Gleam => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: Some(StringOrVec::Single("rm -rf build".to_string())),
-            argv_clean: None,
-        },
-        Language::C => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: Some(StringOrVec::Single("cd e2e/c && make clean".to_string())),
-            argv_clean: None,
-        },
-        Language::Jni => CleanConfig {
-            precondition: None,
-            before: None,
-            clean: None,
-            argv_clean: None,
-        },
+        Language::Rust => commands::rust_config(),
+        Language::Python => commands::python_config(output_dir),
+        Language::Node | Language::Wasm => commands::node_wasm_config(),
+        Language::Go => commands::go_config(output_dir),
+        Language::Ruby => commands::ruby_config(output_dir),
+        Language::Php => commands::php_config(output_dir),
+        Language::Java => commands::java_config(output_dir),
+        Language::Csharp => commands::csharp_config(),
+        Language::Elixir => commands::elixir_config(output_dir),
+        Language::R => commands::r_config(output_dir),
+        Language::Ffi => commands::ffi_config(),
+        Language::Kotlin => commands::kotlin_config(output_dir),
+        Language::KotlinAndroid => commands::kotlin_android_config(output_dir),
+        Language::Swift => commands::swift_config(),
+        Language::Dart => commands::dart_config(),
+        Language::Zig => commands::zig_config(),
+        Language::Gleam => commands::gleam_config(),
+        Language::C => commands::c_config(),
+        Language::Jni => commands::jni_config(),
     }
 }
 

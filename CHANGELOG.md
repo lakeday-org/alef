@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Elixir native lockfile synchronization resolves each local crate version, including versions inherited from nested or explicitly selected Cargo workspaces, instead of overwriting independent path dependencies with the consumer version.
 - Replace invariant-dependent unwraps in Java constructor compatibility and shared exception ownership with contextual generation errors, keeping valid output unchanged.
 - Zig snippet validation negative controls now require the missing-header diagnostic, instead of accepting an unrelated unused-variable error.
+- Split build, setup, clean and test command defaults by language, removing four size-debt exemptions while preserving command configuration and shell quoting.
 
 ## [0.110.1] - 2026-10-12
 

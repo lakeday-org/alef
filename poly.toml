@@ -78,7 +78,7 @@ pylint_max_returns = 10
 "src/e2e/codegen/python/lint_clean_python_tests.rs" = ["lazy-ignore"]
 "src/scaffold/languages/poly.rs" = ["cyclomatic-complexity", "function-too-long", "lazy-ignore"]
 # --- quality-debt baseline (generated) ---
-# 1183 size/complexity findings across 610 files that predate these
+# 1179 size/complexity findings across 606 files that predate these
 # metrics. Listed per file rather than switching the rules off, so the metrics still
 # fire on every file NOT listed here -- new code stays covered, and each path below is
 # one discrete unit of work.
@@ -684,15 +684,11 @@ pylint_max_returns = 10
 "src/codegen/shared.rs" = ["function-too-long"]
 "src/codegen/visitor_context.rs" = ["function-too-long"]
 "src/codegen/visitor_result.rs" = ["function-too-long"]
-"src/core/config/build_defaults.rs" = ["function-too-long"]
-"src/core/config/clean_defaults.rs" = ["function-too-long"]
 "src/core/config/e2e/call.rs" = ["type-too-long"]
 "src/core/config/lint_defaults.rs" = ["function-too-long"]
 "src/core/config/new_config.rs" = ["cyclomatic-complexity", "file-too-long", "function-too-long", "nesting-too-deep"]
 "src/core/config/resolved/lookups.rs" = ["function-too-long"]
-"src/core/config/setup_defaults.rs" = ["function-too-long"]
 "src/core/config/test_apps_run_defaults.rs" = ["function-too-long"]
-"src/core/config/test_defaults.rs" = ["function-too-long"]
 "src/core/config/update_defaults.rs" = ["function-too-long"]
 "src/core/ir/items.rs" = ["file-too-long"]
 "src/core/validation/readiness.rs" = [
