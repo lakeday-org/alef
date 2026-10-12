@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Allow CI to run manually so the current main commit can be verified after workflow re-enablement.
+
 ### Changed
 
 - Update SHA-256 hashing to sha2 0.11.1, which corrects round-constant loads on AArch64.
