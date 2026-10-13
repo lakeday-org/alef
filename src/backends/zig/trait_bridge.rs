@@ -128,10 +128,10 @@ fn vtable_c_params(method: &MethodDef) -> Vec<(String, String)> {
         }
     }
     if method_needs_out_result(method) {
-        params.push(("out_result".to_string(), "?*?[*c]u8".to_string()));
+        params.push(("out_result".to_string(), "?*[*c]u8".to_string()));
     }
     if method.error_type.is_some() || method_needs_out_result(method) {
-        params.push(("out_error".to_string(), "?*?[*c]u8".to_string()));
+        params.push(("out_error".to_string(), "?*[*c]u8".to_string()));
     }
     params
 }
@@ -403,25 +403,25 @@ pub fn emit_trait_bridge(
     if has_super_trait {
         out.push_str("    /// Return the plugin name into `out_name` (heap-allocated, caller frees).\n");
         out.push_str(
-            "    name_fn: ?*const fn (user_data: ?*anyopaque, out_name: ?*?[*c]u8, out_error: ?*?[*c]u8) callconv(.c) i32 = null,\n",
+            "    name_fn: ?*const fn (user_data: ?*anyopaque, out_name: ?*[*c]u8, out_error: ?*[*c]u8) callconv(.c) i32 = null,\n",
         );
         out.push('\n');
 
         out.push_str("    /// Return the plugin version into `out_version` (heap-allocated, caller frees).\n");
         out.push_str(
-            "    version_fn: ?*const fn (user_data: ?*anyopaque, out_version: ?*?[*c]u8, out_error: ?*?[*c]u8) callconv(.c) i32 = null,\n",
+            "    version_fn: ?*const fn (user_data: ?*anyopaque, out_version: ?*[*c]u8, out_error: ?*[*c]u8) callconv(.c) i32 = null,\n",
         );
         out.push('\n');
 
         out.push_str("    /// Initialise the plugin; return 0 on success, non-zero on error.\n");
         out.push_str(
-            "    initialize_fn: ?*const fn (user_data: ?*anyopaque, out_error: ?*?[*c]u8) callconv(.c) i32 = null,\n",
+            "    initialize_fn: ?*const fn (user_data: ?*anyopaque, out_error: ?*[*c]u8) callconv(.c) i32 = null,\n",
         );
         out.push('\n');
 
         out.push_str("    /// Shut down the plugin; return 0 on success, non-zero on error.\n");
         out.push_str(
-            "    shutdown_fn: ?*const fn (user_data: ?*anyopaque, out_error: ?*?[*c]u8) callconv(.c) i32 = null,\n",
+            "    shutdown_fn: ?*const fn (user_data: ?*anyopaque, out_error: ?*[*c]u8) callconv(.c) i32 = null,\n",
         );
         out.push('\n');
     }
@@ -455,10 +455,10 @@ pub fn emit_trait_bridge(
         }
 
         if method_needs_out_result(method) {
-            params.push("out_result: ?*?[*c]u8".to_string());
+            params.push("out_result: ?*[*c]u8".to_string());
         }
         if method.error_type.is_some() || method_needs_out_result(method) {
-            params.push("out_error: ?*?[*c]u8".to_string());
+            params.push("out_error: ?*[*c]u8".to_string());
         }
 
         let params_str = params.join(", ");

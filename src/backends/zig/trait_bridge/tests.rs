@@ -212,8 +212,10 @@ fn trait_vtable_includes_free_string_and_status_lifecycle_callbacks() {
     );
 
     assert!(out.contains("free_string: ?*const fn (ptr: [*c]u8) callconv(.c) void = null"));
-    assert!(out.contains("name_fn: ?*const fn (user_data: ?*anyopaque, out_name: ?*?[*c]u8, out_error: ?*?[*c]u8) callconv(.c) i32 = null"));
-    assert!(out.contains("version_fn: ?*const fn (user_data: ?*anyopaque, out_version: ?*?[*c]u8, out_error: ?*?[*c]u8) callconv(.c) i32 = null"));
+    assert!(out.contains(
+        "name_fn: ?*const fn (user_data: ?*anyopaque, out_name: ?*[*c]u8, out_error: ?*[*c]u8) callconv(.c) i32 = null"
+    ));
+    assert!(out.contains("version_fn: ?*const fn (user_data: ?*anyopaque, out_version: ?*[*c]u8, out_error: ?*[*c]u8) callconv(.c) i32 = null"));
 }
 
 #[test]
@@ -239,15 +241,56 @@ fn infallible_complex_return_matches_ffi_out_error_abi() {
         &mut out,
     );
 
-    let expected_signature = "processing_stage: ?*const fn (user_data: ?*anyopaque, out_result: ?*?[*c]u8, out_error: ?*?[*c]u8) callconv(.c) i32 = null";
+    let expected_signature = "processing_stage: ?*const fn (user_data: ?*anyopaque, out_result: ?*[*c]u8, out_error: ?*[*c]u8) callconv(.c) i32 = null";
     assert!(
         out.contains(expected_signature),
         "infallible complex returns must match the FFI vtable's out_error slot:\n{out}"
     );
     assert!(
-        out.contains("fn thunk(ud: ?*anyopaque, out_result: ?*?[*c]u8, out_error: ?*?[*c]u8) callconv(.c) i32"),
+        out.contains("fn thunk(ud: ?*anyopaque, out_result: ?*[*c]u8, out_error: ?*[*c]u8) callconv(.c) i32"),
         "generated thunk must use the same callback ABI:\n{out}"
     );
+}
+
+#[test]
+fn vtable_thunk_out_params_are_non_optional_c_pointers() {
+    let trait_def = make_trait_def(
+        "PostProcessor",
+        vec![make_method(
+            "processing_stage",
+            vec![],
+            TypeRef::Named("ProcessingStage".to_string()),
+            None,
+        )],
+    );
+    let bridge_cfg = make_bridge_cfg("PostProcessor", Some("Plugin"));
+    let mut out = String::new();
+    emit_trait_bridge(
+        "sample",
+        "SampleError",
+        &bridge_cfg,
+        &trait_def,
+        &HashSet::new(),
+        &mut out,
+    );
+
+    assert!(
+        out.contains("out_name: ?*[*c]u8"),
+        "name thunk must use ?*[*c]u8:\n{out}"
+    );
+    assert!(
+        out.contains("out_result: ?*[*c]u8"),
+        "result thunk must use ?*[*c]u8:\n{out}"
+    );
+    for line in out
+        .lines()
+        .filter(|l| l.contains("fn thunk(") || l.contains("_fn: ?*const fn"))
+    {
+        assert!(
+            !line.contains("?*?[*c]u8"),
+            "vtable thunk keeps optional-pointer out-param: {line}"
+        );
+    }
 }
 
 #[test]
