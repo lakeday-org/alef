@@ -6,88 +6,10 @@ pub(super) fn generate(config: &ResolvedCrateConfig) -> Option<String> {
     if config.components.is_empty() {
         return None;
     }
-    Some(
-        r#"public enum AlefComponentError: Error, LocalizedError {
-    case unsupported(String)
-    case runtime(String)
-
-    public var errorDescription: String? {
-        switch self {
-        case .unsupported(let message): return message
-        case .runtime(let message): return message
-        }
-    }
-}
-
-private struct AlefComponentResponse<Value: Decodable>: Decodable {
-    let ok: Value?
-    let err: String?
-}
-
-private func alefDecodeComponentResponse<Value: Decodable>(
-    _ response: RustString,
-    as type: Value.Type
-) throws -> Value {
-    let decoded = try JSONDecoder().decode(
-        AlefComponentResponse<Value>.self,
-        from: Data(response.toString().utf8)
-    )
-    if let error = decoded.err {
-        throw AlefComponentError.runtime(error)
-    }
-    guard let value = decoded.ok else {
-        throw AlefComponentError.runtime("Native component operation returned no value")
-    }
-    return value
-}
-
-private func alefEnsureComponentPlatform() throws {
-#if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-    throw AlefComponentError.unsupported(
-        "Downloadable native components are unsupported on Apple mobile targets; bundle the feature profile into the application instead."
-    )
-#endif
-}
-
-/// Ensure a signed native component is downloaded, verified, and loaded.
-public func componentLoad(_ component: String) throws {
-    try alefEnsureComponentPlatform()
-    _ = try alefDecodeComponentResponse(
-        RustBridge.component_load(RustString(component)),
-        as: Bool.self
-    )
-}
-
-/// Prefetch one component, or every configured component when `component` is nil.
-public func componentPrefetch(_ component: String? = nil) throws -> [String] {
-    try alefEnsureComponentPlatform()
-    return try alefDecodeComponentResponse(
-        RustBridge.component_prefetch(component.map(RustString.init)),
-        as: [String].self
-    )
-}
-
-/// Return `ready`, `cached`, `not_downloaded`, `bundled`, or `unsupported:<reason>` for a component.
-public func componentStatus(_ component: String) throws -> String {
-    try alefEnsureComponentPlatform()
-    return try alefDecodeComponentResponse(
-        RustBridge.component_status(RustString(component)),
-        as: String.self
-    )
-}
-
-/// Return the verified content-addressed cache path for a component.
-public func componentCachePath(_ component: String) throws -> String {
-    try alefEnsureComponentPlatform()
-    return try alefDecodeComponentResponse(
-        RustBridge.component_cache_path(RustString(component)),
-        as: String.self
-    )
-}
-
-"#
-        .to_string(),
-    )
+    let mut generated = crate::backends::swift::template_env::render("components.swift.jinja", crate::alef_context! {});
+    // Keep the separating blank line used when appending the component API. ~keep
+    generated.push('\n');
+    Some(generated)
 }
 
 #[cfg(test)]
@@ -119,5 +41,13 @@ mod tests {
         assert!(generated.contains("#if os(iOS) || os(tvOS)"));
         assert!(generated.contains("RustBridge.component_load"));
         assert!(generated.contains("AlefComponentResponse<Value>"));
+        use sha2::Digest as _;
+        assert_eq!(
+            sha2::Sha256::digest(generated.as_bytes())
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+            "b053585558b16dddab0945981fb60d4d9914414439b53ad55af2cdffd52f8407"
+        );
     }
 }

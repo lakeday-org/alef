@@ -1,5 +1,9 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
     (
+        "components.swift.jinja",
+        include_str!("../templates/components.swift.jinja"),
+    ),
+    (
         "swift_enum_header.jinja",
         include_str!("../templates/swift_enum_header.jinja"),
     ),

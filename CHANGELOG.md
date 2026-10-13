@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Move Swift component wrapper emission into a registered template without changing generated output, removing one lint warning.
+
 ### Fixed
 
 - Preserve Swift public initializer calls when fields with resolved Rust type-zero defaults are added after a recorded constructor ([#555](https://github.com/xberg-io/alef/issues/555)).
