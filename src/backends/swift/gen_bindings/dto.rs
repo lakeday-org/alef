@@ -250,13 +250,9 @@ pub(super) fn emit_first_class_struct(
             let camel = swift_case_ident(&field.name.to_lower_camel_case());
             let already_optional = matches!(&field.ty, TypeRef::Optional(_));
             let swift_ty = swift_field_type(mapper, &field.ty);
-            // The Rust default, when it has a Swift literal, beats the `nil`/required rendering
-            // below. `Option<T>` carrying `Some(x)` reaches the IR as the bare literal (the
-            // extractor unwraps `Some`), so without this an `Option<u32>` defaulting to
-            // `Some(30)` initialised to `nil` — a value the source crate never produces.
-            // Collection type-zeros are also exact for `Empty` and bare `serde(default)`, keeping
-            // newly added collection fields backward-compatible for Swift callers. ~keep
-            let literal = super::zero_arg_default::swift_memberwise_default_literal(field);
+            // Resolved literals preserve Some(x); recorded extensions also carry their Rust
+            // type-zero defaults so existing Swift calls remain source-compatible. ~keep
+            let literal = super::zero_arg_default::swift_constructor_default_literal(ty, field);
             let optional_suffix = if field.optional && !already_optional { "?" } else { "" };
             match literal {
                 Some(value) => format!("{camel}: {swift_ty}{optional_suffix} = {value}"),

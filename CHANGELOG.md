@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve Swift public initializer calls when fields with resolved Rust type-zero defaults are added after a recorded constructor ([#555](https://github.com/xberg-io/alef/issues/555)).
+
 ## [0.110.4] - 2026-10-13
 
 ### Changed

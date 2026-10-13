@@ -6,9 +6,9 @@
 //! `backends::swift::named_serde_default_tests` for the companion test coverage, kept out of
 //! `dto.rs` for the same reason.
 
-use crate::backends::swift::gen_bindings::dto::swift_typed_default_literal;
+use crate::backends::swift::gen_bindings::dto::{swift_type_based_default, swift_typed_default_literal};
 use crate::codegen::shared::binding_fields;
-use crate::core::ir::{ApiSurface, DefaultValue, FieldDef, TypeRef};
+use crate::core::ir::{ApiSurface, DefaultValue, FieldDef, TypeDef, TypeRef};
 use std::collections::HashSet;
 
 /// Returns the default expression carried by a generated memberwise initializer parameter.
@@ -43,6 +43,13 @@ pub(crate) fn swift_memberwise_default_literal(field: &FieldDef) -> Option<Strin
         })
 }
 
+pub(crate) fn swift_constructor_default_literal(owner: &TypeDef, field: &FieldDef) -> Option<String> {
+    swift_memberwise_default_literal(field).or_else(|| match owner.constructor_extension_value(field)? {
+        DefaultValue::Empty if !field.optional => swift_type_based_default(&field.ty),
+        _ => None,
+    })
+}
+
 /// Computes the subset of `known_dto_names` whose generated memberwise `public init` accepts
 /// zero arguments — i.e. every visible field either renders a Swift literal default
 /// (`= <literal>`) or is Optional (`= nil`), the exact per-field rule `emit_first_class_struct`'s
@@ -74,7 +81,7 @@ pub(crate) fn compute_zero_arg_constructible_names(
         .filter(|t| {
             binding_fields(&t.fields).all(|field| {
                 let already_optional = matches!(&field.ty, TypeRef::Optional(_));
-                field.optional || already_optional || swift_memberwise_default_literal(field).is_some()
+                field.optional || already_optional || swift_constructor_default_literal(t, field).is_some()
             })
         })
         .map(|t| t.name.clone())
@@ -105,4 +112,46 @@ pub(crate) fn zero_arg_named_default(
     zero_arg_constructible_names
         .contains(name)
         .then(|| format!("{swift_ty}()"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zero_arg_detection_uses_the_same_recorded_defaults_as_the_initializer() {
+        let mut owner = TypeDef {
+            name: "Options".into(),
+            has_serde: true,
+            fields: vec![
+                FieldDef {
+                    name: "seed".into(),
+                    ty: TypeRef::Optional(Box::new(TypeRef::String)),
+                    ..Default::default()
+                },
+                FieldDef {
+                    name: "added_value".into(),
+                    ty: TypeRef::String,
+                    typed_default: Some(DefaultValue::Empty),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let known = HashSet::from([owner.name.clone()]);
+        let names = |owner| {
+            compute_zero_arg_constructible_names(
+                &ApiSurface {
+                    types: vec![owner],
+                    ..Default::default()
+                },
+                &known,
+            )
+        };
+        assert!(names(owner.clone()).is_empty());
+        owner.version.legacy_constructor_fields = vec!["seed".into()];
+        assert_eq!(names(owner.clone()), known);
+        owner.fields[1].typed_default = Some(DefaultValue::FunctionCall("unknown".into()));
+        assert!(names(owner).is_empty());
+    }
 }
