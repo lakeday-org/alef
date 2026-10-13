@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.3] - 2026-10-13
+
 ### Fixed
 
 - C# error dispatch retains every distinct message prefix when related error families share one exception class.
