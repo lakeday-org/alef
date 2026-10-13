@@ -1,6 +1,7 @@
 use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
+    ("ffi_components.jinja", include_str!("templates/ffi_components.jinja")),
     ("class_header.jinja", include_str!("templates/class_header.jinja")),
     ("class_empty.jinja", include_str!("templates/class_empty.jinja")),
     ("class_open.jinja", include_str!("templates/class_open.jinja")),
