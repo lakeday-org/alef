@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.8] - 2026-10-13
+
 ### Changed
 
 - Simplify the source-crate hash fixture without changing its source lists or assertions, removing another oversized-test warning.
