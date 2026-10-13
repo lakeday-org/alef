@@ -21,9 +21,9 @@ impl SnippetValidator for YamlValidator {
     ) -> Result<(SnippetStatus, Option<String>)> {
         // `IgnoredAny` still drives a full parse, and unlike `serde_json::Value` it does not
         // reject non-string keys — legal YAML, plausible in hand-written snippets. ~keep
+        // Non-finite scalars are valid YAML and remain accepted as strings. ~keep
         let mut options = serde_saphyr::Options::default();
-        // `.nan` / `.inf` are valid scalars; serde_yaml passed them.
-        options.reject_non_finite_typeless_float = false;
+        options.non_finite_float_policy = serde_saphyr::NonFiniteFloatPolicy::AsString;
         match serde_saphyr::from_str_with_options::<serde::de::IgnoredAny>(&snippet.code, options) {
             Ok(_) => Ok((SnippetStatus::Pass, None)),
             Err(err) => Ok((SnippetStatus::Fail, Some(err.to_string()))),
@@ -91,13 +91,13 @@ mod tests {
     #[test]
     fn valid_yaml_passes_including_shapes_a_json_shaped_target_would_reject() {
         for valid in [
-            "",                   // empty snippet
-            "# just a comment\n", // comment-only snippet
-            "~",                  // explicit null document
-            "a: 1\nb: [x, y]\n",  // ordinary mapping
-            "1: one\n",           // non-string mapping key
-            "a: !mytag hello\n",  // application-specific tag
-            "a: .nan\nb: .inf\n", // non-finite floats
+            "",                             // empty snippet
+            "# just a comment\n",           // comment-only snippet
+            "~",                            // explicit null document
+            "a: 1\nb: [x, y]\n",            // ordinary mapping
+            "1: one\n",                     // non-string mapping key
+            "a: !mytag hello\n",            // application-specific tag
+            "a: .nan\nb: .inf\nc: -.inf\n", // non-finite floats
         ] {
             assert_eq!(
                 status(valid),
