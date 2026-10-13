@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.9] - 2026-10-13
+
 ### Changed
+
+- Refresh the compatible Cargo lockfile to zip 9.0.3 and zerocopy/zerocopy-derive 0.8.63.
 
 - Simplify the overlapping-source hash fixture while preserving its source lists and assertions, removing one oversized-test warning.
 
