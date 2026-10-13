@@ -384,6 +384,10 @@ static TEMPLATES: &[(&str, &str)] = &[
         include_str!("templates/pyo3_capsule_call_no_capsule_return.jinja"),
     ),
     (
+        "pyo3_capsule_method.jinja",
+        include_str!("templates/pyo3_capsule_method.jinja"),
+    ),
+    (
         "pyo3_capsule_param_extract.jinja",
         include_str!("templates/pyo3_capsule_param_extract.jinja"),
     ),

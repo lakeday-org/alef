@@ -54,6 +54,8 @@ use crate::core::backend::{Backend, BuildConfig, BuildDependency, Capabilities, 
 use crate::core::config::{AdapterPattern, Language, ResolvedCrateConfig, resolve_output_dir};
 use crate::core::ir::ApiSurface;
 use ahash::AHashSet;
+use capsule::gen_capsule_function;
+use capsule_methods::rewrite_capsule_methods;
 use std::path::PathBuf;
 
 pub struct Pyo3Backend;
@@ -290,6 +292,7 @@ impl Backend for Pyo3Backend {
             .as_ref()
             .map(|c| c.capsule_types.clone())
             .unwrap_or_default();
+        let release_gil = config.python.as_ref().is_some_and(|python| python.release_gil);
 
         let mut error_type_names: AHashSet<String> = AHashSet::new();
         for error in &api.errors {
@@ -395,7 +398,7 @@ impl Backend for Pyo3Backend {
                 // PyCapsule objects instead of the (non-existent) #[pyclass] wrapper structs.
                 if !capsule_types.is_empty() {
                     impl_block =
-                        capsule_methods::rewrite_capsule_methods(impl_block, typ, &capsule_types, &error_converters);
+                        rewrite_capsule_methods(impl_block, typ, &capsule_types, &error_converters, release_gil);
                 }
                 // the type into a Python-level constructor by appending a `#[new]
                 // block. pyo3 forbids multiple `#[pymethods] impl T` blocks (without
@@ -653,11 +656,12 @@ impl Backend for Pyo3Backend {
                     &error_converters,
                 ));
             } else if !capsule_types.is_empty() && capsule::function_involves_capsule(f, &capsule_types) {
-                builder.add_item(&capsule::gen_capsule_function(
+                builder.add_item(&gen_capsule_function(
                     f,
                     &capsule_types,
                     &core_import,
                     &error_converters,
+                    release_gil,
                 ));
             } else {
                 let mut fn_code =

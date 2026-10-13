@@ -1,1 +1,1 @@
-    let {{ target }} = {{ core_fn_path }}({{ args }});
+    let {{ target }} = {% if release_gil %}py.detach({% if args %}|| {{ core_fn_path }}({{ args }}){% else %}{{ core_fn_path }}{% endif %}){% else %}{{ core_fn_path }}({{ args }}){% endif %};

@@ -11,6 +11,7 @@ pub(super) fn rewrite_capsule_methods(
     typ: &crate::core::ir::TypeDef,
     capsule_types: &std::collections::HashMap<String, crate::core::config::CapsuleTypeConfig>,
     error_converters: &[String],
+    release_gil: bool,
 ) -> String {
     use crate::codegen::type_mapper::TypeMapper as _;
     use crate::core::ir::TypeRef;
@@ -111,6 +112,11 @@ pub(super) fn rewrite_capsule_methods(
         };
 
         let core_call = format!("self.inner.{}({})", method.name, call_args_str);
+        let core_call = if release_gil && !method.is_async && !has_capsule_param {
+            format!("py.detach(|| {core_call})")
+        } else {
+            core_call
+        };
 
         let err_map_suffix = if method.error_type.is_some() {
             let converter = method
@@ -150,32 +156,25 @@ pub(super) fn rewrite_capsule_methods(
             match cfg {
                 crate::core::config::CapsuleTypeConfig::Capsule(capsule_name_str) => {
                     let capsule_cstr = capsule_name_str.replace('.', "_").to_ascii_uppercase();
-                    let construct = match capsule_name_str.rsplit_once('.') {
-                    Some((module_path, class_name)) => format!(
-                        r#"        // SAFETY: capsule_ptr is a valid, non-null Python object pointer we just created above.
-        let _capsule_obj = unsafe {{ pyo3::Bound::from_owned_ptr(py, capsule_ptr) }};
-        let _ts_mod = py.import("{module_path}")?;
-        let _cls = _ts_mod.getattr("{class_name}")?;
-        Ok(_cls.call1((_capsule_obj,))?.unbind())"#,
-                    ),
-                    None => {
-                        "        // SAFETY: capsule_ptr is a valid, non-null Python object pointer we just created above.\n        Ok(unsafe { pyo3::Bound::from_owned_ptr(py, capsule_ptr) }.unbind())".to_string()
-                    }
-                };
-                    format!(
-                        r#"    {sig_attr}    #[allow(clippy::missing_errors_doc)]
-    pub fn {method_name}({params_str}) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {{
-        const {capsule_cstr}_NAME: &::std::ffi::CStr = c"{capsule_name_str}";
-{capsule_param_extract}        let result = {core_call}{err_map_suffix};
-        let raw_ptr = result.into_raw();
-        // SAFETY: raw_ptr is a valid pointer derived from into_raw() on a value with program lifetime.
-        let capsule_ptr = unsafe {{ pyo3::ffi::PyCapsule_New(raw_ptr as *mut _, {capsule_cstr}_NAME.as_ptr(), None) }};
-        if capsule_ptr.is_null() {{
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("Failed to create PyCapsule"));
-        }}
-{construct}
-    }}"#,
+                    let signature = method
+                        .params
+                        .iter()
+                        .map(|param| param.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let (module_path, class_name) = capsule_name_str.rsplit_once('.').unwrap_or(("", ""));
+                    crate::backends::pyo3::template_env::render(
+                        "pyo3_capsule_method.jinja",
+                        crate::alef_context! {
+                            signature => signature,
+                            method_name => method_name, params_str => params_str,
+                            capsule_cstr => capsule_cstr, capsule_name => capsule_name_str,
+                            capsule_param_extract => capsule_param_extract, core_call => core_call,
+                            err_map_suffix => err_map_suffix, module_path => module_path, class_name => class_name,
+                        },
                     )
+                    .trim_end_matches('\n')
+                    .to_string()
                 }
                 crate::core::config::CapsuleTypeConfig::ConstructFrom {
                     python_type,
@@ -373,7 +372,7 @@ mod tests {
             },
         )]);
 
-        let out = rewrite_capsule_methods(IMPL_BLOCK.to_string(), &typ, &capsules, &[]);
+        let out = rewrite_capsule_methods(IMPL_BLOCK.to_string(), &typ, &capsules, &[], false);
 
         assert!(
             !out.contains("unreachable!()"),
@@ -412,7 +411,7 @@ mod tests {
             },
         )]);
 
-        let out = rewrite_capsule_methods(IMPL_BLOCK.to_string(), &typ, &capsules, &[]);
+        let out = rewrite_capsule_methods(IMPL_BLOCK.to_string(), &typ, &capsules, &[], false);
 
         assert!(
             !out.contains("unreachable!()"),

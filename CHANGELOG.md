@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Release the Python GIL around synchronous capsule-returning Rust calls and methods when requested, then reacquire it for error conversion and Python capsule construction ([#562](https://github.com/xberg-io/alef/issues/562)).
+
 ## [0.110.8] - 2026-10-13
 
 ### Changed

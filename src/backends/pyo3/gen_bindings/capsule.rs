@@ -85,6 +85,7 @@ pub(super) fn gen_capsule_function(
     capsule_types: &HashMap<String, CapsuleTypeConfig>,
     core_import: &str,
     error_converters: &[String],
+    release_gil: bool,
 ) -> String {
     use heck::ToSnakeCase;
 
@@ -241,6 +242,8 @@ pub(super) fn gen_capsule_function(
         })
         .collect();
 
+    // Capsule inputs expose raw pointers; keep them on the attached thread. ~keep
+    let release_gil = release_gil && !func.is_async && params_with_capsule(func, capsule_types).next().is_none();
     let has_error = func.error_type.is_some();
     let core_fn_path = format!("{core_import}::{fn_name}", fn_name = func.name);
 
@@ -262,6 +265,7 @@ pub(super) fn gen_capsule_function(
                     out.push_str(&crate::backends::pyo3::template_env::render(
                         "pyo3_capsule_call_result_err.jinja",
                         crate::alef_context! {
+                            release_gil => release_gil,
                             target => "result",
                             core_fn_path => core_fn_path.as_str(),
                             args => core_args.join(", "),
@@ -272,6 +276,7 @@ pub(super) fn gen_capsule_function(
                     out.push_str(&crate::backends::pyo3::template_env::render(
                         "pyo3_capsule_call_result.jinja",
                         crate::alef_context! {
+                            release_gil => release_gil,
                             target => "result",
                             core_fn_path => core_fn_path.as_str(),
                             args => core_args.join(", "),
@@ -549,7 +554,7 @@ mod tests {
             ),
         ]);
 
-        let out = gen_capsule_function(&func, &capsules, "core", &[]);
+        let out = gen_capsule_function(&func, &capsules, "core", &[], false);
 
         assert!(
             !out.contains("unreachable!()"),
@@ -592,7 +597,7 @@ mod tests {
             ),
         ]);
 
-        let out = gen_capsule_function(&func, &capsules, "core", &[]);
+        let out = gen_capsule_function(&func, &capsules, "core", &[], false);
 
         assert!(
             !out.contains("unreachable!()"),
