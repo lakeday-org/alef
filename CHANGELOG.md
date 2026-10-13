@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.6] - 2026-10-13
+
+### Fixed
+
+- Type Zig trait-bridge vtable out-params as `?*[*c]u8` so string results written through `char **` no longer corrupt the caller's slot and neighbouring locals ([#558](https://github.com/xberg-io/alef/issues/558)).
+
 ## [0.110.5] - 2026-10-13
 
 ### Changed
