@@ -105,3 +105,56 @@ fn scan_tallies_opened_marked_and_unexamined_separately() {
         }
     );
 }
+#[test]
+fn submodule_markers_are_excluded_but_parent_markers_are_scanned() {
+    let root = tempfile::tempdir().unwrap();
+    let child = root.path().join("fixtures with spaces/.agents/skills/demo");
+    std::fs::create_dir_all(&child).unwrap();
+    let marked = crate::core::hash::header(crate::core::hash::CommentStyle::DoubleSlash);
+    std::fs::write(child.join("SKILL.md"), &marked).unwrap();
+    std::fs::write(root.path().join("parent.rs"), &marked).unwrap();
+    std::fs::write(
+        root.path().join(".gitmodules"),
+        "[submodule \"corpus\"]\npath = fixtures with spaces\nurl = https://example.com/fixtures\n",
+    )
+    .unwrap();
+    let (found, coverage) = super::scan(root.path());
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].0, root.path().join("parent.rs"));
+    assert_eq!(coverage.marked, 1);
+}
+
+#[test]
+fn gitlink_paths_are_pruned_even_without_gitmodules() {
+    use std::process::Command;
+    let root = tempfile::tempdir().unwrap();
+    let child = root.path().join("checkout");
+    let sibling = root.path().join("checkout-other");
+    std::fs::create_dir_all(&child).unwrap();
+    std::fs::create_dir_all(&sibling).unwrap();
+    let marked = crate::core::hash::header(crate::core::hash::CommentStyle::DoubleSlash);
+    std::fs::write(child.join("bridge.rs"), &marked).unwrap();
+    std::fs::write(sibling.join("bridge.rs"), &marked).unwrap();
+    for args in [
+        vec!["init", "--quiet"],
+        vec![
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "160000,1111111111111111111111111111111111111111,checkout",
+        ],
+    ] {
+        assert!(
+            Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    let (found, coverage) = super::scan(root.path());
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].0, sibling.join("bridge.rs"));
+    assert_eq!(coverage.marked, 1);
+}

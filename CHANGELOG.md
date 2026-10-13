@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Exclude declared submodules and indexed gitlinks from generated-file ownership scans, preserving parent-owned and sibling files ([#557](https://github.com/xberg-io/alef/issues/557)).
 - Synchronize local Python project versions in uv.lock, including workspace members and Maturin-derived versions, and detect stale project entries during lock freshness checks ([#556](https://github.com/xberg-io/alef/issues/556)).
 - Preserve Swift public initializer calls when fields with resolved Rust type-zero defaults are added after a recorded constructor ([#555](https://github.com/xberg-io/alef/issues/555)).
 

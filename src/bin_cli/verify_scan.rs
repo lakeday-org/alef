@@ -6,6 +6,8 @@
 //! two allowlists, the directory prune, the walk itself, and the coverage tally the walk
 //! produces all change together and for the same reason. ~keep
 
+mod submodules;
+
 /// Build/cache directories the verify walk never descends into.
 const VERIFY_SKIP_DIRS: &[&str] = &[
     ".git",
@@ -234,6 +236,7 @@ pub(crate) fn scan(base_dir: &std::path::Path) -> (Vec<(std::path::PathBuf, Opti
     // this run's generated output nor its generation input -- it must never be read as either.
     // See that module's doc for the incident this closes. ~keep
     let gitignored_dirs = super::verify_gitignore::gitignored_dirs(base_dir);
+    let submodule_paths = submodules::paths(base_dir);
 
     while let Some(dir) = stack.pop() {
         let entries = match std::fs::read_dir(&dir) {
@@ -249,10 +252,10 @@ pub(crate) fn scan(base_dir: &std::path::Path) -> (Vec<(std::path::PathBuf, Opti
             if file_type.is_dir() {
                 let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
                 let pruned_as_dotfile = name.starts_with('.') && !VERIFY_SCAN_DOT_DIRS.contains(&name);
-                let pruned_as_gitignored = path
+                let pruned_by_git = path
                     .strip_prefix(base_dir)
-                    .is_ok_and(|relative| gitignored_dirs.contains(relative));
-                if VERIFY_SKIP_DIRS.contains(&name) || pruned_as_dotfile || pruned_as_gitignored {
+                    .is_ok_and(|relative| gitignored_dirs.contains(relative) || submodule_paths.contains(relative));
+                if VERIFY_SKIP_DIRS.contains(&name) || pruned_as_dotfile || pruned_by_git {
                     continue;
                 }
                 stack.push(path);
