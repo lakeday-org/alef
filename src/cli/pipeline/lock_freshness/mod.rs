@@ -37,7 +37,8 @@ mod node;
 mod php;
 mod ruby;
 mod shared;
-mod uv;
+pub(super) mod uv;
+pub(super) use uv::normalize_pep503_name;
 
 pub(crate) use cargo::{
     StaleLockFinding, check_generated_lock_freshness_tolerating_pending_publish, stale_lock_findings,

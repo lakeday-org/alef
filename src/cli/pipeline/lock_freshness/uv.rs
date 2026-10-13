@@ -157,12 +157,13 @@ pub(crate) fn stale_uv_lock_findings(pyproject_dir: &Path) -> Vec<StaleUvLockFin
     let Some(project_name) = project.get("name").and_then(toml::Value::as_str) else {
         return Vec::new();
     };
+    let mut findings = project_version_findings(&manifest_toml, &lock_toml, pyproject_dir, project_name);
     let Some(dependencies) = project.get("dependencies").and_then(toml::Value::as_array) else {
-        return Vec::new();
+        return findings;
     };
     let locked = locked_uv_requirements(&lock_toml, project_name);
     if locked.is_empty() {
-        return Vec::new();
+        return findings;
     }
     // ~keep A name present in `[tool.uv.sources]` has its resolution overridden -- path, git, URL,
     // workspace member, or an explicit alternate index -- exactly the forms `parse_pep508_requirement`
@@ -171,7 +172,6 @@ pub(crate) fn stale_uv_lock_findings(pyproject_dir: &Path) -> Vec<StaleUvLockFin
     // any of these against the lock's registry-shaped specifier text would be a false positive.
     let overridden = uv_source_override_names(&manifest_toml);
 
-    let mut findings = Vec::new();
     for entry in dependencies {
         let Some(raw) = entry.as_str() else { continue };
         let Some((name, requirement)) = parse_pep508_requirement(raw) else {
@@ -202,6 +202,44 @@ pub(crate) fn stale_uv_lock_findings(pyproject_dir: &Path) -> Vec<StaleUvLockFin
     }
     findings.sort_by(|left, right| left.dependency.cmp(&right.dependency));
     findings
+}
+
+fn project_version_findings(
+    manifest: &toml::Value,
+    lock: &toml::Value,
+    directory: &Path,
+    name: &str,
+) -> Vec<StaleUvLockFinding> {
+    let Some(expected) = super::super::version_python::python_project_version(manifest, directory) else {
+        return Vec::new();
+    };
+    let Some(packages) = lock.get("package").and_then(toml::Value::as_array) else {
+        return Vec::new();
+    };
+    packages
+        .iter()
+        .filter_map(|package| {
+            let locked_name = package.get("name")?.as_str()?;
+            if normalize_pep503_name(locked_name) != normalize_pep503_name(name) {
+                return None;
+            }
+            let source = package.get("source")?;
+            if !["editable", "virtual", "directory"]
+                .iter()
+                .any(|key| source.get(*key).and_then(toml::Value::as_str) == Some("."))
+            {
+                return None;
+            }
+            let actual = package.get("version")?.as_str()?;
+            (actual != expected).then(|| StaleUvLockFinding {
+                lock: directory.join("uv.lock"),
+                declared_in: directory.join("pyproject.toml"),
+                dependency: format!("{name} (project version)"),
+                requirement: expected.clone(),
+                locked_requirement: actual.to_string(),
+            })
+        })
+        .collect()
 }
 
 /// `name -> specifier text` `uv.lock` recorded for the project's own dependencies.
@@ -309,7 +347,7 @@ fn parse_pep508_requirement(raw: &str) -> Option<(String, String)> {
 /// `pyproject.toml` and `uv.lock` are not guaranteed to spell the same package identically (`uv`
 /// itself accepts `pytest_asyncio` and `pytest-asyncio` as the same dependency), so every name
 /// compared or used as a map key in this module goes through this first.
-fn normalize_pep503_name(name: &str) -> String {
+pub(in crate::cli::pipeline) fn normalize_pep503_name(name: &str) -> String {
     let mut normalized = String::with_capacity(name.len());
     let mut previous_was_separator = false;
     for character in name.chars() {

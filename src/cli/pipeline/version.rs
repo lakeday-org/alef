@@ -1077,7 +1077,7 @@ fn sync_citation_and_extra_paths(
     for badge_file in sync_docs_version_badges(&crate::docs::reference_output_dir(config), version, writable) {
         state.updated.push(badge_file);
     }
-    Ok(())
+    super::version_python::sync_uv_workspace_locks(writable, &mut state.updated)
 }
 
 fn run_post_write_side_effects(state: &SyncState, version: &str) {

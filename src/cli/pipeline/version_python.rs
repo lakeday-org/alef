@@ -4,6 +4,13 @@ use anyhow::Context as _;
 
 use super::version_text::replace_version_pattern;
 
+mod uv_lock;
+pub(super) use uv_lock::project_version as python_project_version;
+
+pub(super) fn sync_uv_workspace_locks(writable: &IgnoreFilter, updated: &mut Vec<String>) -> anyhow::Result<()> {
+    uv_lock::sync(writable, updated)
+}
+
 pub(super) fn sync_python_versions(
     config: &ResolvedCrateConfig,
     version: &str,
@@ -22,6 +29,7 @@ fn sync_python_pyproject_versions(
 ) -> anyhow::Result<()> {
     let pkg_dir = config.package_dir(Language::Python);
     let mut python_paths: Vec<String> = vec![
+        "pyproject.toml".to_string(),
         "packages/python/pyproject.toml".to_string(),
         std::path::Path::new(&pkg_dir)
             .join("pyproject.toml")
@@ -42,7 +50,7 @@ fn sync_python_pyproject_versions(
             continue;
         }
         if let Ok(content) = std::fs::read_to_string(&python_path)
-            && let Some(new_content) = replace_version_pattern(&content, r#"version = "[^"]*""#, python_version)
+            && let Some(new_content) = replace_project_version(&content, python_version)?
         {
             std::fs::write(&python_path, &new_content).with_context(|| format!("failed to write {python_path}"))?;
             updated.push(python_path);
@@ -50,6 +58,21 @@ fn sync_python_pyproject_versions(
     }
 
     Ok(())
+}
+
+fn replace_project_version(content: &str, version: &str) -> anyhow::Result<Option<String>> {
+    let mut manifest: toml_edit::DocumentMut = content.parse().context("parsing Python project version")?;
+    let Some(project) = manifest.get_mut("project").and_then(toml_edit::Item::as_table_mut) else {
+        return Ok(None);
+    };
+    let Some(existing) = project.get("version").and_then(toml_edit::Item::as_str) else {
+        return Ok(None);
+    };
+    if existing == version {
+        return Ok(None);
+    }
+    project["version"] = toml_edit::value(version);
+    Ok(Some(manifest.to_string()))
 }
 
 /// A setuptools/hatch build mirrors the whole package into `packages/python/build/lib/`, which

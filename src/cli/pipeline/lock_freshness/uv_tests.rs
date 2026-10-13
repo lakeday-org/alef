@@ -8,6 +8,25 @@
 
 use super::*;
 
+#[test]
+fn local_project_version_drift_is_reported_without_dependencies() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join("pyproject.toml"),
+        "[project]\nname = 'sample-lib'\nversion = '1.2.3'\n",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("uv.lock"),
+        "version = 1\n[[package]]\nname = 'sample_lib'\nversion = '1.2.2'\nsource = { editable = '.' }\n",
+    )
+    .unwrap();
+    let findings = stale_uv_lock_findings(temp.path());
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].requirement, "1.2.3");
+    assert_eq!(findings[0].locked_requirement, "1.2.2");
+}
+
 const UV_DIR_RELATIVE: &str = "e2e/python";
 const UV_DEPENDENCY: &str = "sample-pkg";
 const UV_STALE_SPEC: &str = ">=1.1.1";
