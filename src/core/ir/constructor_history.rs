@@ -13,17 +13,31 @@ impl TypeDef {
         !self.legacy_constructor_fields().is_empty() && !self.legacy_constructor_fields().contains(&field.name)
     }
 
-    /// Resolve the supported extension default from Rust's extracted Default, never the field name. ~keep
+    /// Preserve the boolean lookup exposed before typed constructor defaults were supported. ~keep
     #[must_use]
     pub fn constructor_extension_default(&self, field: &FieldDef) -> Option<bool> {
-        if !self.is_constructor_extension(field) || field.ty != TypeRef::Primitive(PrimitiveType::Bool) {
+        if field.ty != TypeRef::Primitive(PrimitiveType::Bool) {
             return None;
         }
-        match &field.typed_default {
-            Some(DefaultValue::BoolLiteral(value)) => Some(*value),
-            Some(DefaultValue::Empty) => Some(false),
+        match self.constructor_extension_value(field)? {
+            DefaultValue::BoolLiteral(value) => Some(*value),
+            DefaultValue::Empty => Some(false),
             _ => None,
         }
+    }
+
+    /// Resolve the supported extension default from Rust's extracted Default, never the field name. ~keep
+    #[must_use]
+    pub fn constructor_extension_value<'a>(&self, field: &'a FieldDef) -> Option<&'a DefaultValue> {
+        if !self.is_constructor_extension(field) {
+            return None;
+        }
+        field.typed_default.as_ref().filter(|value| {
+            !matches!(
+                value,
+                DefaultValue::Unresolved(_) | DefaultValue::FunctionCall(_) | DefaultValue::PublicFunctionCall(_)
+            )
+        })
     }
 }
 
@@ -68,10 +82,11 @@ pub(crate) fn validate_constructor_history(api: &ApiSurface) -> anyhow::Result<(
             .filter(|field| !field.binding_excluded && typ.is_constructor_extension(field))
         {
             anyhow::ensure!(
-                typ.constructor_extension_default(field).is_some(),
-                "{} legacy constructor extension `{}` requires a resolved Rust boolean default",
+                typ.constructor_extension_value(field).is_some(),
+                "{} legacy constructor extension `{}` of type `{:?}` requires a resolved Rust default",
                 typ.name,
-                field.name
+                field.name,
+                field.ty
             );
         }
     }

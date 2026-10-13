@@ -8,7 +8,10 @@
 //!   cbindgen-produced C shared library directly at runtime (Phase 3). No Rust crate
 //!   is generated; the same C library consumed by Go/Java/C#/Zig is reused.
 
+mod constructor_default_rewrite;
+mod constructor_defaults;
 mod frb_rewrite;
+pub use constructor_default_rewrite::apply_constructor_defaults;
 mod gen_bindings;
 pub(crate) mod gen_ffi;
 pub(crate) mod gen_rust_crate;

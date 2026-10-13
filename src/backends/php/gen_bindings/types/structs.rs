@@ -59,7 +59,7 @@ pub use constructor_param::php_field_can_be_constructor_param;
 /// Optionality that may reorder parameters without changing a serde-defaulted field's legacy slot. ~keep
 pub(crate) fn php_field_base_constructor_optional(typ: &TypeDef, field: &FieldDef, serde_available: bool) -> bool {
     field.optional
-        || typ.constructor_extension_default(field).is_some()
+        || typ.constructor_extension_value(field).is_some()
         || (serde_available && typ.has_default && matches!(field.ty, TypeRef::Duration))
 }
 

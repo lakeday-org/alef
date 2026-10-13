@@ -1,3 +1,6 @@
+{% if constructor_metadata is defined and constructor_metadata is not none %}
+    // ~keep alef-constructor-default: {{ constructor_metadata }}
+{% endif %}
 {% if constructor_default is not none %}
     #[frb(default = {{ constructor_default }})]
 {% endif %}

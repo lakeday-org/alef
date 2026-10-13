@@ -62,12 +62,7 @@ pub(crate) fn emit_type_with_imports(
     // `binding_excluded` fields entirely — matching every other backend. Keeping them (as the
     // legacy nullable `= null` branch did) leaks force-controlled / internal knobs into the public
     // DTO; a `[crates.exclude].fields` entry must remove the field, not just null its type.
-    let visible_fields: Vec<(usize, &crate::core::ir::FieldDef)> = ty
-        .fields
-        .iter()
-        .enumerate()
-        .filter(|(_, f)| !f.binding_excluded)
-        .collect();
+    let visible_fields = ordered_visible_fields(ty);
 
     let field_sealed_annotations: Vec<Option<String>> = visible_fields
         .iter()
@@ -101,6 +96,11 @@ pub(crate) fn emit_type_with_imports(
                 enum_defaults,
                 default_constructible_types,
             );
+            let default_suffix = if ty.is_constructor_extension(field) {
+                default_suffix.replace('~', "\\u007e")
+            } else {
+                default_suffix
+            };
             if default_suffix.contains(".milliseconds") {
                 imports.insert("import kotlin.time.Duration.Companion.milliseconds".to_string());
             }
@@ -371,6 +371,24 @@ fn sealed_class_field_annotation(
         }
         _ => None,
     }
+}
+
+fn ordered_visible_fields(ty: &TypeDef) -> Vec<(usize, &crate::core::ir::FieldDef)> {
+    let mut fields: Vec<_> = ty
+        .fields
+        .iter()
+        .enumerate()
+        .filter(|(_, field)| !field.binding_excluded)
+        .collect();
+    if !ty.legacy_constructor_fields().is_empty() {
+        fields.sort_by_key(|(_, field)| {
+            ty.legacy_constructor_fields()
+                .iter()
+                .position(|name| *name == field.name)
+                .unwrap_or(ty.legacy_constructor_fields().len())
+        });
+    }
+    fields
 }
 
 #[cfg(test)]

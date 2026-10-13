@@ -4,6 +4,9 @@ use ahash::AHashSet;
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
+mod constructor_string_default;
+pub(crate) use constructor_string_default::render as render_constructor_string_default;
+
 pub use super::crate_attributes::{format_crate_attributes, format_extra_clippy_allows};
 
 /// Matches a bare zero-argument path call — `a::b::c()` — and nothing else: no trailing
@@ -593,7 +596,7 @@ pub fn format_default_value(field: &FieldDef, typ: &TypeDef, mapped_ty: &str) ->
         .expect("format_default_value: caller must have already confirmed field.typed_default is Some");
     match default {
         DefaultValue::BoolLiteral(b) => format!("{}", b),
-        DefaultValue::StringLiteral(s) => format!("\"{}\".to_string()", s.escape_default()),
+        DefaultValue::StringLiteral(s) => constructor_string_default::render(s, typ.is_constructor_extension(field)),
         DefaultValue::IntLiteral(i) => format!("{}", i),
         DefaultValue::FloatLiteral(f) => {
             let s = format!("{}", f);

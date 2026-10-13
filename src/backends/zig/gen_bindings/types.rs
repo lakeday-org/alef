@@ -16,7 +16,12 @@ use super::helpers::emit_cleaned_zig_doc;
 /// Zig struct members are the public field surface a consumer both constructs and reads by name,
 /// so a configured rename that this emitter ignored would leave the consumer's `alef.toml` a
 /// silent no-op rather than an error. ~keep
-pub(crate) fn emit_type(ty: &TypeDef, enums: &[EnumDef], config: &ResolvedCrateConfig, out: &mut String) {
+pub(crate) fn emit_type(
+    ty: &TypeDef,
+    enums: &[EnumDef],
+    config: &ResolvedCrateConfig,
+    out: &mut String,
+) -> anyhow::Result<()> {
     emit_cleaned_zig_doc(out, &ty.doc, "");
     out.push_str(&crate::backends::zig::template_env::render(
         "type_header.jinja",
@@ -27,9 +32,19 @@ pub(crate) fn emit_type(ty: &TypeDef, enums: &[EnumDef], config: &ResolvedCrateC
     for field in binding_fields(&ty.fields) {
         emit_cleaned_zig_doc(out, &field.doc, "    ");
         let ty_str = zig_field_type(&field.ty, field.optional);
-        let field_default = ty
-            .constructor_extension_default(field)
-            .map_or_else(|| zig_field_default(field, enums), |value| format!(" = {value}"));
+        let field_default = if ty.constructor_extension_value(field).is_some() {
+            let value = super::constructor_defaults::literal(field, enums).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Zig cannot render constructor default for {}.{} ({:?})",
+                    ty.name,
+                    field.name,
+                    field.ty
+                )
+            })?;
+            format!(" = {value}")
+        } else {
+            zig_field_default(field, enums)
+        };
         out.push_str(&crate::backends::zig::template_env::render(
             "type_field.jinja",
             crate::alef_context! {
@@ -40,9 +55,10 @@ pub(crate) fn emit_type(ty: &TypeDef, enums: &[EnumDef], config: &ResolvedCrateC
         ));
     }
     out.push_str("};\n");
+    Ok(())
 }
 
-fn zig_enum_default(enum_def: &EnumDef, variant_ref: &str) -> Option<String> {
+pub(super) fn zig_enum_default(enum_def: &EnumDef, variant_ref: &str) -> Option<String> {
     let variant_name = variant_ref.rsplit_once("::").map_or(variant_ref, |(_, name)| name);
     let variant = enum_def
         .variants
@@ -220,7 +236,7 @@ mod tests {
             ..Default::default()
         }];
         let mut out = String::new();
-        emit_type(&typ, &enums, &ResolvedCrateConfig::default(), &mut out);
+        emit_type(&typ, &enums, &ResolvedCrateConfig::default(), &mut out).unwrap();
 
         assert!(out.contains("llm: LlmConfig,"), "{out}");
         assert!(!out.contains("llm: LlmConfig ="), "{out}");
@@ -241,7 +257,7 @@ mod tests {
             ..Default::default()
         };
         let mut out = String::new();
-        emit_type(&typ, &[], &ResolvedCrateConfig::default(), &mut out);
+        emit_type(&typ, &[], &ResolvedCrateConfig::default(), &mut out).unwrap();
 
         let control = TypeDef {
             name: "OcrPipelineConfig".to_string(),
@@ -253,7 +269,7 @@ mod tests {
             ..Default::default()
         };
         let mut control_out = String::new();
-        emit_type(&control, &[], &ResolvedCrateConfig::default(), &mut control_out);
+        emit_type(&control, &[], &ResolvedCrateConfig::default(), &mut control_out).unwrap();
 
         assert_eq!(out, control_out);
         assert!(out.contains("quality_thresholds: OcrQualityThresholds,"), "{out}");

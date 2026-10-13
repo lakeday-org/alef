@@ -304,11 +304,8 @@ pub(crate) fn gen_constructor_field_inits(
         }
         if php_field_can_be_constructor_param(&field.ty, enum_names, opaque_types, untagged_data_enum_names) {
             let php_param_name = crate::codegen::naming::to_php_name(&field.name);
-            if let Some(default) = typ.constructor_extension_default(field) {
-                field_inits.push(crate::backends::php::template_env::render(
-                    "php_constructor_extension_init.jinja",
-                    crate::alef_context! { field => &field.name, parameter => &php_param_name, default => default.to_string() },
-                ).trim_end().to_string());
+            if let Some(init) = constructor_extension_init(typ, field, &php_param_name, enum_names, opaque_types) {
+                field_inits.push(init);
                 continue;
             }
             field_inits.push(representable_field_init(
@@ -343,6 +340,35 @@ pub(crate) fn gen_constructor_field_inits(
         prelude,
         field_inits: field_inits.join(", "),
     })
+}
+
+fn constructor_extension_init(
+    typ: &TypeDef,
+    field: &FieldDef,
+    parameter: &str,
+    enum_names: &AHashSet<String>,
+    opaque_types: &AHashSet<String>,
+) -> Option<String> {
+    let default = typ.constructor_extension_value(field)?;
+    let mut provided = field.clone();
+    provided.optional = true;
+    let assignment = representable_field_init(&typ.name, &provided, parameter, enum_names, opaque_types, true);
+    let supplied = assignment
+        .split_once(": ")
+        .map_or(assignment.as_str(), |(_, expression)| expression);
+    let fallback = match default {
+        DefaultValue::BoolLiteral(value) => value.to_string(),
+        DefaultValue::Empty if matches!(field.ty, TypeRef::Primitive(crate::core::ir::PrimitiveType::Bool)) => {
+            "false".into()
+        }
+        _ => format!("Self::default().{}", field.name),
+    };
+    Some(crate::backends::php::template_env::render(
+        "php_constructor_extension_init.jinja",
+        crate::alef_context! { field => &field.name, parameter => supplied, default => fallback,
+            optional => field.optional || matches!(field.ty, TypeRef::Optional(_)),
+            lazy => !matches!(default, DefaultValue::BoolLiteral(_)) && !matches!(field.ty, TypeRef::Primitive(crate::core::ir::PrimitiveType::Bool)) },
+    ).trim_end().to_string())
 }
 
 #[cfg(test)]

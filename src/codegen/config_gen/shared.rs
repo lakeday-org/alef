@@ -512,6 +512,16 @@ pub fn default_value_for_field_in_type(field: &FieldDef, language: &str, typ: &T
             field_name = field.name,
         );
     }
+    constructor_history_default(field, language, typ)
+}
+
+fn constructor_history_default(field: &FieldDef, language: &str, typ: &TypeDef) -> String {
+    if language == "rust"
+        && typ.is_constructor_extension(field)
+        && let Some(DefaultValue::StringLiteral(value)) = &field.typed_default
+    {
+        return crate::codegen::shared::render_constructor_string_default(value, true);
+    }
     default_value_for_field(field, language)
 }
 

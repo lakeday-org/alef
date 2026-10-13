@@ -51,6 +51,7 @@ impl Backend for DartBackend {
     }
 
     fn generate_bindings(&self, api: &ApiSurface, config: &ResolvedCrateConfig) -> anyhow::Result<Vec<GeneratedFile>> {
+        super::constructor_defaults::validate(api)?;
         if dart_style(config) == DartStyle::Ffi {
             return gen_ffi::emit(api, config);
         }
@@ -431,6 +432,11 @@ impl DartBackend {
                 post_build_steps.push(PostBuildStep::PostProcessFile {
                     path: lib_dart_path.clone(),
                     processor: PostProcessor::FrbDartSealedVariants,
+                });
+
+                post_build_steps.push(PostBuildStep::PostProcessFile {
+                    path: lib_dart_path.clone(),
+                    processor: PostProcessor::FrbDartOptionalFieldsWithDefaults,
                 });
 
                 if !config.untagged_union_text_types.is_empty() {

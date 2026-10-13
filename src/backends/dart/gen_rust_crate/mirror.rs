@@ -82,7 +82,10 @@ pub(crate) fn emit_mirror_struct(out: &mut String, ty: &TypeDef, source_crate_na
             crate::alef_context! {
                 field_name => field.name.as_str(),
                 rust_ty => rust_ty,
-                constructor_default => ty.constructor_extension_default(field).map(|value| value.to_string()),
+                constructor_default => ty.constructor_extension_value(field).and_then(|_| super::super::constructor_defaults::frb_literal(field)),
+                constructor_metadata => ty.constructor_extension_value(field).and_then(|_| super::super::constructor_defaults::literal(field)).map(|value| {
+                    serde_json::json!([ty.name, crate::codegen::naming::public_field_name(crate::core::config::Language::Dart, &field.name, None), value]).to_string()
+                }),
             },
         ));
     }

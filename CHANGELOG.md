@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Recorded constructors retain resolved string, integer, floating-point, collection, enum and null defaults for added fields, including inserted fields; unknown defaults report the field and type ([#554](https://github.com/xberg-io/alef/issues/554)).
+- Preserve Kotlin JNI positional constructor history and apply resolved constructor defaults after flutter_rust_bridge generation without changing the existing Rust boolean lookup API.
+
 ## [0.110.3] - 2026-10-13
 
 ### Fixed

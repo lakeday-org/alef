@@ -1,1 +1,1 @@
-{{ field }}: {{ parameter }}.unwrap_or({{ default }})
+{{ field }}: {{ parameter }}.{% if optional %}or_else(|| {{ default }}){% elif lazy %}unwrap_or_else(|| {{ default }}){% else %}unwrap_or({{ default }}){% endif %}

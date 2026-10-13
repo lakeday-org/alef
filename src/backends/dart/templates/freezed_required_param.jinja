@@ -1,1 +1,1 @@
-    required {{ ty_str }} {{ name }},
+    {% if default_value is defined and default_value is not none %}@Default({{ default_value }}){% else %}required{% endif %} {{ ty_str }} {{ name }},

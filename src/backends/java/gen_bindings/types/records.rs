@@ -262,13 +262,13 @@ pub(crate) fn gen_record_type(
         let arguments: Vec<_> = visible_fields
             .iter()
             .map(|field| {
-                if let Some(default) = typ.constructor_extension_default(field) {
-                    default.to_string()
+                Ok(if typ.constructor_extension_value(field).is_some() {
+                    super::constructor_defaults::java_constructor_default(field)?
                 } else {
                     safe_java_field_name(&field.name)
-                }
+                })
             })
-            .collect();
+            .collect::<anyhow::Result<Vec<_>>>()?;
         record_block.push_str(&crate::backends::java::template_env::render(
             "record_legacy_constructor.jinja",
             crate::alef_context! {

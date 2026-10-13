@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use crate::backends::zig::trait_bridge::emit_trait_bridge;
 
 mod components;
+mod constructor_defaults;
 mod errors;
 mod functions;
 mod helpers;
@@ -288,7 +289,7 @@ impl Backend for ZigBackend {
             .iter()
             .filter(|t| !exclude_types.contains(&t.name) && !t.is_opaque && t.has_serde)
         {
-            emit_type(ty, &api.enums, config, &mut content);
+            emit_type(ty, &api.enums, config, &mut content)?;
             content.push('\n');
         }
 

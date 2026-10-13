@@ -14,6 +14,7 @@ mod build_command;
 mod frb_bridge_coverage;
 mod frb_cache;
 mod frb_cfg_gates;
+mod frb_constructor_defaults;
 mod frb_version_check;
 mod observability;
 mod staging_profile;
@@ -646,7 +647,7 @@ pub fn run_post_build(
                             crate::backends::dart::filter_excluded_functions(&content, &exclude_set)
                         }
                         PostProcessor::FrbDartOptionalFieldsWithDefaults => {
-                            crate::backends::dart::make_struct_fields_with_defaults_optional(&content)
+                            frb_constructor_defaults::apply(&content, &base_dir.join(crate_dir), config)?
                         }
                         PostProcessor::FrbDartFixHandlerExecutorCalls => {
                             crate::backends::dart::fix_handler_executor_calls(&content)

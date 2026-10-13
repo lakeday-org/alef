@@ -31,7 +31,7 @@ pub(super) fn emit_type(ty: &TypeDef, config: &ResolvedCrateConfig, out: &mut St
 
     let visible_fields: Vec<_> = binding_fields(&ty.fields).collect();
 
-    if visible_fields.len() == 1 {
+    if visible_fields.len() == 1 && !ty.is_constructor_extension(visible_fields[0]) {
         let field = visible_fields[0];
         let ty_str = dart_type(&field.ty, field.optional);
         let name = dart_field_identifier(ty, field, config);
@@ -63,11 +63,15 @@ pub(super) fn emit_type(ty: &TypeDef, config: &ResolvedCrateConfig, out: &mut St
                     },
                 ));
             }
+            let default_value = ty
+                .constructor_extension_value(field)
+                .and_then(|_| super::super::constructor_defaults::literal(field));
             out.push_str(&template_env::render(
                 "freezed_required_param.jinja",
                 crate::alef_context! {
                     ty_str => ty_str,
                     name => name.as_str(),
+                    default_value => default_value,
                 },
             ));
         }
