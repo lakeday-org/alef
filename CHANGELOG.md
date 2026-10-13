@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update the Dart SDK used for constructor runtime checks to 3.13.5 ([#560](https://github.com/xberg-io/alef/pull/560)).
+- Update serde-saphyr and its YAML parser to 2.0 ([#561](https://github.com/xberg-io/alef/pull/561)).
+
 ## [0.110.7] - 2026-10-13
 
 ### Changed
