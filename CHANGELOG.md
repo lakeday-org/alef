@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Simplify the disjoint-source hash fixture without changing its inputs or assertions, bringing its test module below the file-size limit.
+
 ### Fixed
 
 - Synchronize local Python lock versions on Windows by comparing canonical workspace and package paths.
