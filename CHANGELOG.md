@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Simplify the source-order hash fixture without changing its permutations or assertions, removing one oversized-test warning.
+
 - Update the generated Maven Central publishing plugin to 0.11.1 ([#563](https://github.com/xberg-io/alef/pull/563)).
 
 ## [0.110.9] - 2026-10-13
