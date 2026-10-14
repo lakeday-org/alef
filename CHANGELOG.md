@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Split language-filter configuration tests into a focused module, bringing the parent test file below the size cap while preserving all ten moved tests.
+
 - Update the generated Maven Central publishing plugin to 0.12.0 ([#565](https://github.com/xberg-io/alef/pull/565)).
 
 ### Fixed
