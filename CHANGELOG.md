@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update the generated Maven Central publishing plugin to 0.12.0 ([#565](https://github.com/xberg-io/alef/pull/565)).
+
 ### Fixed
 
 - Preserve recorded Swift DTO initializer overloads as callable function references while retaining extended initializers and their defaults; reject recorded metadata whose extension defaults cannot be represented in Swift.
