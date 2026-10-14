@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.11] - 2026-10-14
+
 ### Changed
 
 - Split language-filter configuration tests into a focused module, bringing the parent test file below the size cap while preserving all ten moved tests.
