@@ -685,7 +685,16 @@ jobs:
         with:
           install-llvm-cov: "false"
 
+      - name: Install Task for package verification
+        if: needs.prepare.outputs.dry_run == 'true'
+        uses: xberg-io/actions/install-task@59f1b4d0d2e6186a995f4b8a543951c39ac5edd2
+
+      - name: Verify release crates without publishing
+        if: needs.prepare.outputs.dry_run == 'true'
+        run: task publish:verify -- "${{ needs.prepare.outputs.version }}"
+
       - name: Publish to crates.io
+        if: needs.prepare.outputs.dry_run != 'true'
         uses: xberg-io/actions/publish-crates@v1
         with:
           crates: alef-component-abi alef-component-runtime alef
