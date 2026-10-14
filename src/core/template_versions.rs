@@ -412,7 +412,7 @@ pub mod maven {
     pub const MAVEN_SITE_PLUGIN: &str = "4.0.0-M16";
 
     // renovate: datasource=maven depName=org.sonatype.central:central-publishing-maven-plugin
-    pub const CENTRAL_PUBLISHING_PLUGIN: &str = "0.11.0";
+    pub const CENTRAL_PUBLISHING_PLUGIN: &str = "0.11.1";
 
     // renovate: datasource=maven depName=org.codehaus.mojo:versions-maven-plugin
     pub const VERSIONS_MAVEN_PLUGIN: &str = "2.23.0";
