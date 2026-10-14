@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve recorded Swift DTO initializer overloads as callable function references while retaining extended initializers and their defaults; reject recorded metadata whose extension defaults cannot be represented in Swift.
+
 ## [0.110.10] - 2026-10-14
 
 ### Changed
