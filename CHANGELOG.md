@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.10] - 2026-10-14
+
 ### Changed
+
+- Refresh the compatible Cargo lockfile to equivalent 1.0.3.
 
 - Simplify the source-order hash fixture without changing its permutations or assertions, removing one oversized-test warning.
 
