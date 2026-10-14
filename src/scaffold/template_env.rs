@@ -1,6 +1,7 @@
 use minijinja::{AutoEscape, Environment};
 
 static TEMPLATES: &[(&str, &str)] = &[
+    ("r_authors.jinja", include_str!("templates/r_authors.jinja")),
     ("cargo_env_plain.jinja", include_str!("templates/cargo_env_plain.jinja")),
     (
         "cargo_env_structured.jinja",

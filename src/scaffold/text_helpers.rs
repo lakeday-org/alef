@@ -14,10 +14,10 @@ pub fn xml_escape(s: &str) -> String {
 /// If no angle brackets are found, returns `(input, "")`.
 pub fn parse_author(s: &str) -> (&str, &str) {
     if let Some(start) = s.find('<')
-        && let Some(end) = s.find('>')
+        && let Some(end) = s[start + 1..].find('>')
     {
         let name = s[..start].trim();
-        let email = &s[start + 1..end];
+        let email = &s[start + 1..start + 1 + end];
         return (name, email);
     }
     (s.trim(), "")

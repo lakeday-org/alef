@@ -11,6 +11,8 @@ use crate::backends::kotlin_android::naming::{
 use crate::backends::kotlin_android::template_env::render;
 use crate::scaffold::{parse_author, scaffold_meta, xml_escape};
 
+mod author_metadata;
+
 /// Render the Gradle task that cross-compiles the JNI crate into `src/main/jniLibs/<abi>/`.
 ///
 /// The ABI list is the same [`abis`] the `.gitkeep` scaffolder uses, so the directories alef
@@ -166,23 +168,7 @@ pub fn emit(config: &ResolvedCrateConfig) -> String {
         _ => String::new(),
     };
 
-    let developers_block = if meta.authors.is_empty() {
-        "\n".to_string()
-    } else {
-        let devs: Vec<String> = meta
-            .authors
-            .iter()
-            .map(|a| {
-                let (name, email) = parse_author(a);
-                format!(
-                    "            developer {{\n                name.set(\"{}\")\n                email.set(\"{}\")\n            }}",
-                    xml_escape(name),
-                    xml_escape(email)
-                )
-            })
-            .collect();
-        format!("\n        developers {{\n{}\n        }}\n", devs.join("\n"))
-    };
+    let developers_block = author_metadata::render_developers(&meta.authors);
 
     let marker = crate::core::hash::SELF_MARKING_HEADER_LINE;
     format!(

@@ -1,6 +1,7 @@
 use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
+    ("pom_developers.jinja", include_str!("templates/pom_developers.jinja")),
     ("kt_file.jinja", include_str!("templates/kt_file.jinja")),
     (
         "trait_bridge_object.jinja",

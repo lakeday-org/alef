@@ -1,0 +1,1 @@
+Authors@R: {% if authors | length > 1 %}c({% endif %}{% for author in authors %}person({{ author.given }}{% if author.family %}, {{ author.family }}{% endif %}{% if author.email %}, email = {{ author.email }}{% endif %}, role = {% if loop.first %}c("aut", "cre"){% else %}"aut"{% endif %}){% if not loop.last %}, {% endif %}{% endfor %}{% if authors | length > 1 %}){% endif %}

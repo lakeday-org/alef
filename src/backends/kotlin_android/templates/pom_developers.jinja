@@ -1,0 +1,9 @@
+
+        developers {
+{% for author in authors %}
+            developer {
+                name.set("{{ author.name }}")
+                email.set("{{ author.email }}")
+            }
+{% endfor %}
+        }

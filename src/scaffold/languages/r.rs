@@ -17,16 +17,17 @@ pub(crate) fn scaffold_r(api: &ApiSurface, config: &ResolvedCrateConfig) -> anyh
         description.pop();
     }
 
-    let authors_r = if meta.authors.is_empty() {
+    if meta.authors.is_empty() {
         anyhow::bail!("R scaffold requires package metadata authors; set package_metadata.authors or scaffold.authors");
-    } else if let Some((given, family, email)) = parse_r_author(meta.authors.first().unwrap_or(&String::new())) {
-        format!("Authors@R: person(\"{given}\", \"{family}\", email = \"{email}\", role = c(\"aut\", \"cre\"))")
-    } else {
-        format!(
-            "Authors@R: person(\"{}\", role = c(\"aut\", \"cre\"))",
-            meta.authors.first().unwrap_or(&"Author Name".to_string())
-        )
-    };
+    }
+    let authors = meta
+        .authors
+        .iter()
+        .map(|author| r_author(author))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let authors_r =
+        crate::scaffold::template_env::render("r_authors.jinja", crate::alef_context! { authors => authors });
+    let authors_r = authors_r.trim_end();
     let repository_lines = meta
         .configured_repository
         .as_deref()
@@ -77,18 +78,23 @@ Config/testthat/edition: 3
     }])
 }
 
-fn parse_r_author(author: &str) -> Option<(String, String, String)> {
-    let (name, email) = author.rsplit_once('<')?;
-    let email = email.strip_suffix('>')?.trim();
-    if email.is_empty() {
-        return None;
-    }
-    let name = name.trim();
-    let (given, family) = name.rsplit_once(' ')?;
-    if given.is_empty() || family.is_empty() {
-        return None;
-    }
-    Some((given.to_string(), family.to_string(), email.to_string()))
+fn r_author(author: &str) -> anyhow::Result<minijinja::Value> {
+    let (name, email) = crate::scaffold::parse_author(author);
+    let email = email.trim();
+    let (given, family) = if email.is_empty() {
+        (name, None)
+    } else {
+        name.rsplit_once(' ')
+            .map_or((name, None), |(given, family)| (given, Some(family)))
+    };
+    let given = serde_json::to_string(given)?;
+    let family = family.map(serde_json::to_string).transpose()?;
+    let email = if email.is_empty() {
+        None
+    } else {
+        Some(serde_json::to_string(email)?)
+    };
+    Ok(crate::alef_context! { given => given, family => family, email => email })
 }
 
 pub(crate) fn scaffold_r_cargo(api: &ApiSurface, config: &ResolvedCrateConfig) -> anyhow::Result<Vec<GeneratedFile>> {
