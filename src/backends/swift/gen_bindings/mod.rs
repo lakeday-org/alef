@@ -16,6 +16,7 @@ pub(super) mod boxes;
 pub(crate) mod bridge_artifacts;
 mod client;
 mod components;
+mod constructors;
 mod decoder_gate;
 pub(crate) mod dto;
 mod enums;
@@ -361,7 +362,7 @@ impl Backend for SwiftBackend {
                     &dto_error_name,
                     &configured_features,
                     &mut body,
-                );
+                )?;
             } else {
                 body.push_str(&crate::backends::swift::template_env::render(
                     "typealias.jinja",

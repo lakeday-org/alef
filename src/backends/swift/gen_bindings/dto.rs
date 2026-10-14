@@ -219,7 +219,7 @@ pub(super) fn emit_first_class_struct(
     error_type_name: &str,
     configured_features: &std::collections::HashSet<&str>,
     out: &mut String,
-) {
+) -> anyhow::Result<()> {
     let type_name = &ty.name;
     let type_snake = AsSnakeCase(type_name.as_str()).to_string();
 
@@ -244,24 +244,9 @@ pub(super) fn emit_first_class_struct(
         ));
     }
 
-    let params: Vec<String> = visible_fields
-        .iter()
-        .map(|field| {
-            let camel = swift_case_ident(&field.name.to_lower_camel_case());
-            let already_optional = matches!(&field.ty, TypeRef::Optional(_));
-            let swift_ty = swift_field_type(mapper, &field.ty);
-            // Resolved literals preserve Some(x); recorded extensions also carry their Rust
-            // type-zero defaults so existing Swift calls remain source-compatible. ~keep
-            let literal = super::zero_arg_default::swift_constructor_default_literal(ty, field);
-            let optional_suffix = if field.optional && !already_optional { "?" } else { "" };
-            match literal {
-                Some(value) => format!("{camel}: {swift_ty}{optional_suffix} = {value}"),
-                None if field.optional || already_optional => format!("{camel}: {swift_ty}{optional_suffix} = nil"),
-                None => format!("{camel}: {swift_ty}"),
-            }
-        })
-        .collect();
+    let params = super::constructors::parameters(ty, mapper, &visible_fields);
     let init_params = params.join(", ");
+    let legacy_init = super::constructors::legacy_initializer(ty, &visible_fields, &params)?;
     let mut init_assignments = String::new();
     for field in &visible_fields {
         let camel = swift_case_ident(&field.name.to_lower_camel_case());
@@ -480,6 +465,7 @@ pub(super) fn emit_first_class_struct(
             properties => properties,
             init_params => init_params,
             init_assignments => init_assignments,
+            legacy_init => legacy_init,
             coding_keys => coding_keys,
             decoder_init => decoder_init,
             ffi_init_assignments => ffi_init_assignments,
@@ -487,6 +473,7 @@ pub(super) fn emit_first_class_struct(
             methods => methods_source,
         },
     ));
+    Ok(())
 }
 
 /// Renders a typed `DefaultValue` into a Swift literal expression suitable for use as
@@ -1149,7 +1136,8 @@ mod tests {
             "DemoError",
             &std::collections::HashSet::new(),
             &mut out,
-        );
+        )
+        .unwrap();
 
         assert!(
             out.contains("public let providers: String?"),
@@ -1204,7 +1192,8 @@ mod tests {
             "DemoError",
             &std::collections::HashSet::new(),
             &mut out,
-        );
+        )
+        .unwrap();
 
         assert!(
             out.contains("public func providers(limit: UInt32)"),
@@ -1328,7 +1317,8 @@ mod tests {
             "DemoError",
             &std::collections::HashSet::new(),
             &mut out,
-        );
+        )
+        .unwrap();
 
         assert!(
             out.contains("attempts: UInt32 = 7"),
@@ -1521,7 +1511,8 @@ mod tests {
             "DemoError",
             &std::collections::HashSet::new(),
             &mut out,
-        );
+        )
+        .unwrap();
 
         assert!(
             out.contains("public let metaTags: [String: String]"),
@@ -1651,7 +1642,8 @@ mod tests {
             "DemoError",
             &std::collections::HashSet::new(),
             &mut out,
-        );
+        )
+        .unwrap();
 
         assert!(
             out.contains("public let customProperties: [String: JSONValue]"),
