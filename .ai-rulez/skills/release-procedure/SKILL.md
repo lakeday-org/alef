@@ -42,14 +42,15 @@ Every release step has a concrete verification — never assume; always check.
    fix without a regression test is a release that will regress.
 6. **Use the Taskfile** for version setting — never hand-edit `Cargo.toml`,
    `alef.toml`, `src/core/template_versions.rs`, or `schemas/alef.schema.json`.
-   `task set-version` rewrites all four in lockstep.
+   `task set-version` updates those files, both component manifests, and their dependency pins in lockstep.
 7. **Publish with `gh release create`** — a bare `git tag` is not a release.
    The `Publish` workflow triggers on `release: types: [published]`, so the
    GitHub release is literally what runs `cargo publish`; a tag push alone
    runs nothing at all. This is not theoretical: v0.55.2 and v0.55.3 were
    tagged and pushed with no release created, and neither ever reached
-   crates.io. Alef ships as a single crate, so one release means exactly one
-   `cargo publish` — no multi-crate sequencing, no index propagation race.
+   crates.io. Publish the three crates at the same version in dependency order:
+   `alef-component-abi`, then `alef-component-runtime`, then `alef`. Confirm each
+   registry version before retrying a partially completed publish.
 
 ## Procedure
 
@@ -90,13 +91,14 @@ asks for it.
 ### 2. Set the version via Taskfile
 
 ```bash
-task set-version -- X.Y.Z           # bumps Cargo.toml, alef.toml, ALEF_REV; regenerates
-                                    # schemas/alef.schema.json; runs cargo update
+task set-version -- X.Y.Z           # updates root/component versions and pins, alef.toml, ALEF_REV
+                                    # regenerates schemas/alef.schema.json; runs cargo update
 ```
 
 The `set-version` task is the **only** sanctioned way to bump versions in this
 repo. It rewrites `Cargo.toml` (`package.version`), `alef.toml`
-(`alef_version`), and `src/core/template_versions.rs::ALEF_REV`, regenerates
+(`alef_version`), `src/core/template_versions.rs::ALEF_REV`, both component
+crate manifests and their dependency pins, regenerates
 `schemas/alef.schema.json` (`cargo run -- schema --schema-version`), then runs
 `cargo update` — all in one shot. Never hand-edit any of these — they must stay
 in lockstep. The regenerated schema shows up in the release diff (its `$id` and
@@ -105,13 +107,16 @@ in lockstep. The regenerated schema shows up in the release diff (its `$id` and
 After the task finishes, **verify**:
 
 ```bash
-grep -E '^version' Cargo.toml                       # package version
+grep -E '^version' Cargo.toml                       # root crate version
+grep -E '^version' crates/alef-component-abi/Cargo.toml
+grep -E '^version' crates/alef-component-runtime/Cargo.toml
 grep -E '^alef_version' alef.toml                   # alef.toml mirror
 grep ALEF_REV src/core/template_versions.rs        # template version pin
 grep '"version"' schemas/alef.schema.json           # regenerated schema
 ```
 
-All four must match `X.Y.Z` (the `ALEF_REV` line and the schema `$id` both
+All six version-bearing files must match `X.Y.Z`; component dependency pins must
+also match (the `ALEF_REV` line and the schema `$id` both
 include a leading `v`).
 
 ### 3. Lint pass
@@ -133,7 +138,9 @@ missing — release commit goes on top.
 ### 5. Commit
 
 ```bash
-git add -A
+git add -- CHANGELOG.md Cargo.toml Cargo.lock alef.toml schemas/alef.schema.json \
+  src/core/template_versions.rs crates/alef-component-abi/Cargo.toml \
+  crates/alef-component-runtime/Cargo.toml
 git commit -m "chore(release): X.Y.Z"
 ```
 
@@ -186,8 +193,11 @@ git ls-remote --tags origin vX.Y.Z                       # tag pushed
 gh run list --workflow=publish.yaml --json databaseId,status,conclusion -L 5
 gh run view <run-id> --json jobs \
   --jq '.jobs[] | select(.name | test("crates")) | {name, conclusion}'
-curl -sI -H 'User-Agent: alef-release (contact: <maintainer email>)' \
-  https://index.crates.io/al/ef/alef | head -1     # 200 if the version is on the index
+version=X.Y.Z
+for crate in alef-component-abi alef-component-runtime alef; do
+  curl -fsS "https://index.crates.io/al/ef/${crate}" \
+    | jq -se --arg version "$version" 'any(.[]; .vers == $version and .yanked == false)' || exit 1
+done
 ```
 
 Notes:
