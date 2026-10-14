@@ -311,7 +311,6 @@ impl Backend for SwiftBackend {
         let known_dto_names = dto::compute_first_class_dto_names(api, &exclude_types);
         let zero_arg_constructible_names =
             zero_arg_default::compute_zero_arg_constructible_names(api, &known_dto_names);
-
         // Emitted once, before any DTO that might reference it, and only for crates that
         // actually have a `Map<String, Json>` field -- see `dto::api_needs_json_value_type`. ~keep
         if dto::api_needs_json_value_type(api, &known_dto_names) {
@@ -331,6 +330,7 @@ impl Backend for SwiftBackend {
         {
             client::emit_doc_comment(&ty.doc, "", &mut body);
             if dto::can_emit_first_class_struct(ty, &mapper, &exclude_fields, &known_dto_names) {
+                zero_arg_default::validate_constructor_enum_defaults(api, ty, &configured_enum_features)?;
                 let dto_error_name = api
                     .errors
                     .first()

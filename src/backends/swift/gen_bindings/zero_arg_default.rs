@@ -7,6 +7,7 @@
 //! `dto.rs` for the same reason.
 
 use crate::backends::swift::gen_bindings::dto::{swift_type_based_default, swift_typed_default_literal};
+use crate::backends::swift::gen_bindings::enums::swift_variant_case;
 use crate::codegen::shared::binding_fields;
 use crate::core::ir::{ApiSurface, DefaultValue, FieldDef, TypeDef, TypeRef};
 use std::collections::HashSet;
@@ -46,8 +47,39 @@ pub(crate) fn swift_memberwise_default_literal(field: &FieldDef) -> Option<Strin
 pub(crate) fn swift_constructor_default_literal(owner: &TypeDef, field: &FieldDef) -> Option<String> {
     swift_memberwise_default_literal(field).or_else(|| match owner.constructor_extension_value(field)? {
         DefaultValue::Empty if !field.optional => swift_type_based_default(&field.ty),
+        DefaultValue::EnumVariant(variant) => Some(format!(".{}", swift_variant_case(variant))),
         _ => None,
     })
+}
+
+pub(super) fn validate_constructor_enum_defaults(
+    api: &ApiSurface,
+    owner: &TypeDef,
+    configured_enum_features: &[String],
+) -> anyhow::Result<()> {
+    let source_crate = api.crate_name.replace('-', "_");
+    for field in binding_fields(&owner.fields) {
+        let Some(DefaultValue::EnumVariant(variant)) = owner.constructor_extension_value(field) else {
+            continue;
+        };
+        let declared_unit_case = api.enums.iter().any(|en| {
+            matches!(&field.ty, TypeRef::Named(name) if name == &en.name)
+                && crate::backends::swift::gen_rust_crate::enums::declared_variants(
+                    en,
+                    &source_crate,
+                    Some(configured_enum_features),
+                )
+                .iter()
+                .any(|case| case.name == *variant && case.fields.is_empty() && !case.originally_had_data_fields)
+        });
+        anyhow::ensure!(
+            declared_unit_case,
+            "Swift DTO {} initializer extension `{}` has no representable Swift default: `{variant}` is not a declared unit enum case",
+            owner.name,
+            field.name,
+        );
+    }
+    Ok(())
 }
 
 /// Computes the subset of `known_dto_names` whose generated memberwise `public init` accepts

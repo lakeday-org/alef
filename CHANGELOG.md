@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Preserve every configured R package author with one creator, handle closing brackets in author display names, and escape Kotlin Android developer metadata as Kotlin string literals.
+- Preserve declared unit enum defaults in recorded Swift initializer overloads, including acronym and keyword case names, and reject unsupported associated constants before emitting Swift.
 - Update Rustls to 0.23.46 to fix four TLS security advisories.
 
 ## [0.110.11] - 2026-10-14
