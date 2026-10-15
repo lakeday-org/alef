@@ -27,11 +27,15 @@ sources = ["src/lib.rs"]
     let parsed: NewAlefConfig = toml::from_str(&source).expect("fixture config parses");
     let resolved = parsed.resolve().expect("fixture config resolves").remove(0);
     validate_resolved(&resolved).expect("fixture config validates");
-    let files = alef::scaffold::scaffold(&ApiSurface::default(), &resolved, &[Language::Elixir])
-        .expect("scaffold succeeds");
+    let files =
+        alef::scaffold::scaffold(&ApiSurface::default(), &resolved, &[Language::Elixir]).expect("scaffold succeeds");
     let manifests: Vec<_> = files
         .iter()
-        .filter(|file| file.path.to_string_lossy().ends_with("native/sample_lib_nif/Cargo.toml"))
+        .filter(|file| {
+            file.path
+                .to_string_lossy()
+                .ends_with("native/sample_lib_nif/Cargo.toml")
+        })
         .collect();
     assert_eq!(manifests.len(), 1, "one native manifest must be generated");
     let manifest: toml::Value = toml::from_str(&manifests[0].content).expect("manifest parses");
@@ -46,7 +50,10 @@ fn assert_requirement(dependencies: &toml::Value, dependency: &str, expected: &s
     let parsed = VersionReq::parse(emitted)
         .unwrap_or_else(|error| panic!("invalid {dependency} requirement {emitted:?}: {error}"));
     assert_eq!(emitted, expected, "{dependency} requirement must be preserved");
-    assert_eq!(parsed, VersionReq::parse(expected).expect("expected requirement parses"));
+    assert_eq!(
+        parsed,
+        VersionReq::parse(expected).expect("expected requirement parses")
+    );
 }
 
 #[test]
