@@ -88,3 +88,23 @@ fn factory_composes_non_serde_wrapper_keys_with_dto_value_coercion() {
         "(__alef_coerce_dto_map(py, values, __ALEF_WIRE_CONFIG)?).into_iter().map(|(key, value)| (toolkit::SecretString::from(key), value)).collect()"
     );
 }
+
+#[test]
+fn data_enum_supports_owned_extraction_with_pyo3_030() {
+    let definition = EnumDef {
+        name: "Selection".to_string(),
+        rust_path: "crate::Selection".to_string(),
+        variants: vec![EnumVariant {
+            name: "Named".to_string(),
+            fields: vec![crate::core::ir::FieldDef {
+                name: "value".to_string(),
+                ty: TypeRef::String,
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let generated = gen_pyo3_data_enum(&definition, "sample_core");
+    assert!(generated.contains("#[pyclass(frozen, from_py_object)]"), "{generated}");
+}

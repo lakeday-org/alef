@@ -1,5 +1,5 @@
 #[derive(Clone)]
-#[pyclass(frozen)]
+#[pyclass(frozen, from_py_object)]
 pub struct {{ name }} {
     pub(crate) inner: {{ core_path }},
 }
