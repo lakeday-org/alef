@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.14] - 2026-10-15
+
 ### Fixed
 
 - Support passing generated Python data enums as function arguments with PyO3 0.30.
