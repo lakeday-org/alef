@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Elixir scaffold regression coverage for explicit Cargo requirement overrides and the existing exact Brotli allocator defaults.
+
 ## [0.110.12] - 2026-10-14
 
 ### Fixed
