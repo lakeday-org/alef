@@ -161,9 +161,9 @@ fn run_elixir_mix_format_is_noop_without_packages_elixir() {
 
 #[test]
 fn run_elixir_mix_format_reformats_the_generated_package_when_mix_installed() {
-    if !is_tool_available("mix") {
+    let Some(_path_guard) = crate::test_support::tool_available_with_stable_path("mix") else {
         return;
-    }
+    };
     let dir = tempfile::tempdir().expect("tempdir");
     let base = dir.path();
     let elixir_dir = base.join("packages/elixir");

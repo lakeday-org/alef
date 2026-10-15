@@ -84,8 +84,8 @@ pub mod cargo {
     // renovate: datasource=crate depName=napi-build
     pub const NAPI_BUILD: &str = "2";
 
-    // ~keep Published pyo3-async-runtimes 0.29 requires PyO3 ^0.29; mismatched minors conflict
-    // ~keep on the pyo3-python native link. Upgrade both after a compatible runtime is released.
+    // ~keep PyO3 and pyo3-async-runtimes must use matching minors because they share
+    // ~keep the pyo3-python native link.
     // renovate: datasource=crate depName=pyo3
     pub const PYO3: &str = "0.30";
 
@@ -642,7 +642,7 @@ pub mod cran {
 }
 
 pub mod precommit {
-    pub const ALEF_REV: &str = "v0.110.14";
+    pub const ALEF_REV: &str = "v0.110.15";
 
     /// Codegen format version — bumped only when output-affecting codegen
     /// changes require all generated files to be re-stamped. Unlike

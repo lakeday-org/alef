@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.15] - 2026-10-15
+
+### Changed
+
+- Generate Python bindings with matching PyO3 0.30 and pyo3-async-runtimes 0.30 dependencies by default.
+
 ## [0.110.14] - 2026-10-15
 
 ### Fixed
