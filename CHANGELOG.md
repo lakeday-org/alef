@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.13] - 2026-10-15
+
 ### Changed
 
 - Update generated .NET test projects to Microsoft.NET.Test.Sdk 18.11.0.
