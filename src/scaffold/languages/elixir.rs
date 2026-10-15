@@ -25,6 +25,14 @@ pub(crate) fn elixir_native_crate_dir(config: &ResolvedCrateConfig) -> String {
     format!("{pkg_dir}/native/{nif_name}")
 }
 
+fn exact_cargo_version_or_requirement(value: &str) -> String {
+    if semver::Version::parse(value.trim()).is_ok() {
+        format!("={value}")
+    } else {
+        value.to_owned()
+    }
+}
+
 pub(crate) fn scaffold_elixir_cargo(
     api: &ApiSurface,
     config: &ResolvedCrateConfig,
@@ -145,18 +153,20 @@ pub(crate) fn scaffold_elixir_cargo(
             dep_lines.push(trimmed.to_owned());
         }
     }
-    // ~keep The `=` requirement is the mechanism, not a stale pin: a `[patch.crates-io]` entry
-    // with no path/git is a no-op cargo rejects outright, so direct `=` dependencies are the only
-    // way to hold the whole tree on the allocator versions brotli 8.0.x needs. The versions
-    // themselves live in `template_versions` so Renovate tracks them like every other crate.
+    // ~keep Exact defaults constrain Brotli's allocator dependencies without an invalid
+    // version-only `[patch.crates-io]` entry. Explicit Cargo requirement overrides opt out
+    // of that exact constraint; bare full versions retain the existing pin semantics.
     dep_lines.push(format!(
-        "alloc-no-stdlib = \"={}\"",
-        versions.get("cargo:alloc-no-stdlib")
+        "alloc-no-stdlib = \"{}\"",
+        exact_cargo_version_or_requirement(versions.get("cargo:alloc-no-stdlib"))
     ));
-    dep_lines.push(format!("alloc-stdlib = \"={}\"", versions.get("cargo:alloc-stdlib")));
     dep_lines.push(format!(
-        "brotli-decompressor = \"={}\"",
-        versions.get("cargo:brotli-decompressor")
+        "alloc-stdlib = \"{}\"",
+        exact_cargo_version_or_requirement(versions.get("cargo:alloc-stdlib"))
+    ));
+    dep_lines.push(format!(
+        "brotli-decompressor = \"{}\"",
+        exact_cargo_version_or_requirement(versions.get("cargo:brotli-decompressor"))
     ));
     if !core_dep_line.is_empty() {
         dep_lines.push(core_dep_line);
