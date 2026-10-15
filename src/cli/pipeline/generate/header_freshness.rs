@@ -717,7 +717,8 @@ fn parse_guard_condition(condition: &str) -> GuardFrame {
 
 /// Active `#if`/`#ifdef`/`#else` nesting at each line of a comment-stripped
 /// header, as the byte offset where the line begins paired with the guard
-/// stack in effect for that line.
+/// stack in effect for that line. Backslash-newline continuations are removed
+/// before parsing directives, while offsets retain the original physical lines.
 ///
 /// This is a line-oriented approximation, not a real preprocessor: `#elif`
 /// forgets that prior branches were false (it just replaces the top frame),
@@ -729,29 +730,42 @@ fn guard_stack_by_line(code: &str) -> Vec<(usize, Vec<GuardFrame>)> {
     let mut stack: Vec<GuardFrame> = Vec::new();
     let mut lines = Vec::new();
     let mut offset = 0usize;
+    let mut logical_line = String::new();
+    let mut physical_offsets = Vec::new();
+    let mut physical_lines = code.split_inclusive('\n').peekable();
 
-    for line in code.split_inclusive('\n') {
-        let trimmed = line.trim();
-        if let Some(condition) = trimmed.strip_prefix("#if ") {
-            stack.push(parse_guard_condition(condition));
-        } else if let Some(condition) = trimmed.strip_prefix("#elif ") {
-            stack.pop();
-            stack.push(parse_guard_condition(condition));
-        } else if let Some(macro_name) = trimmed.strip_prefix("#ifdef ") {
-            stack.push(GuardFrame::Defined(BTreeSet::from([macro_name.trim().to_string()])));
-        } else if trimmed.starts_with("#ifndef") {
-            stack.push(GuardFrame::Opaque);
-        } else if trimmed.starts_with("#else") {
-            stack.pop();
-            stack.push(GuardFrame::Opaque);
-        } else if trimmed.starts_with("#endif") {
-            stack.pop();
-        }
-        lines.push((offset, stack.clone()));
+    while let Some(line) = physical_lines.next() {
+        physical_offsets.push(offset);
         offset += line.len();
+        let continued = line.strip_suffix("\\\r\n").or_else(|| line.strip_suffix("\\\n"));
+        logical_line.push_str(continued.unwrap_or(line));
+        if continued.is_some() && physical_lines.peek().is_some() {
+            continue;
+        }
+        update_guard_stack(&mut stack, logical_line.trim());
+        lines.extend(physical_offsets.drain(..).map(|offset| (offset, stack.clone())));
+        logical_line.clear();
     }
 
     lines
+}
+
+fn update_guard_stack(stack: &mut Vec<GuardFrame>, directive: &str) {
+    if let Some(condition) = directive.strip_prefix("#if ") {
+        stack.push(parse_guard_condition(condition));
+    } else if let Some(condition) = directive.strip_prefix("#elif ") {
+        stack.pop();
+        stack.push(parse_guard_condition(condition));
+    } else if let Some(macro_name) = directive.strip_prefix("#ifdef ") {
+        stack.push(GuardFrame::Defined(BTreeSet::from([macro_name.trim().to_string()])));
+    } else if directive.starts_with("#ifndef") {
+        stack.push(GuardFrame::Opaque);
+    } else if directive.starts_with("#else") {
+        stack.pop();
+        stack.push(GuardFrame::Opaque);
+    } else if directive.starts_with("#endif") {
+        stack.pop();
+    }
 }
 
 fn active_prefix_macros(
@@ -1101,6 +1115,10 @@ fn typedef_kind_problems(
 
     problems
 }
+
+#[cfg(test)]
+#[path = "header_freshness_multiline/tests.rs"]
+mod multiline_tests;
 
 #[cfg(test)]
 mod tests {
