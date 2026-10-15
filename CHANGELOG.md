@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.110.16] - 2026-10-16
+
+### Fixed
+
+- Accept formatted C headers with continued preprocessor guards when checking generated FFI freshness.
+
 ## [0.110.15] - 2026-10-15
 
 ### Changed
