@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep generated Python bindings on matching PyO3 and async-runtime dependency minors so Cargo can resolve their shared native Python link.
 - Preserve explicit Cargo requirements in Elixir Brotli allocator dependency overrides while keeping default and bare full versions exact.
 
 ## [0.110.12] - 2026-10-14

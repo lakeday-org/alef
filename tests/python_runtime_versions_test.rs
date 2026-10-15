@@ -8,9 +8,16 @@ fn dependency_minor(manifest: &toml::Value, dependency: &str) -> (u64, u64) {
         .as_str()
         .expect("generated Python runtime dependency has a version");
     let parsed = VersionReq::parse(requirement).expect("generated requirement is valid semver");
-    assert_eq!(parsed.comparators.len(), 1, "expected one comparator for {dependency}: {requirement}");
+    assert_eq!(
+        parsed.comparators.len(),
+        1,
+        "expected one comparator for {dependency}: {requirement}"
+    );
     let comparator = &parsed.comparators[0];
-    (comparator.major, comparator.minor.expect("runtime requirement specifies a minor version"))
+    (
+        comparator.major,
+        comparator.minor.expect("runtime requirement specifies a minor version"),
+    )
 }
 
 #[test]
