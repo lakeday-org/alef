@@ -508,7 +508,7 @@ pub mod maven {
 
 pub mod nuget {
     // renovate: datasource=nuget depName=Microsoft.NET.Test.Sdk
-    pub const MICROSOFT_NET_TEST_SDK: &str = "18.10.1";
+    pub const MICROSOFT_NET_TEST_SDK: &str = "18.11.0";
 
     // renovate: datasource=nuget depName=xunit.v3.mtp-off
     pub const XUNIT: &str = "4.0.2";
