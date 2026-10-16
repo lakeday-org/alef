@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Raise the generated PHP binding dependency floor to ext-php-rs 0.16.3, which uses ZIP 9.
+
 ## [0.110.16] - 2026-10-16
 
 ### Fixed
