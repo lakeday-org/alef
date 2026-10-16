@@ -5,6 +5,9 @@ use crate::process::capture::{OUTPUT_DRAIN_GRACE, collect_output_within, output_
 use crate::process::timed::{Deadline, GroupChild};
 use crate::snippets::error::Result;
 
+#[cfg(test)]
+mod zig_probe_tests;
+
 fn strip_ansi_codes(input: &str) -> String {
     let mut result = String::with_capacity(input.len());
     let mut chars = input.chars();
@@ -58,6 +61,8 @@ pub fn run_command_streams(command: &mut std::process::Command, timeout_secs: u6
     command
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+    #[cfg(test)]
+    let zig_probe = zig_probe_tests::start(command, timeout_secs);
     let mut child = GroupChild::spawn(command)
         .map_err(|err| crate::snippets::error::Error::Other(format!("spawn failed: {err}")))?;
     let stdout = child.take_stdout().map(output_reader);
@@ -77,6 +82,10 @@ pub fn run_command_streams(command: &mut std::process::Command, timeout_secs: u6
                 );
                 child.kill_tree();
             }
+            #[cfg(test)]
+            if let Some(probe) = &zig_probe {
+                probe.finish(if status.success() { "pass" } else { "fail" }, Ok(&drained));
+            }
             Ok(CapturedStreams {
                 success: status.success(),
                 stdout: strip_ansi_codes(&drained.stdout),
@@ -84,14 +93,22 @@ pub fn run_command_streams(command: &mut std::process::Command, timeout_secs: u6
             })
         }
         Ok(Deadline::Expired) => {
-            let _ = collect_output_within(stdout, stderr, OUTPUT_DRAIN_GRACE);
+            let _drained = collect_output_within(stdout, stderr, OUTPUT_DRAIN_GRACE);
+            #[cfg(test)]
+            if let Some(probe) = &zig_probe {
+                probe.finish("timeout", _drained.as_ref());
+            }
             Err(crate::snippets::error::Error::Timeout {
                 command: format!("{command:?}"),
                 timeout_secs,
             })
         }
         Err(err) => {
-            let _ = collect_output_within(stdout, stderr, OUTPUT_DRAIN_GRACE);
+            let _drained = collect_output_within(stdout, stderr, OUTPUT_DRAIN_GRACE);
+            #[cfg(test)]
+            if let Some(probe) = &zig_probe {
+                probe.finish("wait-error", _drained.as_ref());
+            }
             Err(crate::snippets::error::Error::Other(format!("wait failed: {err}")))
         }
     }

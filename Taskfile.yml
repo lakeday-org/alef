@@ -56,6 +56,26 @@ tasks:
     cmds:
       - cargo {{.TEST_CONFIG}} test --workspace {{.CLI_ARGS}}
 
+  test:zig:probe:build:
+    desc: "Build the Windows-only Zig timeout diagnostic executable"
+    platforms: [windows]
+    cmds:
+      - pwsh -NoProfile -File scripts/ci/zig_probe.ps1 -Action Build
+
+  test:zig:probe:
+    desc: "Measure the frozen Zig case set with unchanged snippet deadlines"
+    platforms: [windows]
+    vars:
+      MODE: '{{default "serial" .MODE}}'
+    cmds:
+      - pwsh -NoProfile -File scripts/ci/zig_probe.ps1 -Action Run -Mode {{.MODE}}
+
+  test:zig:probe:collect:
+    desc: "Collect diagnostic verdicts and immutable source identities"
+    platforms: [windows]
+    cmds:
+      - pwsh -NoProfile -File scripts/ci/zig_probe.ps1 -Action Collect
+
   test:census:
     desc: "Report how many toolchain-dependent fixtures the last test run actually executed"
     cmds:
