@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -84,6 +85,7 @@ def bootstrap(gate):
         4 * 1024**3,
         1200,
     )
+    install_clang_format(gate)
     for tool in ["cmake", "pkg-config", "swift", "clang", "clang-format"]:
         if not gate.which(tool):
             raise RuntimeError("strict generation/native tool unavailable: " + tool)
@@ -112,3 +114,65 @@ def install_task(gate):
             256 * 1024**2,
             120,
         )
+
+
+def install_clang_format(gate):
+    formatter = gate.tools / "clang-format"
+    gate.command("clang-format-venv", [gate.python, "-m", "venv", str(formatter)], gate.alef, 256 * 1024**2, 120)
+    binary = formatter / "bin/clang-format"
+    report = gate.evidence / "clang-format-install.json"
+    gate.command(
+        "install-clang-format",
+        [
+            str(formatter / "bin/python"),
+            "-m",
+            "pip",
+            "--isolated",
+            "install",
+            "--only-binary=:all:",
+            "--index-url",
+            "https://pypi.org/simple",
+            "--disable-pip-version-check",
+            "--no-cache-dir",
+            "--report",
+            str(report),
+            "clang-format==22.1.8",
+        ],
+        gate.alef,
+        512 * 1024**2,
+        600,
+    )
+    gate.env["PATH"] = str(binary.parent) + os.pathsep + gate.env["PATH"]
+    selected = gate.which("clang-format")
+    if not binary.is_file() or Path(selected or "").resolve() != binary.resolve():
+        raise RuntimeError("pinned clang-format executable is not selected on the generation PATH")
+    version = gate.command("version-clang-format", [str(binary), "--version"], gate.alef, 0, 15)
+    if (version / "stdout.log").read_text().strip() != "clang-format version 22.1.8":
+        raise RuntimeError("installed clang-format version differs")
+    installed = json.loads(report.read_text())["install"]
+    if (
+        len(installed) != 1
+        or installed[0]["metadata"]["name"] != "clang-format"
+        or installed[0]["metadata"]["version"] != "22.1.8"
+    ):
+        raise RuntimeError("unexpected clang-format package installation report")
+    download = installed[0]["download_info"]
+    digest = download["archive_info"]["hashes"].get("sha256", "")
+    if (
+        not download["url"].startswith("https://files.pythonhosted.org/")
+        or not download["url"].endswith(".whl")
+        or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+    ):
+        raise RuntimeError("official clang-format wheel provenance missing")
+    (gate.evidence / "clang-format-tool.json").write_text(
+        json.dumps(
+            {
+                "selected": str(binary.resolve()),
+                "executable_sha256": sha(binary),
+                "version": "22.1.8",
+                "wheel": download,
+            },
+            indent=2,
+        )
+        + "\n"
+    )
