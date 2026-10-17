@@ -12,6 +12,9 @@ use tracing::{debug, info, warn};
 
 mod build_command;
 mod frb_bridge_coverage;
+mod frb_build_runner;
+#[cfg(test)]
+mod frb_build_runner_tests;
 mod frb_cache;
 mod frb_cfg_gates;
 mod frb_constructor_defaults;
@@ -580,6 +583,19 @@ pub fn run_post_build(
     base_dir: &Path,
     staging_profile: StagingProfile,
 ) -> anyhow::Result<PostBuildOutcome> {
+    run_post_build_with_spawn(lang, bc, config, base_dir, staging_profile, None)
+}
+
+type BeforeSpawn<'a> = &'a dyn Fn(&mut std::process::Command) -> anyhow::Result<()>;
+
+fn run_post_build_with_spawn(
+    lang: Language,
+    bc: &crate::core::backend::BuildConfig,
+    config: &ResolvedCrateConfig,
+    base_dir: &Path,
+    staging_profile: StagingProfile,
+    before_spawn: Option<BeforeSpawn<'_>>,
+) -> anyhow::Result<PostBuildOutcome> {
     use crate::core::backend::PostBuildStep;
 
     let crate_dir = output_path_for(lang, config)
@@ -621,8 +637,19 @@ pub fn run_post_build(
                     .timeout_seconds
                     .map(std::time::Duration::from_secs)
                     .unwrap_or(RUN_COMMAND_TIMEOUT);
-                let ran = run_run_command(cmd, args, &work_dir, &config.name, timeout)
-                    .with_context(|| format!("post-build RunCommand '{cmd}' failed"))?;
+                let result =
+                    if *cmd == frb_version_check::FLUTTER_RUST_BRIDGE_CODEGEN && args.first() == Some(&"generate") {
+                        let no_op = |_: &mut std::process::Command| Ok(());
+                        frb_build_runner::run(args, &work_dir, &config.name, timeout, before_spawn.unwrap_or(&no_op))
+                    } else {
+                        match before_spawn {
+                            Some(callback) => {
+                                run_run_command_with_spawn(cmd, args, &work_dir, &config.name, timeout, callback)
+                            }
+                            None => run_run_command(cmd, args, &work_dir, &config.name, timeout),
+                        }
+                    };
+                let ran = result.with_context(|| format!("post-build RunCommand '{cmd}' failed"))?;
                 if !ran {
                     skipped_missing_tools.push((*cmd).to_string());
                 }
@@ -891,6 +918,17 @@ fn run_run_command(
     cache_scope: &str,
     timeout: std::time::Duration,
 ) -> anyhow::Result<bool> {
+    run_run_command_with_spawn(cmd, args, base_dir, cache_scope, timeout, &|_| Ok(()))
+}
+
+fn run_run_command_with_spawn(
+    cmd: &str,
+    args: &[&str],
+    base_dir: &Path,
+    cache_scope: &str,
+    timeout: std::time::Duration,
+    before_spawn: &dyn Fn(&mut std::process::Command) -> anyhow::Result<()>,
+) -> anyhow::Result<bool> {
     if let Ok(skip_list) = std::env::var("ALEF_SKIP_COMMANDS")
         && skip_list.split(',').any(|s| s.trim() == cmd)
     {
@@ -915,6 +953,7 @@ fn run_run_command(
         cwd = %base_dir.display(),
         "running post-build command"
     );
+    before_spawn(&mut command)?;
     let mut child = match GroupChild::spawn(&mut command) {
         Ok(child) => child,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {

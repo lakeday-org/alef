@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reject invalid FRB generation configuration unless FRB generation is explicitly skipped.
 - Raise the generated PHP binding dependency floor to ext-php-rs 0.16.3, which uses ZIP 9.
 
 ### Fixed
 
+- Report failed or skipped required Dart Freezed generation before post-processing generated bindings.
 - Avoid Dart error accessor names that conflict with generated variant properties.
 - Preserve typed streaming errors and their metadata in generated Java and C FFI bindings, and verify native error identities in Zig streaming tests.
 - Keep valid Dart consumer locks stable when path dependencies declare development-only tools, while retaining checks for root development and transitive runtime dependencies.
