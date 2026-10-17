@@ -11,7 +11,7 @@ from receipts import sha
 def bootstrap(gate):
     gate.require_head(gate.actions, "fdddc35399a9eb87cb9c35ae87346ef38e7bbc29")
     gate.require_head(gate.poly, "8a85d746736986ce80ae4a2315c15c27e5844d28")
-    gate.command("rustup-identity", ["rustup", "--version"], gate.alef, 0, 10)
+    gate.env["RUSTUP_AUTO_INSTALL"] = "0"
     gate.command(
         "rust-toolchain",
         [
@@ -22,14 +22,20 @@ def bootstrap(gate):
             "--profile",
             "minimal",
             "--component",
+            "rust-src",
+            "--component",
             "rustfmt",
             "--component",
             "clippy",
+            "--target",
+            "wasm32-unknown-unknown",
+            "--no-self-update",
         ],
         gate.alef,
         2 * 1024**3,
         600,
     )
+    gate.command("rustup-identity", ["rustup", "--version"], gate.alef, 0, 10)
     sysroot = gate.command(
         "qualified-rust-sysroot", ["rustup", "run", "1.99.1", "rustc", "--print", "sysroot"], gate.alef, 0, 15
     )

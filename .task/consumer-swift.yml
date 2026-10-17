@@ -8,6 +8,6 @@ tasks:
       - task: controls
       - python3 '{{.TASKFILE_DIR}}/../scripts/consumer-swift/entry.py'
   controls:
-    desc: Run all 30 hosted consumer harness controls with resource and process cleanup guards
+    desc: Run all 33 hosted consumer harness controls with resource and process cleanup guards
     cmds:
       - python3 '{{.TASKFILE_DIR}}/../scripts/consumer-swift/entry.py' --controls
