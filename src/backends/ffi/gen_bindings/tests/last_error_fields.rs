@@ -246,3 +246,196 @@ fn main() {{
         String::from_utf8_lossy(&run.stderr)
     );
 }
+
+fn generated_stream_next_transition() -> (String, String) {
+    use quote::ToTokens;
+    use syn::visit::Visit;
+
+    #[derive(Default)]
+    struct NextTransition(Vec<syn::ExprMatch>);
+    impl<'ast> Visit<'ast> for NextTransition {
+        fn visit_expr_match(&mut self, node: &'ast syn::ExprMatch) {
+            if matches!(node.expr.as_ref(), syn::Expr::Path(path) if path.path.is_ident("next")) {
+                self.0.push(node.clone());
+            }
+            syn::visit::visit_expr_match(self, node);
+        }
+    }
+    let generated = crate::backends::ffi::gen_bindings::helpers::gen_stream_handle_functions(
+        "smp",
+        "Client",
+        "watch",
+        "watch",
+        "Chunk",
+        "sample::Request",
+        "sample",
+    );
+    let parsed = syn::parse_file(&generated).expect("parse generated stream implementation");
+    let carrier_name = "SmpClientWatchStreamHandleError";
+    let carrier: Vec<_> = parsed
+        .items
+        .iter()
+        .filter(|item| match item {
+            syn::Item::Struct(item) => item.ident == carrier_name,
+            syn::Item::Impl(item) => {
+                matches!(item.self_ty.as_ref(), syn::Type::Path(path) if path.path.is_ident(carrier_name))
+            }
+            _ => false,
+        })
+        .map(ToTokens::to_token_stream)
+        .collect();
+    assert_eq!(
+        carrier.len(),
+        2,
+        "exercise the actual generated carrier declaration and implementation"
+    );
+    let mut visitor = NextTransition::default();
+    visitor.visit_file(&parsed);
+    assert_eq!(
+        visitor.0.len(),
+        1,
+        "the real generated NEXT transition must be exercised"
+    );
+    (
+        visitor.0.remove(0).into_token_stream().to_string(),
+        quote::quote!(#(#carrier)*).to_string(),
+    )
+}
+
+#[test]
+fn deferred_stream_error_retains_native_identity_after_a_successful_chunk() {
+    let mut api = sample_api();
+    api.errors[0].variants[0].error_code = Some(108);
+    api.errors[0].variants[1].error_code = Some(101);
+    let module = gen_last_error(&api, &config().ffi_prefix(), "sample");
+    let (transition, carrier) = generated_stream_next_transition();
+    let source = format!(
+        r#"
+use std::cell::RefCell;
+use std::ffi::{{c_char, CStr, CString}};
+
+mod sample {{
+    #[derive(Debug)]
+    pub enum SampleError {{
+        Timeout,
+        RateLimited {{ retry_after: Option<std::time::Duration> }},
+    }}
+    impl std::fmt::Display for SampleError {{
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
+            f.write_str("provider stream rejected the next chunk")
+        }}
+    }}
+    impl std::error::Error for SampleError {{}}
+    impl SampleError {{
+        pub fn status_code(&self) -> u16 {{
+            match self {{ Self::Timeout => 408, Self::RateLimited {{ .. }} => 429 }}
+        }}
+        pub fn is_transient(&self) -> bool {{ true }}
+        pub fn error_type(&self) -> &'static str {{
+            match self {{ Self::Timeout => "Timeout", Self::RateLimited {{ .. }} => "RateLimited" }}
+        }}
+        pub fn retry_after(&self) -> Option<std::time::Duration> {{
+            match self {{ Self::RateLimited {{ retry_after }} => *retry_after, _ => None }}
+        }}
+    }}
+}}
+
+{module}
+{carrier}
+
+fn insert_handle(chunk: u64) -> Result<u64, String> {{ Ok(chunk) }}
+fn set_handle_error(error: &String) {{ panic!("unexpected handle error: {{error}}") }}
+
+fn advance(next: Option<Result<u64, SmpClientWatchStreamHandleError>>) -> u64 {{
+    clear_last_error();
+    let mut state = Some(());
+    let guard = &mut state;
+    {transition}
+}}
+
+fn text(pointer: *const c_char) -> Option<String> {{
+    (!pointer.is_null()).then(|| unsafe {{ CStr::from_ptr(pointer) }}.to_str().unwrap().to_owned())
+}}
+
+fn main() {{
+    if std::env::args().any(|arg| arg == "--unknown-error") {{
+        set_last_error_from(
+            &sample::SampleError::RateLimited {{ retry_after: Some(std::time::Duration::from_millis(2500)) }},
+            "seed typed metadata",
+        );
+        let unknown = SmpClientWatchStreamHandleError::new(std::io::Error::other("opaque provider failure"));
+        assert_eq!(advance(Some(Err(unknown))), 0);
+        unsafe {{
+            assert_eq!(smp_last_error_code(), 99);
+            assert!(smp_last_error_variant().is_null());
+            assert!(smp_last_error_error_type().is_null());
+            assert_eq!(smp_last_error_status_code(), 0);
+            assert_eq!(smp_last_error_retry_after(), -1);
+            assert!(!smp_last_error_is_transient());
+            assert!(text(smp_last_error_context()).unwrap().contains("opaque provider failure"));
+        }}
+        return;
+    }}
+    let error = SmpClientWatchStreamHandleError::new(sample::SampleError::RateLimited {{
+        retry_after: Some(std::time::Duration::from_millis(2500)),
+    }});
+    let mut stream = [Ok(7), Err(error)].into_iter();
+    assert_eq!(advance(stream.next()), 7, "a real successful item precedes the deferred failure");
+    unsafe {{ assert_eq!(smp_last_error_code(), 0); }}
+    assert_eq!(advance(stream.next()), 0);
+    let expected_code = if std::env::args().any(|arg| arg == "--wrong-code") {{ 104 }} else {{ 101 }};
+    unsafe {{
+        assert_eq!(smp_last_error_code(), expected_code, "deferred error code must retain its core taxonomy");
+        assert_eq!(text(smp_last_error_variant()).as_deref(), Some("RateLimited"));
+        assert_eq!(smp_last_error_status_code(), 429);
+        assert_eq!(smp_last_error_retry_after(), 2500);
+        assert!(smp_last_error_is_transient());
+        assert_eq!(text(smp_last_error_error_type()).as_deref(), Some("RateLimited"));
+        assert!(text(smp_last_error_context()).unwrap().contains("provider stream rejected the next chunk"));
+    }}
+    assert_eq!(advance(stream.next()), 0);
+    unsafe {{
+        assert_eq!(smp_last_error_code(), 0, "clean EOF must not retain the preceding error");
+        assert!(smp_last_error_variant().is_null());
+        assert!(smp_last_error_context().is_null());
+        assert_eq!(smp_last_error_status_code(), 0);
+        assert_eq!(smp_last_error_retry_after(), -1);
+        assert!(!smp_last_error_is_transient());
+    }}
+}}
+"#
+    );
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let source_path = directory.path().join("deferred_stream.rs");
+    let binary_path = directory.path().join("deferred-stream-test");
+    std::fs::write(&source_path, &source).expect("write generated transition harness");
+    let compile = std::process::Command::new("rustc")
+        .current_dir(directory.path())
+        .args(["--edition=2024", "-o"])
+        .arg(&binary_path)
+        .arg(&source_path)
+        .output()
+        .expect("run rustc");
+    assert!(
+        compile.status.success(),
+        "{}\n{source}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let unknown = std::process::Command::new(&binary_path)
+        .arg("--unknown-error")
+        .output()
+        .expect("run unknown error control");
+    assert!(unknown.status.success(), "{}", String::from_utf8_lossy(&unknown.stderr));
+    let run = std::process::Command::new(&binary_path)
+        .output()
+        .expect("run NEXT transition");
+    assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+    let negative = std::process::Command::new(&binary_path)
+        .arg("--wrong-code")
+        .output()
+        .expect("run wrong taxonomy control");
+    assert!(
+        !negative.status.success(),
+        "a deliberately wrong expected taxonomy must fail"
+    );
+}

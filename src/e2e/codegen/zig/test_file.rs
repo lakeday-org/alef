@@ -45,6 +45,11 @@ fn emit_test_backend_register_call(
     let _ = writeln!(out, "    }}");
 }
 
+struct ErrorExpressions {
+    name: String,
+    message: String,
+}
+
 /// Close the error arm of the `if (call) |_| {..} else |_| {..}` shape and, when the fixture
 /// declares an `error` value this backend can substantiate, actually compare it — or, when the
 /// value names a real variant Zig cannot substantiate, emit the registered skip instead of an
@@ -68,7 +73,7 @@ fn emit_declared_error_value_assertion(
     out: &mut String,
     fixture: &Fixture,
     errors: &[crate::core::ir::ErrorDef],
-    message_expression: &str,
+    expressions: &ErrorExpressions,
     for_docs: bool,
 ) {
     // ~keep A documentation snippet is a `main`, not a `test`: `testing` is never bound in
@@ -76,30 +81,25 @@ fn emit_declared_error_value_assertion(
     // snippet emitter rewrites the literal `else |_| {}` arm into a printing one. Snippet output
     // therefore stays byte-identical to before this change.
     if for_docs {
-        out.push_str(&render_declared_error_branch("bare", message_expression, "", ""));
+        out.push_str(&render_declared_error_branch("bare", expressions, "", ""));
         return;
     }
     use crate::e2e::codegen::declared_error_variant::{DeclaredErrorAssertion, classify, skip_line};
     match classify("zig", fixture, errors) {
         DeclaredErrorAssertion::Undeclared => {
-            out.push_str(&render_declared_error_branch("bare", message_expression, "", ""));
+            out.push_str(&render_declared_error_branch("bare", expressions, "", ""));
         }
         DeclaredErrorAssertion::Assert(declared) => {
             out.push_str(&render_declared_error_branch(
                 "assert",
-                message_expression,
+                expressions,
                 &escape_zig(declared),
                 "",
             ));
         }
         DeclaredErrorAssertion::Unsubstantiable(variant) => {
             let skip = skip_line("        ", "//", variant, &fixture.id, "zig");
-            out.push_str(&render_declared_error_branch(
-                "unsubstantiable",
-                message_expression,
-                "",
-                &skip,
-            ));
+            out.push_str(&render_declared_error_branch("unsubstantiable", expressions, "", &skip));
         }
     }
 }
@@ -110,12 +110,13 @@ fn emit_declared_error_value_assertion(
 /// tests against move together. ~keep
 const ZIG_UNKNOWN_ERROR_NAME: &str = "UnknownFfiError";
 
-fn render_declared_error_branch(kind: &str, message_expression: &str, expected: &str, skip_line: &str) -> String {
+fn render_declared_error_branch(kind: &str, expressions: &ErrorExpressions, expected: &str, skip_line: &str) -> String {
     crate::e2e::template_env::render(
         "zig/declared_error_branch.jinja",
         crate::alef_context! {
             kind => kind,
-            message_expression => message_expression,
+            message_expression => expressions.message,
+            error_name_expression => expressions.name,
             expected => expected,
             skip_line => skip_line,
             unknown_error_name => ZIG_UNKNOWN_ERROR_NAME,
@@ -600,7 +601,18 @@ fn render_test_fn(
         } else {
             format!("{module_name}._last_error() orelse \"\"")
         };
-        emit_declared_error_value_assertion(out, fixture, errors, &message_expression, for_docs);
+        let error_name_expression = if streaming_adapter.is_some() {
+            format!(
+                "if ({module_name}.c.{ffi_prefix}_last_error_variant()) |_variant| std.mem.span(_variant) else @errorName(_err)"
+            )
+        } else {
+            "@errorName(_err)".to_string()
+        };
+        let expressions = ErrorExpressions {
+            name: error_name_expression,
+            message: message_expression,
+        };
+        emit_declared_error_value_assertion(out, fixture, errors, &expressions, for_docs);
         if !for_docs {
             crate::e2e::codegen::error_path_assertions::emit(out, fixture, "    // ", "zig");
         }

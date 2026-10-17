@@ -700,12 +700,25 @@ pub(super) fn gen_stream_handle_functions(
     let fn_free = c_consumer::stream_adapter_symbol(prefix, owner_type, adapter_name, "free");
 
     let core_item = format!("{core_import}::{item_type}");
-    let boxed_err = "Box<dyn std::error::Error + Send + Sync + 'static>";
-    let stream_ty = format!("futures_util::stream::BoxStream<'static, Result<{core_item}, {boxed_err}>>");
+    let error_type = format!("{handle_name}Error");
+    let stream_ty = format!("futures_util::stream::BoxStream<'static, Result<{core_item}, {error_type}>>");
     let owner_ty = format!("{core_import}::{owner_type}");
+    let error_carrier = crate::backends::ffi::template_env::render(
+        "stream_error_carrier.rs.jinja",
+        crate::alef_context! { error_type => error_type.as_str() },
+    );
+    let error_map = crate::backends::ffi::template_env::render(
+        "stream_error_map.rs.jinja",
+        crate::alef_context! { error_type => error_type.as_str() },
+    );
+    let error_capture = crate::backends::ffi::template_env::render(
+        "stream_error_capture.rs.jinja",
+        crate::alef_context! { function_name => fn_next.as_str() },
+    );
 
     format!(
-        r#"/// Opaque handle owning a tokio runtime and a boxed chat-stream for iterator-style consumption.
+        r#"{error_carrier}
+/// Opaque handle owning a tokio runtime and a boxed chat-stream for iterator-style consumption.
 ///
 /// Created by `{fn_start}`, advanced by `{fn_next}`, destroyed by `{fn_free}`.
 /// The handle is NOT thread-safe — callers must ensure only one thread calls `_next` at a time.
@@ -826,10 +839,9 @@ unsafe fn {fn_start}_open(
         }}
     }};
 
-    // Map the stream's concrete error type to Box<dyn Error> to erase it from the handle type.
     let mapped: {stream_ty} = {{
         use futures_util::StreamExt;
-        Box::pin(raw_stream.map(|r| r.map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync + 'static>)))
+        {error_map}
     }};
 
     let handle = {handle_name} {{
@@ -913,7 +925,7 @@ pub unsafe extern "C" fn {fn_next}(
             }}
         }}
         Some(Err(e)) => {{
-            set_last_error(99, &format!("{fn_next}: stream error: {{e}}"));
+            {error_capture}
             0
         }}
         None => {{

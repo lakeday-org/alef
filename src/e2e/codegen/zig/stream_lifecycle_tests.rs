@@ -202,3 +202,21 @@ fn asserted_stream_checks_error_after_collecting_chunks() {
         "partial stream failure swallowed: {rendered}"
     );
 }
+
+#[test]
+fn stream_error_assertions_use_native_variant_identity() {
+    let rendered = render_stream(Some("error"));
+    assert!(
+        rendered.contains("sample.c.sample_last_error_variant()"),
+        "raw stream errors must assert the native variant, not the synthetic UnknownFfiError: {rendered}"
+    );
+    assert!(rendered.contains("sample.c.sample_last_error_context()"));
+    assert!(
+        rendered.contains("provider failure"),
+        "declared error value was discarded: {rendered}"
+    );
+    assert!(
+        rendered.contains("error.TestUnexpectedResult"),
+        "unexpected success must still fail: {rendered}"
+    );
+}

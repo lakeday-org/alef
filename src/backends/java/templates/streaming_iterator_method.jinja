@@ -12,6 +12,10 @@
             Throwable startFailure = null;
             try (HandleLease handleLease = borrowHandle()) {
                 streamHandle = (MemorySegment) NativeLib.{{ start_handle }}.invoke(handleLease.handle(), requestPtr);
+                if (streamHandle == null || streamHandle.equals(MemorySegment.NULL)) {
+                    checkLastFfiError();
+                    throw new {{ exception_class }}("{{ method_name }}: stream handle was null", (Throwable) null);
+                }
             } catch (Throwable failure) {
                 startFailure = failure;
                 throw failure;
@@ -26,10 +30,6 @@
         } catch (Throwable e) {
             if (e instanceof {{ exception_class }} ex) { throw ex; }
             throw new {{ exception_class }}("{{ method_name }}: failed to start stream", e);
-        }
-        if (streamHandle == null || streamHandle.equals(MemorySegment.NULL)) {
-            checkLastFfiError();
-            throw new {{ exception_class }}("{{ method_name }}: stream handle was null", (Throwable) null);
         }
         final MemorySegment finalStreamHandle = streamHandle;
         final class StreamingIterator implements java.util.Iterator<{{ item_type }}>, AutoCloseable {

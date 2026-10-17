@@ -1,0 +1,23 @@
+struct {{ error_type }} {
+    error: Box<dyn std::any::Any + Send + Sync>,
+    message: String,
+}
+
+impl {{ error_type }} {
+    // ~keep Preserve the iterator API's legacy fallback, distinct from the general unknown-error code.
+    const UNKNOWN_STREAM_ERROR: i32 = 99;
+
+    fn new(error: impl std::fmt::Display + Send + Sync + 'static) -> Self {
+        Self {
+            message: error.to_string(),
+            error: Box::new(error),
+        }
+    }
+
+    fn capture(&self, message: &str) {
+        set_last_error_from(self.error.as_ref(), message);
+        if LAST_ERROR_VARIANT.with_borrow(|variant| variant.is_none()) {
+            LAST_ERROR_CODE.with_borrow_mut(|code| *code = Self::UNKNOWN_STREAM_ERROR);
+        }
+    }
+}

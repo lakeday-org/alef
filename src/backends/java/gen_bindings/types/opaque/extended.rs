@@ -482,3 +482,32 @@ pub(super) fn gen_streaming_helpers(out: &mut String, prefix: &str, main_class: 
         },
     ));
 }
+
+#[cfg(test)]
+mod stream_error_regressions {
+    #[test]
+    fn stream_initiation_error_is_captured_before_request_cleanup() {
+        let generated = crate::backends::java::template_env::render(
+            "streaming_iterator_method.jinja",
+            crate::alef_context! {
+                item_type => "Chunk", method_name => "watch", request_type => "Request",
+                request_param => "request", exception_class => "SampleException",
+                req_from_json => "REQUEST_FROM_JSON", start_handle => "STREAM_START",
+                req_free => "REQUEST_FREE", next_handle => "STREAM_NEXT", prefix_upper => "SAMPLE",
+                item_to_json => "CHUNK_TO_JSON", item_free => "CHUNK_FREE", free_handle => "STREAM_FREE",
+            },
+        );
+        let start = generated.find("NativeLib.STREAM_START.invoke").expect("start call");
+        let after_start = &generated[start..];
+        let check = after_start.find("checkLastFfiError();").expect("native error check");
+        let cleanup = after_start
+            .find("NativeLib.REQUEST_FREE.invoke")
+            .expect("request cleanup");
+        assert!(
+            check < cleanup,
+            "cleanup clears native TLS before the typed error is captured: {generated}"
+        );
+        assert!(after_start[..check].contains("streamHandle.equals(MemorySegment.NULL)"));
+        assert!(generated.contains("if (startFailure != null) startFailure.addSuppressed(cleanupFailure)"));
+    }
+}
