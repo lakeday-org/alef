@@ -421,6 +421,49 @@ fn emit_from_impl(out: &mut String, error: &ErrorDef, core_path: &str, error_cfg
     ));
 }
 
+fn error_bridge_method_names(error: &ErrorDef, methods: &[&crate::core::ir::MethodDef]) -> Vec<String> {
+    use crate::codegen::naming::{PublicIdentifierKind, internal_rust_identifier, public_host_identifier};
+    use crate::core::config::Language;
+
+    let dart_name = |name: &str| public_host_identifier(Language::Dart, PublicIdentifierKind::Method, name);
+    let mut occupied: std::collections::HashSet<String> = error
+        .variants
+        .iter()
+        .flat_map(|variant| {
+            if !variant.is_unit && variant.is_tuple && variant.fields.iter().all(|field| field.binding_excluded) {
+                return vec!["field0".to_string()];
+            }
+            binding_fields(&variant.fields)
+                .enumerate()
+                .map(|(index, field)| {
+                    if field.name.is_empty() || field.name.starts_with('_') {
+                        format!("field{index}")
+                    } else {
+                        field.name.clone()
+                    }
+                })
+                .collect()
+        })
+        .map(|name| dart_name(&name))
+        .collect();
+    let mut reserved = occupied.clone();
+    reserved.extend(methods.iter().map(|method| dart_name(&method.name)));
+    methods
+        .iter()
+        .map(|method| {
+            let mut name = method.name.clone();
+            while occupied.contains(&dart_name(&name)) || (name != method.name && reserved.contains(&dart_name(&name)))
+            {
+                name = format!("get_{name}");
+            }
+            let host_name = dart_name(&name);
+            occupied.insert(host_name.clone());
+            reserved.insert(host_name);
+            internal_rust_identifier(&name)
+        })
+        .collect()
+}
+
 /// Emit a `#[frb(mirror(ErrorName))]` enum + safe `impl From` conversion +
 /// `impl ErrorName` block with `#[frb]` introspection methods.
 ///
@@ -538,13 +581,14 @@ pub(crate) fn emit_mirror_error(out: &mut String, error: &ErrorDef, source_crate
             source_cfg => "",
         },
     ));
-    for method in bridge_methods {
+    let bridge_names = error_bridge_method_names(error, &bridge_methods);
+    for (method, bridge_name) in bridge_methods.into_iter().zip(bridge_names) {
         emit_rust_doc(&method.doc, "    ", out);
         let ret_ty = frb_rust_type_inner(&method.return_type);
         out.push_str(&crate::backends::dart::template_env::render(
             "rust_error_method_open.rs.jinja",
             crate::alef_context! {
-                method_name => method.name.as_str(),
+                method_name => bridge_name,
                 ret_ty => ret_ty.as_str(),
             },
         ));
@@ -641,6 +685,78 @@ mod tests {
         emit_mirror_error(&mut bare, &duration_error(TypeRef::Duration), "demo");
         assert!(bare.contains("-> i64"), "{bare}");
         assert!(bare.contains("real.retry_after().as_millis() as i64"), "{bare}");
+    }
+
+    #[test]
+    fn error_accessors_do_not_collide_with_freezed_variant_properties() {
+        use crate::core::ir::{ErrorVariant, FieldDef};
+
+        for (fields, expected) in [
+            (vec!["retry_after"], "get_retry_after"),
+            (vec!["retryAfter"], "get_retry_after"),
+            (vec!["retry_after", "get_retry_after"], "get_get_retry_after"),
+            (vec!["message"], "retry_after"),
+        ] {
+            let mut error = duration_error(TypeRef::Optional(Box::new(TypeRef::Duration)));
+            error.variants.push(ErrorVariant {
+                name: "RateLimited".into(),
+                fields: fields
+                    .iter()
+                    .map(|name| FieldDef {
+                        name: name.to_string(),
+                        ty: TypeRef::Duration,
+                        ..Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            });
+            let mut generated = String::new();
+            emit_mirror_error(&mut generated, &error, "demo");
+            assert!(
+                generated.contains(&format!("pub fn {expected}(&self)")),
+                "{fields:?}: {generated}"
+            );
+            assert!(generated.contains("real.retry_after().map(|d| d.as_millis() as i64)"));
+            for field in fields {
+                assert!(
+                    generated.contains(&format!("{field}: i64")),
+                    "property renamed: {generated}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn renamed_error_accessors_do_not_take_an_existing_method_name() {
+        use crate::core::ir::{ErrorVariant, FieldDef};
+
+        let mut error = duration_error(TypeRef::Duration);
+        let mut other = error.methods[0].clone();
+        other.name = "get_retry_after".into();
+        error.methods.push(other);
+        error.variants.push(ErrorVariant {
+            name: "RateLimited".into(),
+            fields: vec![FieldDef {
+                name: "retry_after".into(),
+                ty: TypeRef::Duration,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        let mut generated = String::new();
+        emit_mirror_error(&mut generated, &error, "demo");
+        assert_eq!(
+            generated.matches("pub fn get_retry_after(&self)").count(),
+            1,
+            "{generated}"
+        );
+        assert_eq!(
+            generated.matches("pub fn get_get_retry_after(&self)").count(),
+            1,
+            "{generated}"
+        );
+        assert!(generated.contains("real.retry_after().as_millis() as i64"));
+        assert!(generated.contains("real.get_retry_after().as_millis() as i64"));
     }
 
     /// The regression this task fixes: an opaque wrapper's `inner` field names the host path

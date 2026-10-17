@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Avoid Dart error accessor names that conflict with generated variant properties.
 - Preserve typed streaming errors and their metadata in generated Java and C FFI bindings, and verify native error identities in Zig streaming tests.
 
 ## [0.110.16] - 2026-10-16
