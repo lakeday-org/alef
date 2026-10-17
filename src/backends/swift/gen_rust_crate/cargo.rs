@@ -342,21 +342,15 @@ swift-bridge-build = "{swift_bridge_build_ver}"
 
 /// Emit the `build.rs` content for the generated swift crate.
 pub(crate) fn emit_build_rs() -> String {
-    format!(
-        "{}\n{}",
-        crate::core::hash::SELF_MARKING_HEADER_LINE,
-        r#"use std::path::PathBuf;
-
-fn main() {
-    let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR unset"));
-    let crate_name = std::env::var("CARGO_PKG_NAME").expect("CARGO_PKG_NAME unset");
-    let bridges = vec!["src/lib.rs"];
-    swift_bridge_build::parse_bridges(bridges).write_all_concatenated(out_dir, &crate_name);
-    println!("cargo:rerun-if-changed=src/lib.rs");
-}
-"#
+    crate::backends::swift::template_env::render(
+        "rust_build.rs.jinja",
+        crate::alef_context! { generated_header => crate::core::hash::SELF_MARKING_HEADER_LINE },
     )
 }
 
 #[cfg(test)]
 mod manifest_tests;
+#[cfg(test)]
+mod swift_callback_link_tests;
+#[cfg(test)]
+mod swift_callback_policy_gate_tests;

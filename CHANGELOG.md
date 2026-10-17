@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Link generated Swift callbacks on Apple targets with strict linker flags while keeping unrelated undefined symbols as errors.
 - Report failed or skipped required Dart Freezed generation before post-processing generated bindings.
 - Avoid Dart error accessor names that conflict with generated variant properties.
 - Preserve typed streaming errors and their metadata in generated Java and C FFI bindings, and verify native error identities in Zig streaming tests.

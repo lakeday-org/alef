@@ -56,6 +56,11 @@ tasks:
     cmds:
       - cargo {{.TEST_CONFIG}} test --workspace {{.CLI_ARGS}}
 
+  gate:swift-callback-policy:
+    desc: "Compile and verify emitted Swift callback link policy"
+    cmds:
+      - task test:run -- --lib swift_callback_link_tests -- --ignored --test-threads=1
+
   test:census:
     desc: "Report how many toolchain-dependent fixtures the last test run actually executed"
     cmds:

@@ -235,6 +235,10 @@ jobs:
         # `ci_poly_pin_gate` across two releases that way -- the log showed one red test and
         # looked complete. Run every target and report every failure. ~keep
         run: task test:run -- --no-fail-fast
+      - name: Verify emitted Swift callback policy
+        if: runner.os == 'macOS'
+        timeout-minutes: 10
+        run: task gate:swift-callback-policy
       # Every Elixir escaping oracle is #[ignore]d, so the step above runs none of them and
       # still exits 0. They evaluate generated Elixir through the real interpreter -- the only
       # checks in this repo that do -- so dropping `--ignored` or the filter here retires them
