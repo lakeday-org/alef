@@ -279,6 +279,96 @@ fn clean_dart_lock_does_not_invoke_a_resolver() {
     );
 }
 
+fn dart_path_dependency_fixture(root: &Path, locked_binding: &str, locked_runtime: &str, locked_test: &str) {
+    write_file(
+        root,
+        "packages/dart/pubspec.yaml",
+        "name: generated_binding\nversion: 0.1.0\ndependencies:\n  runtime_helper: 2.0.0\ndev_dependencies:\n  code_generator: 3.0.0\n",
+    );
+    write_file(
+        root,
+        "e2e/dart/pubspec.yaml",
+        "name: e2e_dart\nversion: 0.1.0\ndependencies:\n  generated_binding:\n    path: ../../packages/dart\ndev_dependencies:\n  test_helper: 4.0.0\n",
+    );
+    write_file(
+        root,
+        "e2e/dart/pubspec.lock",
+        &format!(
+            "packages:\n  generated_binding:\n    version: '{locked_binding}'\n  runtime_helper:\n    version: '{locked_runtime}'\n  test_helper:\n    version: '{locked_test}'\n"
+        ),
+    );
+}
+
+fn dart_path_dependency_relock_calls(root: &Path) -> usize {
+    let files = [GeneratedFile {
+        path: PathBuf::from("e2e/dart/pubspec.yaml"),
+        content: std::fs::read_to_string(root.join("e2e/dart/pubspec.yaml")).expect("pubspec"),
+        generated_header: true,
+    }];
+    let mut calls = 0;
+    relock_dart_lockfiles_with(&files, root, &HashSet::new(), |_, _| {
+        calls += 1;
+        Ok(CargoStatus::success())
+    });
+    calls
+}
+
+#[test]
+fn path_dependency_dev_tools_do_not_make_a_valid_root_lock_stale() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    dart_path_dependency_fixture(temp.path(), "0.1.0", "2.0.0", "4.0.0");
+    let stale: Vec<_> = stale_dart_pins(&temp.path().join("e2e/dart"))
+        .into_iter()
+        .map(|pin| pin.name)
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "dependency-only code_generator is not part of the consumer resolution: {stale:?}"
+    );
+    assert_eq!(dart_path_dependency_relock_calls(temp.path()), 0);
+}
+
+#[test]
+fn root_dev_pins_and_path_runtime_and_own_versions_still_require_relocking() {
+    for (binding, runtime, test, expected) in [
+        ("0.1.0", "2.0.0", "3.9.0", "test_helper"),
+        ("0.1.0", "1.9.0", "4.0.0", "runtime_helper"),
+        ("0.0.9", "2.0.0", "4.0.0", "generated_binding"),
+    ] {
+        let temp = tempfile::tempdir().expect("tempdir");
+        dart_path_dependency_fixture(temp.path(), binding, runtime, test);
+        let stale: Vec<_> = stale_dart_pins(&temp.path().join("e2e/dart"))
+            .into_iter()
+            .map(|pin| pin.name)
+            .collect();
+        assert_eq!(
+            stale,
+            [expected],
+            "only the actual stale resolved dependency should be reported"
+        );
+        assert_eq!(
+            dart_path_dependency_relock_calls(temp.path()),
+            1,
+            "valid stale controls must trigger a resolver"
+        );
+    }
+}
+
+#[test]
+fn a_root_dev_dependency_is_not_hidden_by_a_transitive_dev_declaration() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    dart_path_dependency_fixture(temp.path(), "0.1.0", "2.0.0", "4.0.0");
+    let manifest = temp.path().join("e2e/dart/pubspec.yaml");
+    let text = std::fs::read_to_string(&manifest).expect("pubspec");
+    std::fs::write(manifest, format!("{text}  code_generator: 3.0.0\n")).expect("root dev dependency");
+    let stale: Vec<_> = stale_dart_pins(&temp.path().join("e2e/dart"))
+        .into_iter()
+        .map(|pin| pin.name)
+        .collect();
+    assert_eq!(stale, ["code_generator"]);
+    assert_eq!(dart_path_dependency_relock_calls(temp.path()), 1);
+}
+
 #[test]
 fn dart_lock_detects_a_stale_exact_pin_from_a_path_dependency() {
     let temp = tempfile::tempdir().expect("tempdir");

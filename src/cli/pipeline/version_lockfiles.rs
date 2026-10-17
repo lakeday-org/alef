@@ -326,7 +326,7 @@ fn stale_dart_pins(directory: &Path) -> Vec<DartPin> {
     let Some(packages) = lock.get("packages").and_then(serde_json::Value::as_object) else {
         return Vec::new();
     };
-    declared_dart_pins(&directory.join("pubspec.yaml"), &mut HashSet::new())
+    declared_dart_pins(&directory.join("pubspec.yaml"), &mut HashSet::new(), true)
         .into_iter()
         .filter(|pin| {
             let locked = packages
@@ -364,7 +364,7 @@ fn dart_lock_blocked_on_publish(directory: &Path, declared_package_versions: &Ha
             .all(|pin| !pin.from_path && declared_package_versions.get(&pin.name) == Some(&pin.requirement))
 }
 
-fn declared_dart_pins(path: &Path, visited: &mut HashSet<PathBuf>) -> Vec<DartPin> {
+fn declared_dart_pins(path: &Path, visited: &mut HashSet<PathBuf>, include_dev_dependencies: bool) -> Vec<DartPin> {
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     if !visited.insert(canonical) {
         return Vec::new();
@@ -376,9 +376,16 @@ fn declared_dart_pins(path: &Path, visited: &mut HashSet<PathBuf>) -> Vec<DartPi
         return Vec::new();
     };
     let mut pins = Vec::new();
-    for bucket in ["dependencies", "dev_dependencies"] {
+    let buckets: &[&str] = if include_dev_dependencies {
+        &["dependencies", "dev_dependencies"]
+    } else {
+        &["dependencies"]
+    };
+    for bucket in buckets {
         append_dart_dependency_pins(&document, bucket, path, visited, &mut pins);
     }
+    let mut seen = HashSet::new();
+    pins.retain(|pin| seen.insert((pin.name.clone(), pin.requirement.clone(), pin.from_path)));
     pins
 }
 
@@ -432,7 +439,7 @@ fn append_dart_path_dependency_pins(
             from_path: true,
         });
     }
-    pins.extend(declared_dart_pins(&dependency_manifest, visited));
+    pins.extend(declared_dart_pins(&dependency_manifest, visited, false));
 }
 
 fn dart_version_matches(requirement: &str, locked: &str) -> bool {
