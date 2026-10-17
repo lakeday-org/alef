@@ -12,6 +12,7 @@ import bootstrap
 
 class FormatterGate:
     def __init__(self, root, wrong_version=False, wrong_path=False, invalid_report=None):
+        root = root.resolve(strict=True)
         self.alef = root / "alef"
         self.xberg = root / "xberg"
         self.actions = root / "actions"
