@@ -1,5 +1,8 @@
 version: "3"
 
+includes:
+  consumer-swift: .task/consumer-swift.yml
+
 vars:
   RUST_LOG: info
 

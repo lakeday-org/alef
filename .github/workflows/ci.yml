@@ -68,6 +68,16 @@ jobs:
         uses: xberg-io/actions/install-task@f2be77fcc9149c34363aa08de6ba8abb60b04d0c
         with:
           version: "3.54.0"
+      - name: Hosted Swift consumer harness controls
+        if: runner.os == 'macOS'
+        run: task consumer-swift:controls
+      - name: Preserve hosted Swift harness control receipts
+        if: always() && runner.os == 'macOS'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: hosted-swift-harness-${{ matrix.os }}
+          path: ${{ runner.temp }}/consumer-controls-evidence
+          if-no-files-found: error
       - uses: xberg-io/actions/setup-rust@v1
         with:
           install-llvm-cov: "false"

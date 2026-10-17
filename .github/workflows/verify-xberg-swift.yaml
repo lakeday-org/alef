@@ -1,0 +1,47 @@
+name: Verify pinned Xberg Swift consumer
+on:
+  workflow_dispatch:
+    inputs:
+      alef_ref:
+        description: Immutable candidate Alef commit
+        required: true
+        type: string
+      xberg_ref:
+        description: Immutable public Xberg consumer commit
+        required: true
+        default: d67fe72b2281653f0d7629e4d3c2b8012abb9f8d
+        type: string
+permissions:
+  contents: read
+jobs:
+  consumer:
+    runs-on: macos-15
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: gate
+          persist-credentials: false
+      - name: Bootstrap verified Task under resource and process guards
+        env:
+          ALEF_REF: ${{ inputs.alef_ref }}
+          XBERG_REF: ${{ inputs.xberg_ref }}
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 gate/scripts/consumer-swift/entry.py --bootstrap-task
+      - name: Qualify real consumer under guarded Task stages
+        env:
+          ALEF_REF: ${{ inputs.alef_ref }}
+          XBERG_REF: ${{ inputs.xberg_ref }}
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: task --dir gate consumer-swift:verify
+      - name: Preserve bounded evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: xberg-swift-consumer-receipts
+          path: |
+            consumer-evidence
+            consumer-task-bootstrap
+            ${{ runner.temp }}/consumer-controls-evidence
+          if-no-files-found: error

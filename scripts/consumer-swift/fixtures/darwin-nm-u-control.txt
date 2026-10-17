@@ -1,0 +1,4 @@
+___stderrp
+_exit
+_fprintf
+_puts
