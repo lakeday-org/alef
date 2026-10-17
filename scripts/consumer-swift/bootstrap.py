@@ -6,6 +6,7 @@ import re
 import shutil
 from pathlib import Path
 
+import tomllib
 from receipts import sha
 
 
@@ -37,14 +38,7 @@ def bootstrap(gate):
         600,
     )
     gate.command("rustup-identity", ["rustup", "--version"], gate.alef, 0, 10)
-    sysroot = gate.command(
-        "qualified-rust-sysroot", ["rustup", "run", "1.99.1", "rustc", "--print", "sysroot"], gate.alef, 0, 15
-    )
-    library = Path((sysroot / "stdout.log").read_text().strip()) / "lib"
-    if not library.is_dir() or gate.env.get("DYLD_LIBRARY_PATH"):
-        raise RuntimeError("matching Rust library missing or overriding loader environment requires review")
-    ambient = gate.env.get("DYLD_FALLBACK_LIBRARY_PATH", "")
-    gate.env["DYLD_FALLBACK_LIBRARY_PATH"] = str(library) + (os.pathsep + ambient if ambient else "")
+    configure_rust_native_environment(gate)
     install_task(gate)
     gate.env["POLY_INSTALL_DIR"] = str(gate.bin)
     gate.command(
@@ -89,6 +83,18 @@ def bootstrap(gate):
     for tool in ["cmake", "pkg-config", "swift", "clang", "clang-format"]:
         if not gate.which(tool):
             raise RuntimeError("strict generation/native tool unavailable: " + tool)
+
+
+def configure_rust_native_environment(gate):
+    sysroot = gate.command(
+        "qualified-rust-sysroot", ["rustup", "run", "1.99.1", "rustc", "--print", "sysroot"], gate.alef, 0, 15
+    )
+    library = Path((sysroot / "stdout.log").read_text().strip()) / "lib"
+    if not library.is_dir() or gate.env.get("DYLD_LIBRARY_PATH"):
+        raise RuntimeError("matching Rust library missing or overriding loader environment requires review")
+    configure_macos_deployment(gate)
+    ambient = gate.env.get("DYLD_FALLBACK_LIBRARY_PATH", "")
+    gate.env["DYLD_FALLBACK_LIBRARY_PATH"] = str(library) + (os.pathsep + ambient if ambient else "")
 
 
 def install_task(gate):
@@ -176,3 +182,72 @@ def install_clang_format(gate):
         )
         + "\n"
     )
+
+
+def configure_macos_deployment(gate):
+    if gate.env.get("CARGO_BUILD_TARGET"):
+        raise RuntimeError("explicit Cargo build target requires deployment-target review")
+    require_host_cargo_configuration(gate)
+    requested = gate.env.get("MACOSX_DEPLOYMENT_TARGET")
+    stage = gate.command(
+        "qualified-macos-deployment-target",
+        ["rustup", "run", "1.99.1", "rustc", "--print=deployment-target"],
+        gate.alef,
+        0,
+        15,
+    )
+    value = (stage / "stdout.log").read_text().strip()
+    match = re.fullmatch(r"MACOSX_DEPLOYMENT_TARGET=([0-9]+\.[0-9]+(?:\.[0-9]+)?)", value)
+    if match is None or (stage / "stderr.log").read_text():
+        raise RuntimeError("qualified Rust macOS deployment target is invalid or has diagnostics")
+    selected = match.group(1)
+    if requested is not None:
+        if re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", requested) is None:
+            raise RuntimeError("explicit macOS deployment target requires review")
+
+        def normalized(text):
+            parts = tuple(map(int, text.split(".")))
+            return parts + (0,) * (3 - len(parts))
+
+        if normalized(requested) != normalized(selected):
+            raise RuntimeError("explicit macOS deployment target differs from qualified Rust selection")
+    else:
+        gate.env["MACOSX_DEPLOYMENT_TARGET"] = selected
+    (gate.evidence / "macos-deployment-target.json").write_text(
+        json.dumps(
+            {"requested": requested, "rust_selected": selected, "effective": gate.env["MACOSX_DEPLOYMENT_TARGET"]},
+            indent=2,
+        )
+        + "\n"
+    )
+
+
+def require_host_cargo_configuration(gate):
+    configured_home = gate.env.get("CARGO_HOME")
+    home = Path(configured_home) if configured_home is not None else Path.home() / ".cargo"
+    if configured_home == "" or not home.is_absolute():
+        raise RuntimeError("relative or empty Cargo home requires deployment-target review")
+    configurations = {home / "config", home / "config.toml"}
+    for checkout in [gate.alef, gate.xberg]:
+        for directory in [checkout, *checkout.parents]:
+            configurations.update([directory / ".cargo/config", directory / ".cargo/config.toml"])
+    receipts = []
+    for path in sorted(configurations):
+        if not path.exists() and not path.is_symlink():
+            continue
+        try:
+            document = tomllib.loads(path.read_text())
+        except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+            raise RuntimeError(
+                "unreadable or malformed Cargo configuration requires deployment-target review"
+            ) from error
+        build = document.get("build", {})
+        if not isinstance(build, dict) or "target" in build:
+            raise RuntimeError("Cargo configuration build target requires deployment-target review")
+        configured_environment = document.get("env", {})
+        if not isinstance(configured_environment, dict) or any(
+            key in configured_environment for key in ["MACOSX_DEPLOYMENT_TARGET", "CARGO_BUILD_TARGET"]
+        ):
+            raise RuntimeError("Cargo configuration deployment environment requires review")
+        receipts.append({"path": str(path), "sha256": sha(path)})
+    (gate.evidence / "cargo-host-configuration.json").write_text(json.dumps(receipts, indent=2) + "\n")

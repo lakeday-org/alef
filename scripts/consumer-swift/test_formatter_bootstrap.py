@@ -20,7 +20,7 @@ class FormatterGate:
         self.evidence = root / "evidence"
         self.tools = self.evidence / "tools"
         self.bin = self.tools / "bin"
-        self.env = {"PATH": "/owned/ambient"}
+        self.env = {"PATH": "/owned/ambient", "CARGO_HOME": str(root / "cargo-home")}
         self.real_cargo = "/owned/cargo"
         self.python = "/owned/python"
         self.paths = []
@@ -52,7 +52,9 @@ class FormatterGate:
         result = self.evidence / name
         result.mkdir()
         output = ""
-        if name == "qualified-rust-sysroot":
+        if name == "qualified-macos-deployment-target":
+            output = "MACOSX_DEPLOYMENT_TARGET=11.0"
+        elif name == "qualified-rust-sysroot":
             output = str(self.alef.parent / "sysroot")
         elif name == "actual-homebrew-cache":
             output = str(self.alef.parent / "brew-cache")
@@ -90,6 +92,7 @@ class FormatterGate:
                 )
             )
         (result / "stdout.log").write_text(output + "\n")
+        (result / "stderr.log").write_text("")
         return result
 
 
