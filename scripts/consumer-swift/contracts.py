@@ -28,9 +28,12 @@ def cargo_arguments(arguments):
         result.append("--locked")
     if any(arg.startswith("--message-format") for arg in result):
         raise ValueError("unexpected caller message format; review rather than overwrite")
-    result.append("--message-format=json-render-diagnostics")
-    if "-vv" not in result and "--verbose" not in result and "-v" not in result:
-        result.append("-vv")
+    verbose = sum(argument in {"-v", "--verbose"} for argument in result)
+    if verbose > 1 or any(re.fullmatch(r"-v{2,}", argument) for argument in result):
+        raise ValueError("very verbose Cargo output requires JSON protocol review")
+    result.append("--message-format=json")
+    if verbose == 0:
+        result.append("-v")
     return result
 
 

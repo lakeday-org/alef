@@ -62,8 +62,8 @@ class ActualAdapter(unittest.TestCase):
         args = json.loads(result.stdout)
         assert args[:5] == ["build", "--locked", "--release", "--features", "one,two"]
         assert args.count("--locked") == 1
-        assert "--message-format=json-render-diagnostics" in args
-        assert "-vv" in args
+        assert "--message-format=json" in args
+        assert "-v" in args
 
     def test_lock_mutation_is_explicit_failure(self):
         source = "import os,pathlib\npathlib.Path(os.environ['SWIFT_GATE_LOCK']).write_text('mutated')\n"
