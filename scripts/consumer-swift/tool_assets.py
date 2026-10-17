@@ -24,12 +24,18 @@ def task_asset():
     architecture = {"arm64": "arm64", "x86_64": "amd64"}.get(platform.machine())
     if architecture is None:
         raise ValueError("unsupported hosted Task architecture")
-    metadata = json.loads(bounded("https://api.github.com/repos/go-task/task/releases/tags/v3.54.0", 2 * 1024**2))
+    pins = {
+        "arm64": (604090068, 15770964, "12a69fcf37bb8d5bc9150c44f9a936775b73e59ff044c2c245232f198c135637"),
+        "amd64": (604090006, 17017543, "0543b0844a725814c0412d3f4bed12873ce9ed0da207b15775f63a97d734aac0"),
+    }
+    asset_id, size, digest = pins[architecture]
     name = "task_darwin_" + architecture + ".tar.gz"
-    matches = [asset for asset in metadata["assets"] if asset["name"] == name]
-    if len(matches) != 1 or not matches[0].get("digest", "").startswith("sha256:"):
-        raise ValueError("unique official Task archive and GitHub SHA256 digest required")
-    asset = matches[0]
+    asset = {
+        "id": asset_id,
+        "size": size,
+        "digest": "sha256:" + digest,
+        "browser_download_url": "https://github.com/go-task/task/releases/download/v3.54.0/" + name,
+    }
     data = bounded(asset["browser_download_url"], 32 * 1024**2)
     actual = hashlib.sha256(data).hexdigest()
     if "sha256:" + actual != asset["digest"] or len(data) != asset["size"]:
