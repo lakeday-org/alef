@@ -12,6 +12,7 @@ from assertions import raises
 
 class SelectedBindingReceipt(unittest.TestCase):
     def fixture(self, root, selected_release=True, trailing_release=False):
+        root = root.resolve(strict=True)
         target = root / "target"
         out = target / "release/build/xberg-swift-fixture/out"
         nested = out / "xberg-swift"

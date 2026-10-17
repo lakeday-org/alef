@@ -51,7 +51,8 @@ class Contracts(unittest.TestCase):
             contracts.cargo_arguments(["build", "--message-format=json"])
 
     def test_receipt_requires_real_unique_outdir_archive_and_success(self):
-        with tempfile.TemporaryDirectory() as root:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(strict=True)
             out = Path(root) / "out"
             out.mkdir()
             archive = Path(root) / "libxberg_swift.a"
