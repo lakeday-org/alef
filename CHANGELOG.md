@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Return the typed native error from a generated Zig stream when the server rejects the start or the stream fails midway, instead of `error.UnknownFfiError` (#585).
+
 ## [0.111.0] - 2026-10-18
 
 ### Changed
