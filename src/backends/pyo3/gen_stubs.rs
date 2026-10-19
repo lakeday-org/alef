@@ -767,8 +767,14 @@ module_name = "test_lib"
         let public = stub.split("class NativeOnly").next().expect("split");
         assert!(public.contains("class PublicConfig"), "{stub}");
         assert!(public.contains("label: str"), "{stub}");
-        assert!(!public.contains("def validate("), "dataclass-backed type must not declare validate:\n{stub}");
-        assert!(stub.contains("class NativeOnly:") && stub.contains("def validate("), "{stub}");
+        assert!(
+            !public.contains("def validate("),
+            "dataclass-backed type must not declare validate:\n{stub}"
+        );
+        assert!(
+            stub.contains("class NativeOnly:") && stub.contains("def validate("),
+            "{stub}"
+        );
     }
 
     #[test]

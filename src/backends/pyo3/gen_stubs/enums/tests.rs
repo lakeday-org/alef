@@ -625,7 +625,10 @@ fn should_declare_an_untyped_property_for_a_variant_with_a_dict_shaped_getter() 
     let stub = gen_enum_stub(&metadata_enum(), false, &no_dtos(), true, &[]);
 
     assert!(stub.contains("    empty: Any | None"), "unit variant: {stub}");
-    assert!(stub.contains("    pair: Any | None"), "multi-field tuple variant: {stub}");
+    assert!(
+        stub.contains("    pair: Any | None"),
+        "multi-field tuple variant: {stub}"
+    );
 }
 
 /// `write_pyo3_variant_accessors` emits the `#[getter]` for a foreign-cfg-gated variant
@@ -736,7 +739,10 @@ fn every_variant_getter_is_declared_on_the_wrapper_class() {
             EnumVariant {
                 name: "Parts".into(),
                 is_tuple: true,
-                fields: vec![field("_0", TypeRef::Vec(Box::new(TypeRef::Named("ContentPart".into()))))],
+                fields: vec![field(
+                    "_0",
+                    TypeRef::Vec(Box::new(TypeRef::Named("ContentPart".into()))),
+                )],
                 ..Default::default()
             },
             EnumVariant {

@@ -320,7 +320,15 @@ mod tests {
         let e2e_config = E2eConfig::default();
         let groups: Vec<FixtureGroup> = Vec::new();
         let without = PythonE2eCodegen
-            .generate(&groups, &e2e_config, &ResolvedCrateConfig::default(), &[], &[], &[], &[])
+            .generate(
+                &groups,
+                &e2e_config,
+                &ResolvedCrateConfig::default(),
+                &[],
+                &[],
+                &[],
+                &[],
+            )
             .expect("python e2e codegen must succeed");
         assert!(!without.iter().any(|f| f.path.ends_with("test_stub_conformance.py")));
 
@@ -349,7 +357,12 @@ output = "packages/python/example_core"
             .find(|f| f.path.ends_with("test_stub_conformance.py"))
             .expect("conformance test must be emitted when stubs are configured");
         assert!(file.content.contains("hasattr(cls, name)"), "{}", file.content);
-        assert!(file.content.contains(&format!("\"{}.pyi\"", config.python_module_name())), "{}", file.content);
+        assert!(
+            file.content
+                .contains(&format!("\"{}.pyi\"", config.python_module_name())),
+            "{}",
+            file.content
+        );
     }
 
     fn make_http_fixture(id: &str) -> crate::e2e::fixture::Fixture {
