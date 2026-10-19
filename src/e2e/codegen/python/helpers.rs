@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::e2e::config::E2eConfig;
+use crate::e2e::config::{CallConfig, E2eConfig};
 use crate::e2e::fixture::Fixture;
 
 // ---------------------------------------------------------------------------
@@ -48,6 +48,11 @@ pub(super) fn resolve_client_factory(e2e_config: &E2eConfig) -> Option<String> {
         .overrides
         .get("python")
         .and_then(|o| o.client_factory.clone())
+}
+
+/// The client factory for one resolved call, `None` for a free-function call (GH#592).
+pub(super) fn resolve_call_client_factory(e2e_config: &E2eConfig, call_config: &CallConfig) -> Option<String> {
+    crate::e2e::codegen::client_factory::call_client_factory(e2e_config, call_config, "python").map(str::to_string)
 }
 
 /// Resolve how json_object args are passed: "kwargs" (default), "dict", or "json".

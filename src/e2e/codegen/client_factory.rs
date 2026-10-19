@@ -85,6 +85,29 @@ pub fn plain_factory<'a>(e2e_config: &'a E2eConfig, call_config: &'a CallConfig,
     })
 }
 
+/// The client factory `language` constructs a client with for this call, or `None` when the call
+/// is a free-function call that needs no client.
+///
+/// A call opts out with an empty `client_factory` in its own `[e2e.calls.<name>.overrides.<language>]`
+/// table: [`plain_factory`] returns that empty value instead of falling back to the default call's
+/// factory, and an empty factory names no client. Without it every call inherits the default call's
+/// client, so a library's free function was generated as a method of a client that does not have
+/// it (GH#592).
+pub fn call_client_factory<'a>(
+    e2e_config: &'a E2eConfig,
+    call_config: &'a CallConfig,
+    language: &str,
+) -> Option<&'a str> {
+    plain_factory(e2e_config, call_config, language).filter(|factory| !factory.is_empty())
+}
+
+/// True when this call is a free-function call: its own `client_factory` override is empty, which
+/// stops [`plain_factory`] from falling back to the default call's client. For backends that
+/// receive the file-level factory as a parameter and only need to drop it for this call.
+pub fn is_free_function_call(e2e_config: &E2eConfig, call_config: &CallConfig, language: &str) -> bool {
+    plain_factory(e2e_config, call_config, language).is_some_and(str::is_empty)
+}
+
 /// The PHP client factory (`php_client_factory`) for this call, resolved by
 /// [`call_or_default_override`]. PHP projects name their factory under this key, and the PHP
 /// e2e suite reads only it, so the snippet must too.

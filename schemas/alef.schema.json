@@ -724,7 +724,7 @@
         },
         "client_factory": {
           "default": null,
-          "description": "Client factory function name for instance-method languages (WASM, etc.).\n\nWhen set, the generated test imports this function, creates a client,\nand calls API methods on the instance instead of as top-level functions.\n\nE.g., `\"createClient\"` generates:\n```typescript\nimport { createClient } from 'pkg';\nconst client = createClient('test-key');\nconst result = await client.chat(request);\n```",
+          "description": "Client factory function name for instance-method languages (WASM, etc.).\n\nWhen set, the generated test imports this function, creates a client,\nand calls API methods on the instance instead of as top-level functions.\n\nE.g., `\"createClient\"` generates:\n```typescript\nimport { createClient } from 'pkg';\nconst client = createClient('test-key');\nconst result = await client.chat(request);\n```\n\nAn empty string on a named call marks it as a free-function call: it needs no client, so\nthe generated test imports and calls the function directly instead of inheriting the\ndefault call's client.",
           "type": [
             "string",
             "null"

@@ -65,7 +65,7 @@ pub fn render_test_file(
     let mut imported: std::collections::BTreeSet<(String, String)> = std::collections::BTreeSet::new();
 
     // Http fixtures and pure stub fixtures use different code paths and don't import the call function.
-    if file_has_call_based && client_factory.is_none() {
+    if file_has_call_based {
         for fixture in fixtures.iter().filter(|f| {
             if f.mock_response.is_some() {
                 return true;
@@ -90,6 +90,13 @@ pub fn render_test_file(
                 &fixture.tags,
                 &fixture.input,
             );
+            // A client call reaches its function as a method of the client, so only a call with
+            // no client (GH#592) imports the function itself.
+            if client_factory.is_some()
+                && !crate::e2e::codegen::client_factory::is_free_function_call(e2e_config, call_config, "rust")
+            {
+                continue;
+            }
             let fn_name = resolve_function_name_for_call(call_config);
             let mod_name = resolve_module_for_call(call_config, dep_name);
             imported.insert((mod_name, fn_name));

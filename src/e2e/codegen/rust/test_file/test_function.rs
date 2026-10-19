@@ -94,6 +94,9 @@ pub fn render_test_function(
         &fixture.tags,
         &fixture.input,
     );
+    // A call that opts out of the client (GH#592) is a free-function call.
+    let client_factory = client_factory
+        .filter(|_| !crate::e2e::codegen::client_factory::is_free_function_call(e2e_config, call_config, "rust"));
     // Per-call field resolver: overrides the file-level resolver when this call
     // declares its own result_fields / fields / fields_optional / fields_array /
     // fields_method_calls.
