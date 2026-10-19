@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Return the payload from the Python variant getters of an enum marked `#[serde(untagged)]`. The getters looked for a key named after the variant, which an untagged value never has, so every getter returned `None`. Each getter now matches the variant that the value holds. (GH#579)
+
 ## [0.111.0] - 2026-10-18
 
 ### Changed
