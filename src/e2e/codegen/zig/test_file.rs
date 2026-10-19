@@ -589,16 +589,25 @@ fn render_test_fn(
         // since a fixture asserting `error` has nothing meaningful to check once the
         // call has already failed the test by succeeding.
         if let Some(adapter) = streaming_adapter.as_ref() {
-            stream_error::render(out, adapter, &args_str);
+            stream_error::render(out, adapter, module_name, ffi_prefix, &args_str);
         } else {
             let _ = writeln!(out, "    if ({call_prefix}.{function_name}({args_str})) |_| {{");
         }
         let _ = writeln!(out, "        return error.TestUnexpectedResult;");
-        // The wrapper returns the typed error and records its message, so a streaming fixture
-        // reads both the way any other call does. Reading the variant from the C library here
-        // would pass even when the wrapper returns `UnknownFfiError`. ~keep
-        let message_expression = format!("{module_name}._last_error() orelse \"\"");
-        let error_name_expression = "@errorName(_err)".to_string();
+        let message_expression = if streaming_adapter.is_some() {
+            format!(
+                "if ({module_name}.c.{ffi_prefix}_last_error_context()) |_message| std.mem.span(_message) else \"\""
+            )
+        } else {
+            format!("{module_name}._last_error() orelse \"\"")
+        };
+        let error_name_expression = if streaming_adapter.is_some() {
+            format!(
+                "if ({module_name}.c.{ffi_prefix}_last_error_variant()) |_variant| std.mem.span(_variant) else @errorName(_err)"
+            )
+        } else {
+            "@errorName(_err)".to_string()
+        };
         let expressions = ErrorExpressions {
             name: error_name_expression,
             message: message_expression,
