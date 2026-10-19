@@ -775,8 +775,22 @@ pub(crate) fn write_pyo3_variant_accessors(out: &mut String, enum_def: &EnumDef,
         // `"custom"` key that serde never writes. Matching directly on `&self.inner`, like the
         // typed `variant_accessor` path above, needs no tag at all and works for any field type,
         // not only a `TypeRef::Named` payload. ~keep
-        if variant.serde_untagged && variant.fields.len() == 1 {
-            write_pyo3_untagged_variant_accessor(out, enum_def, variant, core_path, is_host_enum, &fn_name);
+        //
+        // A whole enum marked `#[serde(untagged)]` is the same case for every variant: the wire
+        // value is the bare payload, so no variant has a key to look up. The enum already holds
+        // one Rust variant, so the getter matches that variant and two variants with one JSON
+        // shape stay apart. A unit, multi-field or struct variant has no single field to
+        // serialize, so its arm serializes the whole value, which is the payload. ~keep
+        let whole_enum_untagged = matches!(
+            crate::codegen::serde_enum_repr::serde_enum_repr(enum_def),
+            crate::codegen::serde_enum_repr::SerdeEnumRepr::Untagged
+        );
+        if (variant.serde_untagged || whole_enum_untagged) && variant.fields.len() == 1 {
+            write_pyo3_untagged_variant_accessor(out, enum_def, variant, core_path, is_host_enum, &fn_name, false);
+            continue;
+        }
+        if whole_enum_untagged {
+            write_pyo3_untagged_variant_accessor(out, enum_def, variant, core_path, is_host_enum, &fn_name, true);
             continue;
         }
 
@@ -846,6 +860,7 @@ fn write_pyo3_untagged_variant_accessor(
     core_path: &str,
     is_host_enum: bool,
     fn_name: &str,
+    serialize_whole_value: bool,
 ) {
     out.push('\n');
     out.push_str("    #[getter]\n");
@@ -873,7 +888,25 @@ fn write_pyo3_untagged_variant_accessor(
             false
         }
     };
-    if keep_arm {
+    if keep_arm && serialize_whole_value {
+        if let Some(cfg) = variant.cfg.as_deref() {
+            out.push_str(&format!("            #[cfg({cfg})]\n"));
+        }
+        let pattern = if variant.fields.is_empty() {
+            String::new()
+        } else if variant.is_tuple {
+            "(..)".to_string()
+        } else {
+            " { .. }".to_string()
+        };
+        out.push_str(&format!("            {core_path}::{}{pattern} => {{\n", variant.name));
+        out.push_str("                let json = serde_json::to_value(&self.inner)\n");
+        out.push_str("                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;\n");
+        out.push_str("                let json_mod = py.import(\"json\")?;\n");
+        out.push_str("                let value = json_mod.call_method1(\"loads\", (&json.to_string(),))?;\n");
+        out.push_str("                Ok(Some(value.unbind()))\n");
+        out.push_str("            }\n");
+    } else if keep_arm {
         out.push_str(&crate::codegen::template_env::render(
             "generators/enums/untagged_variant_match.jinja",
             crate::alef_context! {
