@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Return the payload from the Python variant getters of an enum marked `#[serde(untagged)]`. The getters looked for a key named after the variant, which an untagged value never has, so every getter returned `None`. Each getter now matches the variant that the value holds. (GH#579)
 - Read `fields_display_as_text` fields through their `.text` accessor in generated Python e2e tests, so a getter that returns `None` fails the test instead of passing through `str()` (GH#580).
+- Return the typed native error from a generated Zig stream when the server rejects the start or the stream fails midway, instead of `error.UnknownFfiError` (#585).
+- Generated Zig e2e tests for streaming error fixtures start the stream and read chunks through the wrapper, so they check the error the wrapper returns and no longer read it from the C library (#585).
 
 ## [0.111.0] - 2026-10-18
 

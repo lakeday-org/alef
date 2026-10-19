@@ -173,7 +173,52 @@ mod tests {
             rendered.contains("if (_code == 5) return error.Cancelled;"),
             "a cancelled stream must not surface as UnknownFfiError:\n{rendered}"
         );
-        assert!(rendered.contains("if (_code != 0) return error.UnknownFfiError;"));
+        assert!(
+            rendered.contains("if (_code != 0) return _error_with_message(RequestError);"),
+            "a mid-stream failure must return the typed native error:\n{rendered}"
+        );
+        assert!(
+            !rendered.contains("if (_code != 0) return error.UnknownFfiError;"),
+            "a native failure must keep its typed error:\n{rendered}"
+        );
+        assert!(
+            !rendered.contains("try std.json.parseFromSliceLeaky"),
+            "a chunk parse error is outside the declared error set and must be mapped:\n{rendered}"
+        );
+        assert!(
+            rendered.contains("UnknownFfiError})!?"),
+            "the mapped parse error must be in the declared error set:\n{rendered}"
+        );
         assert!(rendered.contains("self._handle = 0"));
+    }
+
+    #[test]
+    fn stream_start_failure_returns_the_native_error_before_the_request_is_freed() {
+        let rendered = crate::backends::zig::template_env::render(
+            "opaque_stream_method.jinja",
+            crate::alef_context! {
+                method_name => "stream_records",
+                type_name => "Client",
+                req_param => "req",
+                zig_error_type => "RequestError",
+                struct_name => "RecordStream",
+                req_param_lower => "req",
+                prefix => "sample",
+                req_type_snake => "record_request",
+                type_snake => "client",
+                method_snake => "stream_records",
+                c_handle => "handle",
+            },
+        );
+
+        assert!(
+            rendered.contains("if (_stream_handle == 0) { return _error_with_message(RequestError); }"),
+            "a rejected stream start must return the typed native error:\n{rendered}"
+        );
+        assert!(
+            rendered.contains("if (req_handle == 0) { return _error_with_message(RequestError); }"),
+            "a request that fails to marshal must return the typed native error:\n{rendered}"
+        );
+        assert!(!rendered.contains("UnknownFfiError"));
     }
 }
