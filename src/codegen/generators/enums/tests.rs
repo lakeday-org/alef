@@ -215,8 +215,14 @@ fn untagged_enum_getters_match_the_rust_variant_instead_of_a_json_key() {
     def.serde_untagged = true;
     let generated = gen_pyo3_data_enum(&def, "core");
 
-    assert!(generated.contains("crate::AssistantContent::Text(data) => {"), "{generated}");
-    assert!(generated.contains("crate::AssistantContent::Parts(data) => {"), "{generated}");
+    assert!(
+        generated.contains("crate::AssistantContent::Text(data) => {"),
+        "{generated}"
+    );
+    assert!(
+        generated.contains("crate::AssistantContent::Parts(data) => {"),
+        "{generated}"
+    );
     assert!(
         !generated.contains("values.get(\"Text\")") && !generated.contains("values.get(\"Parts\")"),
         "an untagged value never has a key named after its variant: {generated}"
