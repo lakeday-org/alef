@@ -169,7 +169,7 @@ fn every_text_comparison_reads_the_text_accessor() {
         ),
         (
             "not_contains",
-            "    assert \"hello\".lower() not in _alef_e2e_text(result.content.text).lower()\n",
+            "    assert result.content is None or \"hello\".lower() not in _alef_e2e_text(result.content.text).lower()\n",
         ),
         (
             "starts_with",

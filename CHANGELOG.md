@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Read `fields_display_as_text` fields through their `.text` accessor in generated Python e2e tests, so a getter that returns `None` fails the test instead of passing through `str()` (GH#580).
+
 ## [0.111.0] - 2026-10-18
 
 ### Changed

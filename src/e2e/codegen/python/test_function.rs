@@ -108,6 +108,7 @@ pub(super) fn render_test_function(out: &mut String, fixture: &Fixture, context:
         &std::collections::HashSet::new(),
     )
     .with_enum_fields(e2e_config.effective_fields_enum(call_config).clone())
+    .with_display_as_text_fields(e2e_config.effective_fields_display_as_text(call_config).clone())
     .with_ir_enum_map(FieldResolver::ir_enum_fields(type_defs, enums), call_root_type.clone())
     .with_python_typeddict_facts(FieldResolver::python_typeddict_facts(type_defs), call_root_type.clone())
     .with_ir_result_fields(

@@ -11,6 +11,7 @@ use super::helpers::strip_redundant_call_arg_parens;
 use super::json::{python_string_literal, value_to_python_string};
 
 mod chunks_synthetic;
+mod text_accessor;
 
 /// Render a single assertion into the test function body.
 pub(super) fn render_assertion(
@@ -127,6 +128,16 @@ pub(super) fn render_assertion(
         .field
         .as_deref()
         .is_some_and(|f| field_resolver.is_array(field_resolver.resolve(f)));
+
+    // A `fields_display_as_text` field is asserted through its `.text` accessor, never through
+    // `str()`: the string form of the enum passes even when the accessor returns `None`. ~keep
+    let field_is_display_as_text = assertion
+        .field
+        .as_deref()
+        .is_some_and(|f| !f.is_empty() && field_resolver.is_display_as_text(f));
+    if field_is_display_as_text && text_accessor::try_render(out, assertion, &field_access, field_is_optional) {
+        return;
+    }
 
     render_standard_assertion(
         out,
