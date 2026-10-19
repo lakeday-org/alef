@@ -563,6 +563,7 @@ fn streaming_error_e2e_goes_through_the_wrapper_stream_start_and_next() {
     };
     fixture.assertions.push(crate::e2e::fixture::Assertion {
         assertion_type: "error".into(),
+        value: Some(serde_json::json!("rejected")),
         ..Default::default()
     });
     let mut e2e = E2eConfig::default();

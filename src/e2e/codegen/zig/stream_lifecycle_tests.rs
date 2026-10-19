@@ -116,30 +116,46 @@ fn stream_without_field_assertions_is_drained_and_freed() {
 #[test]
 fn expected_stream_error_is_observed_during_iteration() {
     let rendered = render_stream(Some("error"));
-    assert!(rendered.contains("_next("), "only initiation checked: {rendered}");
     assert!(
-        rendered.contains("_last_error_code()"),
-        "deferred error was not checked: {rendered}"
+        rendered.contains("_client.stream_records("),
+        "the stream must start through the wrapper: {rendered}"
+    );
+    assert!(
+        rendered.contains("_stream.next() catch |_next_err| break :stream_result _next_err"),
+        "an error from next() during iteration was not captured: {rendered}"
+    );
+    assert!(
+        rendered.contains("if (_chunk == null) break :stream_result {}"),
+        "the end of the stream must end the loop: {rendered}"
     );
     assert!(
         rendered.contains("error.TestUnexpectedResult"),
         "successful completion must fail: {rendered}"
     );
     assert!(
-        rendered.contains("defer") && rendered.contains("_free("),
+        rendered.contains("defer _stream.deinit();"),
         "stream lifecycle not released: {rendered}"
     );
 }
 
 #[test]
 fn configured_stream_adapter_does_not_require_stream_in_its_name() {
-    for assertion in [None, Some("error"), Some("not_empty")] {
+    for assertion in [None, Some("not_empty")] {
         let rendered = render_named_stream(assertion, "watch");
         assert!(
             rendered.contains("_client_watch_next("),
             "configured stream not drained: {rendered}"
         );
     }
+    let rendered = render_named_stream(Some("error"), "watch");
+    assert!(
+        rendered.contains("_client.watch("),
+        "configured stream not started through the wrapper: {rendered}"
+    );
+    assert!(
+        rendered.contains("_stream.next() catch"),
+        "configured stream not drained through the wrapper: {rendered}"
+    );
 }
 
 #[test]
@@ -152,15 +168,15 @@ fn ordinary_stream_assertion_is_not_silently_discarded() {
 }
 
 #[test]
-fn stream_error_message_reads_current_raw_context() {
+fn stream_error_message_reads_the_wrapper_last_error() {
     let rendered = render_stream(Some("error"));
     assert!(
-        rendered.contains("sample.c.sample_last_error_context()"),
-        "raw error context not read: {rendered}"
+        rendered.contains("sample._last_error() orelse"),
+        "the wrapper's last error message is not read: {rendered}"
     );
     assert!(
-        !rendered.contains("sample._last_error()"),
-        "stale wrapper capture used: {rendered}"
+        !rendered.contains("sample.c.sample_last_error_context()"),
+        "the message must not come from the raw C call: {rendered}"
     );
     assert!(
         rendered.contains("provider failure"),
@@ -207,10 +223,17 @@ fn asserted_stream_checks_error_after_collecting_chunks() {
 fn stream_error_assertions_use_native_variant_identity() {
     let rendered = render_stream(Some("error"));
     assert!(
-        rendered.contains("sample.c.sample_last_error_variant()"),
-        "raw stream errors must assert the native variant, not the synthetic UnknownFfiError: {rendered}"
+        rendered.contains("const _err_name = @errorName(_err);"),
+        "the error name must come from the typed error the wrapper returned: {rendered}"
     );
-    assert!(rendered.contains("sample.c.sample_last_error_context()"));
+    assert!(
+        !rendered.contains("last_error_variant"),
+        "the C library variant would hide an untyped wrapper error: {rendered}"
+    );
+    assert!(
+        rendered.contains("indexOf(u8, _err_name, \"provider failure\")"),
+        "the declared error value must be matched against the error name: {rendered}"
+    );
     assert!(
         rendered.contains("provider failure"),
         "declared error value was discarded: {rendered}"
