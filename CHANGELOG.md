@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Read `fields_display_as_text` fields through their `.text` accessor in generated Python e2e tests, so a getter that returns `None` fails the test instead of passing through `str()` (GH#580).
 - Return the typed native error from a generated Zig stream when the server rejects the start or the stream fails midway, instead of `error.UnknownFfiError` (#585).
 - Generated Zig e2e tests for streaming error fixtures start the stream and read chunks through the wrapper, so they check the error the wrapper returns and no longer read it from the C library (#585).
+- Make the generated Python type stub describe the objects a caller receives. The stub of an enum wrapper now declares every getter of the native class, including `text` and `parts`, and the stub of a type the package publishes as a dataclass no longer declares the native methods that dataclass lacks. The Python e2e suite gets a generated `test_stub_conformance.py` that fails when a declared member is missing at runtime. (GH#581)
 - Keep optional error variant fields, such as `retry_after`, optional in generated Dart error classes, and keep `None` as `None` when the error converts back to Rust. The Dart class required a value where the Rust error can have none.
 
 ## [0.111.0] - 2026-10-18

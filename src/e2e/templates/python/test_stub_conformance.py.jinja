@@ -1,0 +1,49 @@
+{#- Python stub conformance test template
+
+   Context variables:
+   - header: file header comment
+   - import_name: public Python package that ships the native module and its stub
+   - native_module: name of the native extension module inside that package
+#}
+{{ header }}"""Every class member the type stub declares must exist on the runtime class."""
+
+import ast
+import importlib
+from pathlib import Path
+
+import pytest
+
+
+def _declared_members(stub: Path) -> dict[str, set[str]]:
+    members: dict[str, set[str]] = {}
+    for node in ast.parse(stub.read_text(encoding="utf-8")).body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        names = members.setdefault(node.name, set())
+        for item in node.body:
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                names.add(item.target.id)
+            elif isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name != "__init__":
+                names.add(item.name)
+    return members
+
+
+def test_stub_declares_only_members_present_at_runtime() -> None:
+    package = importlib.import_module("{{ import_name }}")
+    stub = Path(package.__file__).parent / "{{ native_module }}.pyi"
+    if not stub.is_file():
+        pytest.skip(f"{stub} is not shipped with this installation")
+    native = importlib.import_module("{{ import_name }}.{{ native_module }}")
+    declared = _declared_members(stub)
+    checked = 0
+    missing: list[str] = []
+    for class_name, names in declared.items():
+        cls = getattr(native, class_name, None)
+        if cls is None:
+            continue
+        for name in sorted(names):
+            checked += 1
+            if not hasattr(cls, name):
+                missing.append(f"{class_name}.{name}")
+    assert checked > 0, "the stub declares no class members to check"
+    assert not missing, f"declared in the stub but absent at runtime: {missing}"

@@ -617,15 +617,15 @@ fn should_declare_a_stub_property_for_every_runtime_variant_getter() {
     );
 }
 
-/// Negative control: a unit variant and a multi-field tuple variant get no runtime typed
-/// `#[getter]` (they fall back to the untyped dict-shaped getter instead), so the stub must not
-/// declare a property for either.
+/// A unit variant and a multi-field tuple variant have no typed `#[getter]`, but the runtime
+/// still gives each an untyped dict-shaped one (GH#581), so the stub declares it as `Any | None`
+/// rather than a typed property.
 #[test]
-fn should_not_declare_a_stub_property_for_a_variant_with_no_runtime_typed_getter() {
+fn should_declare_an_untyped_property_for_a_variant_with_a_dict_shaped_getter() {
     let stub = gen_enum_stub(&metadata_enum(), false, &no_dtos(), true, &[]);
 
-    assert!(!stub.contains("    empty:"), "unit variant: {stub}");
-    assert!(!stub.contains("    pair:"), "multi-field tuple variant: {stub}");
+    assert!(stub.contains("    empty: Any | None"), "unit variant: {stub}");
+    assert!(stub.contains("    pair: Any | None"), "multi-field tuple variant: {stub}");
 }
 
 /// `write_pyo3_variant_accessors` emits the `#[getter]` for a foreign-cfg-gated variant
@@ -716,4 +716,40 @@ fn multi_field_tuple_variant_keeps_its_positional_fields() {
     assert!(stub.contains("class FormatMetadataPairVariant(TypedDict):"), "{stub}");
     assert!(stub.contains("    _0: str"), "{stub}");
     assert!(stub.contains("    _1: str"), "{stub}");
+}
+
+/// GH#581: the wrapper pyclass has a runtime `#[getter]` for EVERY variant -- a typed one for a
+/// `Named` newtype payload and a dict-shaped one otherwise -- so a variant carrying a `String`
+/// or a `Vec` (`UserContent::Text`, `UserContent::Parts`) must be declared too.
+#[test]
+fn every_variant_getter_is_declared_on_the_wrapper_class() {
+    let def = EnumDef {
+        name: "UserContent".into(),
+        serde_untagged: true,
+        variants: vec![
+            EnumVariant {
+                name: "Text".into(),
+                is_tuple: true,
+                fields: vec![field("_0", TypeRef::String)],
+                ..Default::default()
+            },
+            EnumVariant {
+                name: "Parts".into(),
+                is_tuple: true,
+                fields: vec![field("_0", TypeRef::Vec(Box::new(TypeRef::Named("ContentPart".into()))))],
+                ..Default::default()
+            },
+            EnumVariant {
+                name: "Single".into(),
+                is_tuple: true,
+                fields: vec![field("_0", TypeRef::Named("ContentPart".into()))],
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let stub = gen_enum_stub(&def, false, &no_dtos(), true, &[]);
+    assert!(stub.contains("    text: Any | None"), "{stub}");
+    assert!(stub.contains("    parts: Any | None"), "{stub}");
+    assert!(stub.contains("    single: ContentPart | None"), "{stub}");
 }
