@@ -553,6 +553,98 @@ fn streaming_e2e_uses_scalar_handle_tokens() {
     );
 }
 
+#[test]
+fn streaming_error_e2e_goes_through_the_wrapper_stream_start_and_next() {
+    let mut fixture = Fixture {
+        id: "stream_rejected".into(),
+        description: "A rejected stream".into(),
+        input: serde_json::json!({}),
+        ..Fixture::default()
+    };
+    fixture.assertions.push(crate::e2e::fixture::Assertion {
+        assertion_type: "error".into(),
+        ..Default::default()
+    });
+    let mut e2e = E2eConfig::default();
+    e2e.call.function = "stream_records".into();
+    e2e.call.args = vec![crate::e2e::config::ArgMapping {
+        name: "request".into(),
+        field: "input".into(),
+        arg_type: "json_object".into(),
+        optional: false,
+        owned: true,
+        element_type: None,
+        go_type: None,
+        vec_inner_is_ref: false,
+        trait_name: None,
+    }];
+    e2e.call.streaming = Some(crate::core::config::e2e::StreamingConfig::Enabled(true));
+    e2e.call.overrides.insert(
+        "zig".into(),
+        crate::e2e::config::CallOverride {
+            client_factory: Some("create_client".into()),
+            result_is_json_struct: true,
+            ..Default::default()
+        },
+    );
+    let config = ResolvedCrateConfig {
+        adapters: vec![crate::core::config::AdapterConfig {
+            name: "stream_records".into(),
+            pattern: AdapterPattern::Streaming,
+            core_path: "sample::Client::stream_records".into(),
+            params: Vec::new(),
+            returns: None,
+            error_type: None,
+            owner_type: Some("Client".into()),
+            item_type: Some("Record".into()),
+            gil_release: false,
+            trait_name: None,
+            trait_method: None,
+            detect_async: false,
+            request_type: Some("sample::RecordRequest".into()),
+            skip_languages: Vec::new(),
+        }],
+        ..ResolvedCrateConfig::default()
+    };
+
+    let rendered = render_test_file(
+        "streaming",
+        &[&fixture],
+        &e2e,
+        "stream_records",
+        "result",
+        &[],
+        "sample",
+        "sample",
+        &config,
+        &[],
+        &[],
+        crate::e2e::codegen::call_ir::CallIr::default(),
+        &[],
+    );
+
+    assert!(
+        rendered.contains("_client.stream_records("),
+        "the stream must start through the wrapper method:\n{rendered}"
+    );
+    assert!(
+        rendered.contains("_stream.next() catch"),
+        "chunks must be read through the wrapper stream:\n{rendered}"
+    );
+    assert!(
+        rendered.contains("@errorName(_err)"),
+        "the error name must come from the error the wrapper returned:\n{rendered}"
+    );
+    assert!(
+        !rendered.contains("last_error_variant"),
+        "the C library variant would hide an untyped wrapper error:\n{rendered}"
+    );
+    assert!(
+        !rendered.contains("_stream_start("),
+        "the test must not call the C stream start itself:\n{rendered}"
+    );
+}
+
 /// Fixture shared by the snippet/test-target pair below: a `json_object` arg whose docs
 /// presentation replaces a nested field with a file read (mirrors the batch `bytes_happy`
 /// fixture that drives `test_documents/html/html.html` into `/inputs/1/bytes`). The file
