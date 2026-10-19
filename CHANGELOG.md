@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep optional error variant fields, such as `retry_after`, optional in generated Dart error classes, and keep `None` as `None` when the error converts back to Rust. The Dart class required a value where the Rust error can have none.
+
 ## [0.111.0] - 2026-10-18
 
 ### Changed
