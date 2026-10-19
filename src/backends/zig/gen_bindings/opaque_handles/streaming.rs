@@ -84,7 +84,6 @@ pub(super) fn emit_streaming_struct(method: &MethodDef, streaming: &StreamingCon
             type_snake => type_snake,
             method_snake => &method_snake,
             item_snake => &item_snake,
-            cancelled_code => crate::core::ir::ApiSurface::FFI_ERROR_CODE_CANCELLED,
         },
     ));
 }
@@ -145,6 +144,9 @@ pub(super) fn emit_opaque_streaming_method(method: &MethodDef, streaming: &Strea
 }
 
 #[cfg(test)]
+mod runtime_tests;
+
+#[cfg(test)]
 mod tests {
     #[test]
     fn stream_template_checks_json_and_releases_every_native_value() {
@@ -158,7 +160,6 @@ mod tests {
                 type_snake => "client",
                 method_snake => "stream_records",
                 item_snake => "record",
-                cancelled_code => 5,
             },
         );
 
@@ -170,8 +171,8 @@ mod tests {
         assert!(rendered.contains("_handle: u64"));
         assert!(rendered.contains("if (_chunk == 0)"));
         assert!(
-            rendered.contains("if (_code == 5) return error.Cancelled;"),
-            "a cancelled stream must not surface as UnknownFfiError:\n{rendered}"
+            !rendered.contains("error.Cancelled"),
+            "the cancelled code is mapped by the error helper, not by a second check here:\n{rendered}"
         );
         assert!(
             rendered.contains("if (_code != 0) return _error_with_message(RequestError);"),

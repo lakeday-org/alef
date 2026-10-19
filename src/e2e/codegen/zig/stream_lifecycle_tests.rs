@@ -220,7 +220,7 @@ fn asserted_stream_checks_error_after_collecting_chunks() {
 }
 
 #[test]
-fn stream_error_assertions_use_native_variant_identity() {
+fn stream_error_assertions_match_the_wrapper_error_name() {
     let rendered = render_stream(Some("error"));
     assert!(
         rendered.contains("const _err_name = @errorName(_err);"),
@@ -241,5 +241,104 @@ fn stream_error_assertions_use_native_variant_identity() {
     assert!(
         rendered.contains("error.TestUnexpectedResult"),
         "unexpected success must still fail: {rendered}"
+    );
+}
+
+/// The Zig test file for an error fixture, compiled against a stub library whose stream fails.
+///
+/// The stub library has no message, so the name of the error that the generated test gets from
+/// the stream decides the result: `error.@"provider failure"` passes and any other name fails.
+/// Returns the compiler report and whether the Zig tests passed.
+fn run_error_fixture(failure: &str) -> (bool, String) {
+    let sample = format!(
+        r#"pub const failure = .{failure};
+pub fn _last_error() ?[]const u8 {{
+    return null;
+}}
+pub const Stream = struct {{
+    remaining: u8 = 2,
+    pub fn next(self: *Stream) error{{@"provider failure"}}!?u8 {{
+        if (failure == .next and self.remaining == 1) return error.@"provider failure";
+        if (self.remaining == 0) return null;
+        self.remaining -= 1;
+        return 1;
+    }}
+    pub fn deinit(self: *Stream) void {{
+        _ = self;
+    }}
+}};
+pub const Client = struct {{
+    pub fn stream_records(self: *Client, request: []const u8) error{{@"provider failure"}}!Stream {{
+        _ = self;
+        _ = request;
+        if (failure == .start) return error.@"provider failure";
+        return .{{}};
+    }}
+    pub fn free(self: *Client) void {{
+        _ = self;
+    }}
+}};
+pub fn create_client(api_key: anytype, base_url: anytype, a: anytype, b: anytype, d: anytype) !Client {{
+    _ = api_key;
+    _ = base_url;
+    _ = a;
+    _ = b;
+    _ = d;
+    return .{{}};
+}}
+"#
+    );
+    let directory = tempfile::tempdir().expect("temporary directory");
+    std::fs::write(directory.path().join("stream_test.zig"), render_stream(Some("error"))).expect("write test");
+    std::fs::write(directory.path().join("sample.zig"), sample).expect("write stub library");
+    // `-lc` mirrors the `.link_libc = true` of every generated e2e project: the test reads
+    // the mock server address through `std.c.getenv`. ~keep
+    let output = std::process::Command::new("zig")
+        .args([
+            "test",
+            "-lc",
+            "--dep",
+            "sample",
+            "-Mroot=stream_test.zig",
+            "-Msample=sample.zig",
+        ])
+        .current_dir(directory.path())
+        .output()
+        .expect("run Zig compiler");
+    let report = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    (output.status.success() && report.contains("All 1 tests passed"), report)
+}
+
+fn zig_is_installed() -> bool {
+    std::process::Command::new("zig").arg("version").output().is_ok()
+}
+
+#[test]
+fn generated_error_fixture_passes_only_with_the_error_the_wrapper_returned() {
+    if !zig_is_installed() {
+        return;
+    }
+    for failure in ["start", "next"] {
+        let (passed, report) = run_error_fixture(failure);
+        assert!(
+            passed,
+            "the generated test must see the error the stream returned when it fails at {failure}:\n{report}"
+        );
+    }
+}
+
+#[test]
+fn generated_error_fixture_fails_when_the_stream_never_fails() {
+    if !zig_is_installed() {
+        return;
+    }
+    let (passed, report) = run_error_fixture("none");
+    assert!(
+        !passed && report.contains("TestUnexpectedResult"),
+        "a stream that never fails must fail the error fixture:\n{report}"
     );
 }

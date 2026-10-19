@@ -11,7 +11,6 @@ pub const {{ struct_name }} = struct {
         if (_chunk == 0) {
             // Check errno: 0 = clean EOS, != 0 = error
             const _code = c.{{ prefix }}_last_error_code();
-            if (_code == {{ cancelled_code }}) return error.Cancelled;
             if (_code != 0) return _error_with_message({{ zig_error_type }});
             return null;
         }
