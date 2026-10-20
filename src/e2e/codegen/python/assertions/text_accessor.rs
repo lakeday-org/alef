@@ -48,7 +48,9 @@ pub(super) fn try_render(out: &mut String, assertion: &Assertion, field_access: 
         }
         "contains_any" => {
             let list = literals.join(", ");
-            out.push_str(&format!("    assert any(v.lower() in {text}.lower() for v in [{list}])\n"));
+            out.push_str(&format!(
+                "    assert any(v.lower() in {text}.lower() for v in [{list}])\n"
+            ));
         }
         "not_contains" => {
             for literal in &literals {
