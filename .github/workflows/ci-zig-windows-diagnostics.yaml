@@ -25,7 +25,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 90
     env:
-      ALEF_ZIG_DIAGNOSTIC_DIR: ${{ runner.temp }}/zig-diagnostics
+      ALEF_ZIG_DIAGNOSTIC_DIR: ${{ github.workspace }}/.zig-diagnostics
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: never
       RUST_BACKTRACE: "1"

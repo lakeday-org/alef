@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add Windows process sampling and eight cold/warm Zig consumer checks with qualified failure controls and compiler receipts (GH#573).
 
+### Fixed
+
+- Resolve the Windows diagnostic evidence directory from a context available when GitHub initializes the job.
+
 ## [0.111.1] - 2026-10-19
 
 ### Fixed
