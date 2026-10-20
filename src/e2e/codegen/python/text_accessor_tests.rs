@@ -5,7 +5,8 @@
 //! untagged enum such as a message `content` (a text variant and a parts variant) the object's
 //! string form is correct even when the `.text` getter returns `None`, so a broken getter
 //! passed. These tests drive `render_test_function` with the `fields_display_as_text` config,
-//! the same key the Go, Java, C# and PHP generators read.
+//! the same key the Go, Java, C# and PHP generators read. A `None` accessor fails the assertion,
+//! and a field that is not an enum field keeps the exact comparison the standard assertions use.
 
 use std::collections::{HashMap, HashSet};
 
@@ -48,12 +49,22 @@ fn content_enum() -> EnumDef {
 fn render_assertion_for(assertion: Assertion, display_as_text: bool) -> String {
     let type_defs = vec![TypeDef {
         name: "Reply".to_string(),
-        fields: vec![FieldDef {
-            name: "content".to_string(),
-            ty: TypeRef::Optional(Box::new(TypeRef::Named("MessageContent".to_string()))),
-            optional: true,
-            ..FieldDef::default()
-        }],
+        fields: vec![
+            FieldDef {
+                name: "content".to_string(),
+                ty: TypeRef::Optional(Box::new(TypeRef::Named("MessageContent".to_string()))),
+                optional: true,
+                ..FieldDef::default()
+            },
+            // Listed as display-as-text but not an enum field: the standard assertions compare
+            // such a field exactly.
+            FieldDef {
+                name: "label".to_string(),
+                ty: TypeRef::Optional(Box::new(TypeRef::String)),
+                optional: true,
+                ..FieldDef::default()
+            },
+        ],
         ..TypeDef::default()
     }];
     let enums = vec![content_enum()];
@@ -72,8 +83,11 @@ fn render_assertion_for(assertion: Assertion, display_as_text: bool) -> String {
         },
     );
     e2e_config.fields_optional.insert("content".to_string());
+    e2e_config.fields_optional.insert("label".to_string());
     if display_as_text {
         e2e_config.fields_display_as_text.insert("content".to_string());
+        e2e_config.fields_display_as_text.insert("label".to_string());
+        e2e_config.fields_display_as_text.insert("items[].content".to_string());
     }
     let fixture = Fixture {
         id: "reply_text".to_string(),
@@ -113,10 +127,10 @@ fn render_assertion_for(assertion: Assertion, display_as_text: bool) -> String {
     out
 }
 
-fn text_assertion(kind: &str, value: serde_json::Value) -> Assertion {
+fn text_assertion_on(field: &str, kind: &str, value: serde_json::Value) -> Assertion {
     let mut assertion = Assertion {
         assertion_type: kind.to_string(),
-        field: Some("content".to_string()),
+        field: Some(field.to_string()),
         ..Assertion::default()
     };
     if kind == "contains_all" || kind == "contains_any" {
@@ -127,6 +141,10 @@ fn text_assertion(kind: &str, value: serde_json::Value) -> Assertion {
     assertion
 }
 
+fn text_assertion(kind: &str, value: serde_json::Value) -> Assertion {
+    text_assertion_on("content", kind, value)
+}
+
 fn hello() -> serde_json::Value {
     serde_json::json!("hello")
 }
@@ -135,11 +153,12 @@ fn hello() -> serde_json::Value {
 fn equals_reads_the_text_accessor_and_requires_the_value_to_be_present() {
     let out = render_assertion_for(text_assertion("equals", hello()), true);
     assert!(out.contains("    assert result.content is not None\n"), "{out}");
+    assert!(out.contains("    assert result.content.text is not None\n"), "{out}");
     assert!(
-        out.contains("    assert _alef_e2e_text(result.content.text).lower() == \"hello\".lower()\n"),
+        out.contains("    assert result.content.text.lower() == \"hello\".lower()\n"),
         "{out}"
     );
-    assert!(!out.contains("_alef_e2e_text(result.content)"), "{out}");
+    assert!(!out.contains("_alef_e2e_text"), "{out}");
 }
 
 #[test]
@@ -157,34 +176,101 @@ fn every_text_comparison_reads_the_text_accessor() {
     let cases = [
         (
             "contains",
-            "    assert \"hello\".lower() in _alef_e2e_text(result.content.text).lower()\n",
+            "    assert \"hello\".lower() in result.content.text.lower()\n",
         ),
         (
             "contains_all",
-            "    assert \"hello\".lower() in _alef_e2e_text(result.content.text).lower()\n",
+            "    assert \"hello\".lower() in result.content.text.lower()\n",
         ),
         (
             "contains_any",
-            "    assert any(v.lower() in _alef_e2e_text(result.content.text).lower() for v in [\"hello\"])\n",
+            "    assert any(v.lower() in result.content.text.lower() for v in [\"hello\"])\n",
         ),
         (
             "not_contains",
-            "    assert result.content is None or \"hello\".lower() not in _alef_e2e_text(result.content.text).lower()\n",
+            "    assert result.content is None or \"hello\".lower() not in result.content.text.lower()\n",
         ),
-        (
-            "starts_with",
-            "    assert _alef_e2e_text(result.content.text).startswith(\"hello\")\n",
-        ),
-        (
-            "ends_with",
-            "    assert _alef_e2e_text(result.content.text).endswith(\"hello\")\n",
-        ),
+        ("starts_with", "    assert result.content.text.startswith(\"hello\")\n"),
+        ("ends_with", "    assert result.content.text.endswith(\"hello\")\n"),
     ];
     for (kind, expected) in cases {
         let out = render_assertion_for(text_assertion(kind, hello()), true);
         assert!(out.contains(expected), "{kind}: {out}");
         assert!(!out.contains("str(result.content)"), "{kind}: {out}");
     }
+}
+
+#[test]
+fn a_field_that_is_not_an_enum_field_keeps_the_exact_comparison() {
+    // The standard assertions compare an enum field case-insensitively and any other field
+    // exactly, so a reply in the wrong case must still fail on `label`.
+    let cases = [
+        ("equals", "    assert result.label.text == \"hello\"\n"),
+        ("contains", "    assert \"hello\" in result.label.text\n"),
+        ("contains_all", "    assert \"hello\" in result.label.text\n"),
+        ("contains_any", "    assert any(v in result.label.text for v in [\"hello\"])\n"),
+        (
+            "not_contains",
+            "    assert result.label is None or \"hello\" not in result.label.text\n",
+        ),
+        ("starts_with", "    assert result.label.text.startswith(\"hello\")\n"),
+        ("ends_with", "    assert result.label.text.endswith(\"hello\")\n"),
+    ];
+    for (kind, expected) in cases {
+        let out = render_assertion_for(text_assertion_on("label", kind, hello()), true);
+        assert!(out.contains(expected), "{kind}: {out}");
+        assert!(!out.contains(".lower()"), "{kind}: {out}");
+    }
+}
+
+#[test]
+fn an_accessor_that_returns_none_fails_every_text_comparison() {
+    // `None` must stay distinct from the empty string: an empty expected value would otherwise
+    // match a getter that returns nothing.
+    for kind in ["equals", "contains", "not_contains", "starts_with", "ends_with"] {
+        for value in [hello(), serde_json::json!("")] {
+            let out = render_assertion_for(text_assertion(kind, value), true);
+            let none_check = out
+                .find("result.content.text is not None\n")
+                .unwrap_or_else(|| panic!("{kind}: no check that the accessor is not None: {out}"));
+            let comparison = out
+                .rfind("result.content.text")
+                .unwrap_or_else(|| panic!("{kind}: no comparison: {out}"));
+            assert!(none_check < comparison, "{kind}: {out}");
+            assert!(!out.contains("_alef_e2e_text"), "{kind}: {out}");
+        }
+    }
+}
+
+#[test]
+fn contains_all_checks_every_literal() {
+    let mut assertion = text_assertion("contains_all", hello());
+    assertion.values = Some(vec![serde_json::json!("alpha"), serde_json::json!("beta")]);
+    let out = render_assertion_for(assertion, true);
+    assert!(out.contains("    assert \"alpha\".lower() in result.content.text.lower()\n"), "{out}");
+    assert!(out.contains("    assert \"beta\".lower() in result.content.text.lower()\n"), "{out}");
+}
+
+#[test]
+fn an_empty_expected_list_keeps_the_standard_rendering() {
+    let mut contains_all = text_assertion("contains_all", hello());
+    contains_all.values = Some(vec![]);
+    let mut contains_any = text_assertion("contains_any", hello());
+    contains_any.values = Some(vec![]);
+    let mut equals = text_assertion("equals", hello());
+    equals.value = None;
+    for assertion in [contains_all, contains_any, equals] {
+        let kind = assertion.assertion_type.clone();
+        let out = render_assertion_for(assertion, true);
+        assert!(!out.contains(".text"), "{kind}: {out}");
+    }
+}
+
+#[test]
+fn a_wildcard_path_keeps_the_string_form() {
+    let out = render_assertion_for(text_assertion_on("items[].content", "contains", hello()), true);
+    assert!(out.contains("any(\"hello\" in str("), "{out}");
+    assert!(!out.contains(".text"), "{out}");
 }
 
 #[test]
