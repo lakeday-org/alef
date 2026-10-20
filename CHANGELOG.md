@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Resolve the Windows diagnostic evidence directory from a context available when GitHub initializes the job.
+- Keep process sampling running after the observed tree exits and preserve its diagnostic artifacts.
 
 ## [0.111.1] - 2026-10-19
 

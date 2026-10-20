@@ -72,7 +72,7 @@ function Watch-DiagnosticTree($Runner, [hashtable] $State, $Writer) {
         $owned = @(Get-OwnedSnapshot $State $snapshot)
         Write-ProcessSample $Writer $owned $now.Ticks
         $samples += 1
-        $rss = [long](($owned | Measure-Object WorkingSetBytes -Sum).Sum)
+        $rss = Get-SnapshotRss $owned
         $peakRss = [Math]::Max($peakRss, $rss)
         if ($Runner.Process.HasExited) {
             if ($null -eq $exitObserved) { $exitObserved = $now }

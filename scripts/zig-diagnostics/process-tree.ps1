@@ -78,6 +78,12 @@ function Update-ProcessTree([hashtable] $State, [object[]] $Snapshot, [long] $Ob
     } while ($State.Count -gt $previousCount)
 }
 
+function Get-SnapshotRss([object[]] $Owned) {
+    $rss = 0L
+    foreach ($row in $Owned) { $rss += $row.WorkingSetBytes }
+    $rss
+}
+
 function Get-WindowsSnapshot {
     @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object { $null -ne $_.CreationDate } | ForEach-Object {
         [pscustomobject]@{

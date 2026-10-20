@@ -58,6 +58,8 @@ Update-ProcessTree $state @($updated) 150
 Assert-Control ($state['10@100'].ObservedCpuMilliseconds -eq 30) 'CPU deltas must use 100ns counter units.'
 Assert-Control ($state['10@100'].PeakSampledRssBytes -eq 8192) 'Sampled RSS must retain the peak.'
 Assert-Control ($state['10@100'].Samples -eq 2) 'The initial and updated samples must both be counted.'
+Assert-Control ((Get-SnapshotRss @()) -eq 0) 'An exited process tree must have zero sampled RSS.'
+Assert-Control ((Get-SnapshotRss @($root, $updated)) -eq 12288) 'Sampled tree RSS must sum every observed process.'
 
 . "$PSScriptRoot/receipts.ps1"
 $receipts = foreach ($phase in @('cold', 'warm')) {
@@ -113,8 +115,8 @@ foreach ($mutation in @('stale_source', 'missing_child', 'wrong_exit', 'no_cpu')
     try { Assert-SamplerControlProof $mutated | Out-Null } catch { $rejected = $true }
     Assert-Control $rejected "Live-control proof mutation '$mutation' must be rejected."
 }
-if ($script:Checks -ne 33) { throw "Expected 33 portable controls, ran $script:Checks." }
-Write-Host "Portable sampler controls: 33/33 passed."
+if ($script:Checks -ne 35) { throw "Expected 35 portable controls, ran $script:Checks." }
+Write-Host "Portable sampler controls: 35/35 passed."
 if ($IsWindows) {
     Invoke-WindowsControls
 } else {
