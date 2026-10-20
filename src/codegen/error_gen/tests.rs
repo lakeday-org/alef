@@ -10,6 +10,8 @@ use crate::core::ir::{CoreWrapper, FieldDef, PrimitiveType, TypeRef};
 mod duration_methods;
 #[path = "tests/native_methods.rs"]
 mod native_methods;
+#[path = "tests/python_attributes.rs"]
+mod python_attributes;
 
 /// Helper to create a tuple-style field (e.g. `_0: String`).
 fn tuple_field(index: usize) -> FieldDef {
