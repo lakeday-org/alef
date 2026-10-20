@@ -696,11 +696,6 @@ pub(crate) fn variant_accessor(variant: &EnumVariant) -> Option<VariantAccessor<
     })
 }
 
-/// Collect the [`variant_accessor`]-eligible variants of a data enum, in declaration order.
-pub(crate) fn collect_variant_accessors(enum_def: &EnumDef) -> Vec<VariantAccessor<'_>> {
-    enum_def.variants.iter().filter_map(variant_accessor).collect()
-}
-
 /// Generate variant accessor properties for a data enum.
 /// For single-tuple variants with a Named inner type, returns the typed binding struct directly.
 /// For all other variants, returns the variant data as a Python dict, or None if not active.
@@ -785,11 +780,11 @@ pub(crate) fn write_pyo3_variant_accessors(out: &mut String, enum_def: &EnumDef,
             crate::codegen::serde_enum_repr::serde_enum_repr(enum_def),
             crate::codegen::serde_enum_repr::SerdeEnumRepr::Untagged
         );
-        if (variant.serde_untagged || (whole_enum_untagged && variant.is_tuple)) && variant.fields.len() == 1 {
+        if (variant.serde_untagged || whole_enum_untagged) && variant.is_tuple && variant.fields.len() == 1 {
             write_pyo3_untagged_variant_accessor(out, enum_def, variant, core_path, is_host_enum, &fn_name, false);
             continue;
         }
-        if whole_enum_untagged {
+        if variant.serde_untagged || whole_enum_untagged {
             write_pyo3_untagged_variant_accessor(out, enum_def, variant, core_path, is_host_enum, &fn_name, true);
             continue;
         }

@@ -433,7 +433,9 @@ pub fn render_test_file(
                 &fixture.input,
             );
             let fixture_fn = resolve_node_function_name(call_config);
-            if client_factory.is_none() && !imports.contains(&fixture_fn) {
+            let is_free_function_call = client_factory.is_some()
+                && crate::e2e::codegen::client_factory::is_free_function_call(e2e_config, call_config, lang);
+            if (client_factory.is_none() || is_free_function_call) && !imports.contains(&fixture_fn) {
                 imports.push(fixture_fn);
             }
         }

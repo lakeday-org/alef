@@ -145,6 +145,14 @@ impl super::E2eCodegen for PythonE2eCodegen {
             });
         }
 
+        if config.python.as_ref().is_some_and(|c| c.stubs.is_some()) {
+            files.push(GeneratedFile {
+                path: output_base.join("tests").join("test_stub_conformance.py"),
+                content: render_stub_conformance_test(&pkg_name.replace('-', "_"), &config.python_module_name()),
+                generated_header: true,
+            });
+        }
+
         // Registry-mode test_apps/ runners (e.g. a consumer's
         // `task smoke:python` step) invoke a fixed `uv run pytest
         // tests/test_smoke.py` smoke target by convention. Emit a minimal
@@ -223,6 +231,21 @@ fn render_python_smoke_test(pip_name: &str) -> String {
     crate::e2e::template_env::render("python/test_smoke.py.jinja", ctx)
 }
 
+/// Render the test that parses the shipped `.pyi` and asserts each declared class member exists
+/// on the runtime class (GH#581).
+fn render_stub_conformance_test(import_name: &str, native_module: &str) -> String {
+    use crate::core::hash::{self, CommentStyle};
+
+    crate::e2e::template_env::render(
+        "python/test_stub_conformance.py.jinja",
+        crate::alef_context! {
+            header => hash::e2e_header(CommentStyle::Hash),
+            import_name => import_name,
+            native_module => native_module,
+        },
+    )
+}
+
 fn is_python_fixture_runnable(fixture: &Fixture, e2e_config: &E2eConfig) -> bool {
     if !super::fixture_inclusion(fixture, "python", e2e_config).is_included() {
         return false;
@@ -290,6 +313,56 @@ mod tests {
         assert!(smoke.contains("importlib.import_module(\"structuredmerge_core\")"));
         assert!(!smoke.contains("importlib.import_module(\"structuredmerge-core\")"));
         assert!(render_python_smoke_test("sample_pkg").contains("importlib.import_module(\"sample_pkg\")"));
+    }
+
+    #[test]
+    fn stub_conformance_test_is_emitted_only_when_stubs_are_configured() {
+        let e2e_config = E2eConfig::default();
+        let groups: Vec<FixtureGroup> = Vec::new();
+        let without = PythonE2eCodegen
+            .generate(
+                &groups,
+                &e2e_config,
+                &ResolvedCrateConfig::default(),
+                &[],
+                &[],
+                &[],
+                &[],
+            )
+            .expect("python e2e codegen must succeed");
+        assert!(!without.iter().any(|f| f.path.ends_with("test_stub_conformance.py")));
+
+        let config: ResolvedCrateConfig = toml::from_str::<crate::core::config::NewAlefConfig>(
+            r#"
+[workspace]
+languages = ["python"]
+[[crates]]
+name = "example-core"
+sources = ["src/lib.rs"]
+[crates.python]
+module_name = "example_native"
+[crates.python.stubs]
+output = "packages/python/example_core"
+"#,
+        )
+        .expect("config parses")
+        .resolve()
+        .expect("config resolves")
+        .remove(0);
+        let with = PythonE2eCodegen
+            .generate(&groups, &e2e_config, &config, &[], &[], &[], &[])
+            .expect("python e2e codegen must succeed");
+        let file = with
+            .iter()
+            .find(|f| f.path.ends_with("test_stub_conformance.py"))
+            .expect("conformance test must be emitted when stubs are configured");
+        assert!(file.content.contains("hasattr(cls, name)"), "{}", file.content);
+        assert!(
+            file.content
+                .contains(&format!("\"{}.pyi\"", config.python_module_name())),
+            "{}",
+            file.content
+        );
     }
 
     fn make_http_fixture(id: &str) -> crate::e2e::fixture::Fixture {

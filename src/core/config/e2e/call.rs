@@ -673,6 +673,10 @@ pub struct CallOverride {
     /// const client = createClient('test-key');
     /// const result = await client.chat(request);
     /// ```
+    ///
+    /// An empty string on a named call marks it as a free-function call: it needs no client, so
+    /// the generated test imports and calls the function directly instead of inheriting the
+    /// default call's client.
     #[serde(default)]
     pub client_factory: Option<String>,
     /// Verbatim trailing arguments appended after the fixed `("test-key", ...)` pair

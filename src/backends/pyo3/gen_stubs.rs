@@ -328,8 +328,24 @@ pub fn gen_stubs(
         }
     }
 
+    // The package publishes these names as `options.py` dataclasses, which keep the native
+    // type's fields and delegate only `from_json`; every other native method is absent from the
+    // class a caller receives, so the stub must not declare it. ~keep
+    let mut dataclass_public_types = options_types.clone();
+    dataclass_public_types.extend(crate::backends::pyo3::gen_bindings::options_return_dataclass_names(
+        api,
+        &config.dto,
+        &stub_reexported_types,
+    ));
     for typ in &non_opaque {
         let typ_for_stub = with_from_json_stub(typ, api, has_serde);
+        let typ_for_stub = if dataclass_public_types.contains(&typ.name) {
+            let mut public = typ_for_stub.into_owned();
+            public.methods.retain(|m| m.is_static && m.name == "from_json");
+            std::borrow::Cow::Owned(public)
+        } else {
+            typ_for_stub
+        };
         body_lines.push(gen_type_stub(
             &typ_for_stub,
             api,
@@ -715,6 +731,49 @@ module_name = "test_lib"
         assert_eq!(
             methods, 0,
             "the same-named method stub must be dropped, found {methods}:\n{stub}"
+        );
+    }
+
+    /// GH#581: the package publishes a `has_default` type as the `options.py` dataclass, which
+    /// keeps the fields of the native type and carries none of its methods (only `from_json` is
+    /// delegated). The stub must declare what that public class has, so a method that exists
+    /// solely on the native class is not advertised; a type the package keeps native retains
+    /// every method.
+    #[test]
+    fn dataclass_backed_type_stub_declares_no_native_only_methods() {
+        let validate = MethodDef {
+            name: "validate".to_string(),
+            return_type: TypeRef::Unit,
+            receiver: Some(ReceiverKind::Ref),
+            ..Default::default()
+        };
+        let named_type = |name: &str, has_default: bool| TypeDef {
+            name: name.to_string(),
+            rust_path: format!("test_lib::{name}"),
+            has_default,
+            fields: vec![FieldDef {
+                name: "label".to_string(),
+                ty: TypeRef::String,
+                ..Default::default()
+            }],
+            methods: vec![validate.clone()],
+            ..Default::default()
+        };
+        let api = ApiSurface {
+            types: vec![named_type("PublicConfig", true), named_type("NativeOnly", false)],
+            ..Default::default()
+        };
+        let stub = gen_stubs(&api, &[], &python_config(), &ahash::AHashSet::default()).expect("valid stub surface");
+        let public = stub.split("class NativeOnly").next().expect("split");
+        assert!(public.contains("class PublicConfig"), "{stub}");
+        assert!(public.contains("label: str"), "{stub}");
+        assert!(
+            !public.contains("def validate("),
+            "dataclass-backed type must not declare validate:\n{stub}"
+        );
+        assert!(
+            stub.contains("class NativeOnly:") && stub.contains("def validate("),
+            "{stub}"
         );
     }
 

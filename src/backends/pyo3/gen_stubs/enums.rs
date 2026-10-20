@@ -252,15 +252,13 @@ fn gen_data_enum_typeddicts(
 /// data enum's wrapper `#[pyclass]` -- `write_pyo3_variant_accessors`
 /// (`codegen::generators::enums`) emits one such getter per single-tuple-field variant whose
 /// payload is a `TypeRef::Named` type (e.g. `FormatMetadata::Excel(ExcelMetadata)` becomes
-/// `metadata.format.excel: ExcelMetadata | None`). `collect_variant_accessors` shares the exact
+/// `metadata.format.excel: ExcelMetadata | None`). `variant_accessor` shares the exact
 /// eligibility rule with that emitter, so this can never declare a property the runtime pyclass
 /// lacks or omit one it has.
 ///
 /// A dict-shaped variant (unit, multi-field tuple, struct, or non-`Named` payload) also gets a
-/// runtime `#[getter]` via `write_pyo3_variant_accessors`, but it returns an untyped
-/// `dict[str, Any] | None` the stub can't usefully narrow beyond what mypy already infers for an
-/// unannotated attribute, so — matching every other stub emitter in this module, which declares
-/// only the typed surface — it is left undeclared here.
+/// runtime `#[getter]` via `write_pyo3_variant_accessors` that returns an untyped
+/// `dict[str, Any] | None`; it is declared as `Any | None` so every runtime getter is declared.
 ///
 /// Bare annotation (not `@property`) matches the precedent `gen_type_stub`
 /// (`backends::pyo3::gen_stubs::classes`) already sets for `#[pyo3(get)]` struct fields.
@@ -271,14 +269,30 @@ fn gen_data_enum_typeddicts(
 /// So, unlike `gen_data_enum_variant_constructor_stubs`'s `@staticmethod`s (which really can be
 /// absent under some cfg), this property is always present and needs no `is_host_enum` filter.
 fn gen_data_enum_variant_accessor_stubs(lines: &mut Vec<String>, enum_def: &EnumDef) {
-    use crate::codegen::generators::collect_variant_accessors;
+    use crate::codegen::generators::variant_accessor;
 
-    for accessor in collect_variant_accessors(enum_def) {
-        lines.push(format!(
-            "    {}: {} | None",
-            accessor.py_name,
-            python_type(&TypeRef::Named(accessor.inner_type_name.to_string()))
-        ));
+    let mut declared: AHashSet<String> = AHashSet::new();
+    for variant in &enum_def.variants {
+        if let Some(accessor) = variant_accessor(variant) {
+            declared.insert(accessor.py_name.clone());
+            lines.push(format!(
+                "    {}: {} | None",
+                accessor.py_name,
+                python_type(&TypeRef::Named(accessor.inner_type_name.to_string()))
+            ));
+            continue;
+        }
+        // The dict-shaped getter is real at runtime for every remaining variant, so a caller
+        // reading `content.text` or `content.parts` must find it declared. A name Python
+        // reserves cannot be spelled in a stub, and one already declared (the tag attribute
+        // or a sibling variant) must not be redefined. ~keep
+        let name = crate::codegen::naming::pascal_to_snake(&variant.name);
+        if python_safe_name(&name) != name || enum_def.serde_tag.as_deref() == Some(name.as_str()) {
+            continue;
+        }
+        if declared.insert(name.clone()) {
+            lines.push(format!("    {name}: Any | None"));
+        }
     }
 }
 

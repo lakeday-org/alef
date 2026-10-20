@@ -16,7 +16,7 @@ use crate::e2e::escape::{escape_python, sanitize_ident};
 use crate::e2e::field_access::FieldResolver;
 use crate::e2e::fixture::Fixture;
 
-use super::helpers::{self, is_skipped, resolve_client_factory, resolve_function_name_for_call};
+use super::helpers::{self, is_skipped, resolve_call_client_factory, resolve_function_name_for_call};
 use super::visitor_context::{distinct_context_probes, visitor_callback_probes};
 use super::visitors::{
     emit_python_visitor_context_assertions, emit_python_visitor_context_probes, emit_python_visitor_method,
@@ -303,7 +303,7 @@ pub(super) fn render_test_function(out: &mut String, fixture: &Fixture, context:
     // Fixtures with mock_response point the client at the mock server via base_url so
     // the fixture response is served via prefix routing.
     // Fixtures without mock_response (real-API smoke tests) use no base_url override.
-    let client_factory = resolve_client_factory(e2e_config);
+    let client_factory = resolve_call_client_factory(e2e_config, call_config);
     let mut client_setup = String::new();
     let call_expr = if let Some(ref factory) = client_factory {
         let has_mock = fixture.mock_response.is_some() || fixture.http.is_some();

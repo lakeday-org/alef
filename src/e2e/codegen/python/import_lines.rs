@@ -85,7 +85,7 @@ pub(super) fn collect_nested_config_types(
 /// api key fixture (mock or not) did the same for the print/`T201` branch. ~keep
 pub(super) fn compute_pytest_and_sys_import_needs(
     fixtures: &[&Fixture],
-    client_factory: Option<&str>,
+    fixture_has_client: &dyn Fn(&Fixture) -> bool,
     has_error_test: bool,
     is_async: bool,
 ) -> (bool, bool) {
@@ -93,15 +93,19 @@ pub(super) fn compute_pytest_and_sys_import_needs(
         .iter()
         .filter(|f| !f.is_http_test())
         .any(|f| is_skipped(f, "python"));
-    let has_pytest_skip_call = client_factory.is_some()
-        && fixtures.iter().filter(|f| !f.is_http_test()).any(|f| {
+    let has_pytest_skip_call = fixtures
+        .iter()
+        .filter(|f| !f.is_http_test() && fixture_has_client(f))
+        .any(|f| {
             let has_mock = f.mock_response.is_some() || f.http.is_some();
             !has_mock && f.env.as_ref().and_then(|e| e.api_key_var.as_ref()).is_some()
         });
     let needs_pytest = has_error_test || is_async || has_skipped_fixture || has_pytest_skip_call;
 
-    let needs_sys_import = client_factory.is_some()
-        && fixtures.iter().filter(|f| !f.is_http_test()).any(|f| {
+    let needs_sys_import = fixtures
+        .iter()
+        .filter(|f| !f.is_http_test() && fixture_has_client(f))
+        .any(|f| {
             let has_mock = f.mock_response.is_some() || f.http.is_some();
             has_mock && f.env.as_ref().and_then(|e| e.api_key_var.as_ref()).is_some()
         });

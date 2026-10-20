@@ -97,7 +97,9 @@ pub fn list_points(count: i64) -> Vec<Point> {
     (0..count).map(|i| Point::new(i, i, None)).collect()
 }
 
-#[derive(Default, Clone)]
+// No `Default`: a `has_default` type is published as an options.py dataclass whose stub declares
+// no native methods (GH#581), and this fixture exists to exercise method annotations. ~keep
+#[derive(Clone)]
 pub struct ByteContainer {
     pub bytes: Vec<u8>,
 }
@@ -108,7 +110,7 @@ impl ByteContainer {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct MethodShadow;
 
 impl MethodShadow {

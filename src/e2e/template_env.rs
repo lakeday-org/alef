@@ -197,6 +197,10 @@ static TEMPLATES: &[(&str, &str)] = &[
         include_str!("templates/python/test_smoke.py.jinja"),
     ),
     (
+        "python/test_stub_conformance.py.jinja",
+        include_str!("templates/python/test_stub_conformance.py.jinja"),
+    ),
+    (
         "python/mock_request_helper.py.jinja",
         include_str!("templates/python/mock_request_helper.py.jinja"),
     ),

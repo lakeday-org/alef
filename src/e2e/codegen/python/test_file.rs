@@ -42,9 +42,9 @@ use crate::e2e::fixture::Fixture;
 
 use self::import_lines::{ImportNeeds, compute_pytest_and_sys_import_needs, finalize_stdlib_and_bare_imports};
 use super::helpers::{
-    self, BytesKind, classify_bytes_value, python_method_helper_import, resolve_client_factory, resolve_enum_fields,
-    resolve_function_name, resolve_function_name_for_call, resolve_handle_dict_types, resolve_handle_nested_types,
-    resolve_module, resolve_options_type, resolve_options_via,
+    self, BytesKind, classify_bytes_value, python_method_helper_import, resolve_call_client_factory,
+    resolve_enum_fields, resolve_function_name, resolve_function_name_for_call, resolve_handle_dict_types,
+    resolve_handle_nested_types, resolve_module, resolve_options_type, resolve_options_via,
 };
 use super::http::render_http_test_function;
 use super::test_function::handle_values::collect_used_nested_types;
@@ -188,9 +188,15 @@ pub(super) fn render_test_file(
                 || crate::e2e::codegen::streaming_assertions::resolve_is_streaming(f, cc.streaming_enabled())
         }) || e2e_config.call.r#async
     });
-    let client_factory = resolve_client_factory(e2e_config);
+    // Per fixture, because a call may be a free function that needs no client (GH#592).
+    let fixture_has_client = |f: &Fixture| {
+        let cc =
+            e2e_config.resolve_call_for_fixture(f.call.as_deref(), &f.id, &f.resolved_category(), &f.tags, &f.input);
+        resolve_call_client_factory(e2e_config, cc).is_some()
+    };
+    let any_client = fixtures.iter().any(|f| fixture_has_client(f));
     let (needs_pytest, needs_sys_import) =
-        compute_pytest_and_sys_import_needs(fixtures, client_factory.as_deref(), has_error_test, is_async);
+        compute_pytest_and_sys_import_needs(fixtures, &fixture_has_client, has_error_test, is_async);
 
     let has_mock_url_placeholder = fixtures.iter().any(|f| {
         let cc =
@@ -211,7 +217,7 @@ pub(super) fn render_test_file(
                     .any(|arg| arg.arg_type == "json_object" && !resolve_field(&f.input, &arg.field).is_null())
             });
 
-    let needs_os_import = client_factory.is_some()
+    let needs_os_import = any_client
         || has_http_tests
         || has_mock_url_placeholder
         || e2e_config
@@ -398,7 +404,6 @@ pub(super) fn render_test_file(
             config,
             module: &module,
             function_name: &function_name,
-            client_factory: client_factory.as_deref(),
             options_type: &effective_options_type,
             options_via: effective_options_via,
             from_json_module: from_json_module.as_deref(),
@@ -562,7 +567,6 @@ struct ThirdpartyImportContext<'a> {
     config: &'a crate::core::config::ResolvedCrateConfig,
     module: &'a str,
     function_name: &'a str,
-    client_factory: Option<&'a str>,
     options_type: &'a Option<String>,
     options_via: &'a str,
     from_json_module: Option<&'a str>,
@@ -585,7 +589,6 @@ fn build_thirdparty_imports(context: ThirdpartyImportContext<'_>, thirdparty_fro
         config,
         module,
         function_name,
-        client_factory,
         options_type,
         options_via,
         from_json_module,
@@ -611,27 +614,23 @@ fn build_thirdparty_imports(context: ThirdpartyImportContext<'_>, thirdparty_fro
 
     let mut import_names: Vec<String> = Vec::new();
 
-    // When a client_factory is configured, import only the factory function.
-    // Individual API functions are called as methods on the client instance.
-    if let Some(factory) = client_factory {
-        import_names.push(factory.to_string());
-    } else {
-        for fixture in fixtures.iter() {
-            let cc = e2e_config.resolve_call_for_fixture(
-                fixture.call.as_deref(),
-                &fixture.id,
-                &fixture.resolved_category(),
-                &fixture.tags,
-                &fixture.input,
-            );
-            let fn_name = resolve_function_name_for_call(cc);
-            if !import_names.contains(&fn_name) {
-                import_names.push(fn_name);
-            }
+    // A client call imports its factory (its API functions are methods on the client); a
+    // free-function call imports the function itself (GH#592).
+    for fixture in fixtures.iter() {
+        let cc = e2e_config.resolve_call_for_fixture(
+            fixture.call.as_deref(),
+            &fixture.id,
+            &fixture.resolved_category(),
+            &fixture.tags,
+            &fixture.input,
+        );
+        let name = resolve_call_client_factory(e2e_config, cc).unwrap_or_else(|| resolve_function_name_for_call(cc));
+        if !import_names.contains(&name) {
+            import_names.push(name);
         }
-        if import_names.is_empty() {
-            import_names.push(function_name.to_string());
-        }
+    }
+    if import_names.is_empty() {
+        import_names.push(function_name.to_string());
     }
     for ctor in &handle_constructors {
         if !import_names.contains(ctor) {
@@ -891,8 +890,22 @@ mod tests {
     /// `helpers::pyo3_would_inject_from_json`).
     #[test]
     fn build_thirdparty_imports_does_not_duplicate_the_from_json_type_across_modules() {
-        let fixtures: Vec<&crate::e2e::fixture::Fixture> = Vec::new();
-        let e2e_config = crate::e2e::config::E2eConfig::default();
+        let fixture: crate::e2e::fixture::Fixture = serde_json::from_value(serde_json::json!({
+            "id": "client_call",
+            "description": "client call",
+            "input": {},
+            "assertions": [{"type": "not_error"}]
+        }))
+        .expect("fixture parses");
+        let fixtures: Vec<&crate::e2e::fixture::Fixture> = vec![&fixture];
+        let mut e2e_config = crate::e2e::config::E2eConfig::default();
+        e2e_config.call.overrides.insert(
+            "python".to_string(),
+            crate::e2e::config::CallOverride {
+                client_factory: Some("create_client".to_string()),
+                ..Default::default()
+            },
+        );
         let config = crate::core::config::ResolvedCrateConfig::default();
         let options_type = Some("WidgetRequest".to_string());
         // Mirrors what `render_test_file`'s scan populates for a json_object arg constructed
@@ -907,7 +920,6 @@ mod tests {
             config: &config,
             module: "my_lib",
             function_name: "create_widget",
-            client_factory: Some("create_client"),
             options_type: &options_type,
             options_via: "from_json",
             from_json_module: Some("my_lib._internal_bindings"),

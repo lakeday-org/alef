@@ -45,6 +45,8 @@ pub(crate) mod field_skip;
 mod file_inputs;
 pub(crate) mod fixture_refusal;
 #[cfg(test)]
+mod free_function_call_tests;
+#[cfg(test)]
 mod generated_marker_coverage_tests;
 pub mod gleam;
 pub mod go;

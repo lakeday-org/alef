@@ -56,6 +56,9 @@ pub(in crate::e2e::codegen::typescript::test_file) fn render_test_case(
     // Fallback: if the resolved call has required args missing from input,
     // try to find a better-matching call from the named calls.
     call_config = crate::e2e::codegen::select_best_matching_call(call_config, e2e_config, fixture);
+    // A call that opts out of the client (GH#592) is a free-function call.
+    let client_factory = client_factory
+        .filter(|_| !crate::e2e::codegen::client_factory::is_free_function_call(e2e_config, call_config, lang));
     let (ir_reachable_fields, ir_known_excluded_fields, ir_optional_fields) = FieldResolver::ir_field_sets(type_defs);
     // Anchor the IR-derived result-field oracle (`with_ir_result_fields`) at the call's declared
     // Rust return type, mirroring the rust/python/java/csharp/elixir/go e2e generators. Purely
