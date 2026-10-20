@@ -206,39 +206,36 @@ pub(crate) fn emit_mirror_enum(
 /// mirror field binding.
 ///
 /// Mirror fields use FRB-widened types: integers → `i64`, floats → `f64`,
-/// `Duration` → `i64` millis, and optional primitive/Duration fields collapse to
-/// their non-optional widened form. String/Bytes/Vec optional fields retain
-/// `Option<...>` wrapping in the mirror because FRB handles those correctly.
+/// `Duration` → `i64` millis. An optional field keeps its `Option<...>` wrapper in
+/// the mirror (`frb_rust_type`), so the conversion maps through the option and a
+/// `None` stays `None`.
 ///
 /// `field_expr` is the pattern-binding identifier (e.g. `"f_status"`). The
 /// caller binds it via `ref f_<name>` so its type is `&MirrorFieldType`.
 fn field_from_expr(field: &FieldDef, field_expr: &str) -> String {
+    if field.optional && !matches!(field.ty, TypeRef::Optional(_)) {
+        let inner_field = FieldDef {
+            optional: false,
+            ..field.clone()
+        };
+        let inner_expr = field_from_expr(&inner_field, "v");
+        return format!("{field_expr}.as_ref().map(|v| {inner_expr})");
+    }
     match &field.ty {
         TypeRef::Primitive(prim) => {
             let native = primitive_name(prim);
-            let base = match prim {
+            match prim {
                 PrimitiveType::I64 | PrimitiveType::F64 | PrimitiveType::Bool => {
                     format!("*{field_expr}")
                 }
                 _ => format!("*{field_expr} as {native}"),
-            };
-            if field.optional { format!("Some({base})") } else { base }
-        }
-        TypeRef::Duration => {
-            let base = format!("std::time::Duration::from_millis(*{field_expr} as u64)");
-            if field.optional { format!("Some({base})") } else { base }
-        }
-        TypeRef::String | TypeRef::Bytes => {
-            if field.optional {
-                format!("Some({field_expr}.clone())")
-            } else {
-                format!("{field_expr}.clone()")
             }
         }
-        TypeRef::Char => {
-            let base = format!("{field_expr}.chars().next().unwrap_or('\\0')");
-            if field.optional { format!("Some({base})") } else { base }
+        TypeRef::Duration => {
+            format!("std::time::Duration::from_millis(*{field_expr} as u64)")
         }
+        TypeRef::String | TypeRef::Bytes => format!("{field_expr}.clone()"),
+        TypeRef::Char => format!("{field_expr}.chars().next().unwrap_or('\\0')"),
         TypeRef::Optional(inner) => {
             let inner_field = FieldDef {
                 name: field.name.clone(),
@@ -543,7 +540,7 @@ pub(crate) fn emit_mirror_error(out: &mut String, error: &ErrorDef, source_crate
                     } else {
                         f.name.clone()
                     };
-                    let rust_ty = frb_rust_type_inner(&f.ty);
+                    let rust_ty = frb_rust_type(&f.ty, f.optional);
                     out.push_str(&template_env::render(
                         "rust_mirror_enum_data_variant_field.jinja",
                         crate::alef_context! {
@@ -724,6 +721,47 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// The Rust field is `Option<Duration>`. The Dart variant field must stay optional, and the
+    /// conversion back to the core error must keep `None` as `None`. ~keep
+    #[test]
+    fn optional_error_variant_fields_stay_optional_in_the_mirror() {
+        use crate::core::ir::{ErrorVariant, FieldDef};
+
+        let field = |name: &str, ty: TypeRef, optional: bool| FieldDef {
+            name: name.to_string(),
+            ty,
+            optional,
+            ..Default::default()
+        };
+        let mut error = duration_error(TypeRef::Optional(Box::new(TypeRef::Duration)));
+        error.variants.push(ErrorVariant {
+            name: "RateLimited".into(),
+            fields: vec![
+                field("message", TypeRef::String, false),
+                field("retry_after", TypeRef::Duration, true),
+                field("model", TypeRef::String, true),
+                field("status", TypeRef::Primitive(crate::core::ir::PrimitiveType::U16), false),
+            ],
+            ..Default::default()
+        });
+        let mut generated = String::new();
+        emit_mirror_error(&mut generated, &error, "demo");
+        for expected in [
+            "retry_after: Option<i64>,",
+            "model: Option<String>,",
+            "message: String,",
+            "status: i64,",
+            "retry_after: f_retry_after.as_ref().map(|v| std::time::Duration::from_millis(*v as u64))",
+            "model: f_model.as_ref().map(|v| v.clone())",
+            "message: f_message.clone()",
+            "status: *f_status as u16",
+        ] {
+            assert!(generated.contains(expected), "missing `{expected}`: {generated}");
+        }
+        assert!(!generated.contains("Some(std::time::Duration"), "{generated}");
+        assert!(!generated.contains("Some(f_model"), "{generated}");
     }
 
     #[test]

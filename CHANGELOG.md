@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep optional error variant fields, such as `retry_after`, optional in generated Dart error classes, and keep `None` as `None` when the error converts back to Rust. The Dart class required a value where the Rust error can have none.
 - Read `fields_display_as_text` fields through their `.text` accessor in generated Python e2e tests, so a getter that returns `None` fails the test instead of passing through `str()` (GH#580).
 - Return the payload from the Python variant getters of an enum marked `#[serde(untagged)]`. The getters looked for a key named after the variant, which an untagged value never has, so every getter returned `None`. Each getter now matches the variant that the value holds. (GH#579)
 - Return the typed native error from a generated Zig stream when the server rejects the start or the stream fails midway, instead of `error.UnknownFfiError` (#585).

@@ -2447,12 +2447,16 @@ fn mirror_error_from_impl_handles_optional_string_duration_and_sanitized_fields(
     let lib = find_file(&files, "packages/dart/rust/src/lib.rs").expect("lib.rs not found");
 
     assert!(
-        lib.contains("model: Some(f_model.clone())"),
-        "optional String field must be wrapped with Some(...) in From impl: {lib}"
+        lib.contains("model: f_model.as_ref().map(|v| v.clone())"),
+        "optional String field must map through the option in From impl: {lib}"
     );
     assert!(
-        lib.contains("retry_after: Some(std::time::Duration::from_millis(*f_retry_after as u64))"),
-        "optional Duration field must become Some(Duration::from_millis(...)) in From impl: {lib}"
+        lib.contains("retry_after: f_retry_after.as_ref().map(|v| std::time::Duration::from_millis(*v as u64))"),
+        "optional Duration field must map through the option in From impl: {lib}"
+    );
+    assert!(
+        lib.contains("model: Option<String>,") && lib.contains("retry_after: Option<i64>,"),
+        "optional error variant fields must stay optional in the mirror enum: {lib}"
     );
     assert!(
         lib.contains("unreachable!"),
