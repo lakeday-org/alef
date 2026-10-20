@@ -267,6 +267,27 @@ fn untagged_enum_struct_variant_getter_serializes_the_whole_value() {
     assert!(!body.contains("values.get("), "{body}");
 }
 
+/// A unit variant and a multi-field tuple variant of an untagged enum have no single field to bind:
+/// the getter matches the bare variant name or `(..)` and serializes the whole value.
+#[test]
+fn untagged_enum_unit_and_multi_field_variants_serialize_the_whole_value() {
+    for (name, field_count, arm) in [
+        ("Empty", 0, "crate::Mixed::Empty=>{"),
+        ("Pair", 2, "crate::Mixed::Pair(..)=>{"),
+    ] {
+        let fields = (0..field_count).map(|i| field(&format!("_{i}"))).collect();
+        let mut held = variant(name, fields);
+        held.is_tuple = true;
+        let mut def = enum_def("Mixed", vec![held]);
+        def.serde_untagged = true;
+        let generated = gen_pyo3_data_enum(&def, "core");
+
+        let body = generated_method_body(&generated, &name.to_lowercase()).replace(' ', "");
+        assert!(body.contains(arm), "{name}: {body}");
+        assert!(body.contains("serde_json::to_value(&self.inner)"), "{name}: {body}");
+    }
+}
+
 /// A struct variant with one field is not a tuple variant: `Core::Object(data)` does not compile
 /// for it, so the getter matches `Object { .. }` and serializes the whole value.
 #[test]
