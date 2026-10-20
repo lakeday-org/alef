@@ -172,6 +172,8 @@ pub struct E2eConfig {
     /// - Java: `.map(v -> v.text()).orElse("")` instead of `Objects::toString`
     /// - C#: `field?.Text()?.Trim()` instead of `field?.ToString()?.Trim()`
     /// - PHP: `$result->getText()` instead of raw property access
+    /// - Python: `field.text` instead of `str(field)`, for string comparisons only;
+    ///   `not_empty` and length checks keep the whole value
     ///
     /// Use this for fields like `content` whose Rust type is `Option<RichTextContent>`
     /// (a multimodal union) rather than `Option<String>`. The inner type must
