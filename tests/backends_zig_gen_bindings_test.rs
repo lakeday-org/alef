@@ -1813,12 +1813,16 @@ type = "CrawlStreamRequest"
         "next() must read the error state on a null chunk via last_error_code: {content}"
     );
     assert!(
-        content.contains("if (_code == 5) return error.Cancelled;"),
-        "a cancelled stream must surface as error.Cancelled, not UnknownFfiError: {content}"
+        content.contains("if (_code != 0) return _error_with_message("),
+        "any error state on a null chunk must return the typed native error: {content}"
     );
     assert!(
-        content.contains("if (_code != 0) return error.UnknownFfiError;"),
-        "any other error state on a null chunk must surface as UnknownFfiError: {content}"
+        !content.contains("if (_code == 5) return error.Cancelled;"),
+        "the cancelled code is mapped by `_error_with_message`, not by a second check in next(): {content}"
+    );
+    assert!(
+        !content.contains("if (_code != 0) return error.UnknownFfiError;"),
+        "a native stream failure must not collapse to UnknownFfiError: {content}"
     );
     assert!(
         content.contains("return null;"),
