@@ -17,6 +17,8 @@ mod snippet;
 mod stubs;
 mod test_file;
 mod test_function;
+#[cfg(test)]
+mod text_accessor_tests;
 mod visitor_context;
 mod visitors;
 
