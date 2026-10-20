@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Windows process sampling and eight cold/warm Zig consumer checks with qualified failure controls and compiler receipts (GH#573).
+
 ## [0.111.1] - 2026-10-19
 
 ### Fixed
