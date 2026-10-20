@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve typed PHP error subclasses and named scalar payloads, including nullable values, when native free functions fail.
 - Preserve explicit JSON null in Java nullable primitive builder setters while retaining primitive setter overloads.
 - Preserve named scalar error payloads as Python exception attributes, including optional values, without changing exception messages or args.
 - Retain extension-native methods such as `default` in Python native stubs while keeping public dataclass declarations accurate.

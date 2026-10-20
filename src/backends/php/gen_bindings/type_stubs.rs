@@ -73,6 +73,7 @@ pub(super) fn generate_type_stubs(
         crate::alef_context! { namespace => &namespace },
     ));
 
+    content.push_str(&crate::codegen::error_gen::gen_php_error_stubs(api)?);
     content.push_str(&crate::backends::php::template_env::render(
         "php_exception_class_declaration.jinja",
         crate::alef_context! { class_name => &class_name },
