@@ -208,7 +208,10 @@ fn a_field_that_is_not_an_enum_field_keeps_the_exact_comparison() {
         ("equals", "    assert result.label.text == \"hello\"\n"),
         ("contains", "    assert \"hello\" in result.label.text\n"),
         ("contains_all", "    assert \"hello\" in result.label.text\n"),
-        ("contains_any", "    assert any(v in result.label.text for v in [\"hello\"])\n"),
+        (
+            "contains_any",
+            "    assert any(v in result.label.text for v in [\"hello\"])\n",
+        ),
         (
             "not_contains",
             "    assert result.label is None or \"hello\" not in result.label.text\n",
@@ -247,8 +250,14 @@ fn contains_all_checks_every_literal() {
     let mut assertion = text_assertion("contains_all", hello());
     assertion.values = Some(vec![serde_json::json!("alpha"), serde_json::json!("beta")]);
     let out = render_assertion_for(assertion, true);
-    assert!(out.contains("    assert \"alpha\".lower() in result.content.text.lower()\n"), "{out}");
-    assert!(out.contains("    assert \"beta\".lower() in result.content.text.lower()\n"), "{out}");
+    assert!(
+        out.contains("    assert \"alpha\".lower() in result.content.text.lower()\n"),
+        "{out}"
+    );
+    assert!(
+        out.contains("    assert \"beta\".lower() in result.content.text.lower()\n"),
+        "{out}"
+    );
 }
 
 #[test]
