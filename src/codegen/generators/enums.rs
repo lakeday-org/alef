@@ -785,7 +785,7 @@ pub(crate) fn write_pyo3_variant_accessors(out: &mut String, enum_def: &EnumDef,
             crate::codegen::serde_enum_repr::serde_enum_repr(enum_def),
             crate::codegen::serde_enum_repr::SerdeEnumRepr::Untagged
         );
-        if (variant.serde_untagged || whole_enum_untagged) && variant.fields.len() == 1 {
+        if (variant.serde_untagged || (whole_enum_untagged && variant.is_tuple)) && variant.fields.len() == 1 {
             write_pyo3_untagged_variant_accessor(out, enum_def, variant, core_path, is_host_enum, &fn_name, false);
             continue;
         }

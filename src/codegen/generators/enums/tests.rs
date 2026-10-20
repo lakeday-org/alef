@@ -267,6 +267,22 @@ fn untagged_enum_struct_variant_getter_serializes_the_whole_value() {
     assert!(!body.contains("values.get("), "{body}");
 }
 
+/// A struct variant with one field is not a tuple variant: `Core::Object(data)` does not compile
+/// for it, so the getter matches `Object { .. }` and serializes the whole value.
+#[test]
+fn untagged_enum_single_field_struct_variant_getter_matches_the_struct_pattern() {
+    let mut object = variant("Object", vec![field("text")]);
+    object.is_tuple = false;
+    let mut def = enum_def("Document", vec![object]);
+    def.serde_untagged = true;
+    let generated = gen_pyo3_data_enum(&def, "core");
+
+    let body = generated_method_body(&generated, "object").replace(' ', "");
+    assert!(body.contains("crate::Document::Object{..}=>{"), "{body}");
+    assert!(!body.contains("Object(data)"), "{body}");
+    assert!(body.contains("serde_json::to_value(&self.inner)"), "{body}");
+}
+
 #[test]
 fn pyo3_variant_getters_do_not_emit_rejected_rust_raw_identifiers() {
     let mut payload = field("_0");
