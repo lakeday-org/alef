@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (BREAKING)
+
+- Rename Swift enum case `None` to `none_` so optional fields retain explicitly selected values. Update `Type.none` to `Type.none_`; serialized values are unchanged (GH#593).
+
 ## [0.111.1] - 2026-10-19
 
 ### Fixed
