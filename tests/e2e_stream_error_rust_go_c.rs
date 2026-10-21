@@ -276,7 +276,7 @@ fn assert_standalone_rust_runtime(returns_result: bool, async_call: bool) {
     let emitted = |suffix: &str| {
         files
             .iter()
-            .find(|file| file.path.to_string_lossy().ends_with(suffix))
+            .find(|file| file.path.ends_with(suffix))
             .map(|file| file.content.clone())
     };
     let source = emitted("streaming_test.rs").expect("generated test file");
