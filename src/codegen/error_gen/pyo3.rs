@@ -377,6 +377,7 @@ pub fn pyo3_error_attribute_fields(variant: &crate::core::ir::ErrorVariant) -> V
         .iter()
         .filter(|field| {
             !field.binding_excluded
+                && field.cfg.is_none()
                 && !field.sensitive
                 && !field.sanitized
                 && !field.is_boxed
