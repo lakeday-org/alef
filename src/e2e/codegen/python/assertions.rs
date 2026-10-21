@@ -135,7 +135,9 @@ pub(super) fn render_assertion(
         .field
         .as_deref()
         .is_some_and(|f| !f.is_empty() && field_resolver.is_display_as_text(f));
-    if field_is_display_as_text && text_accessor::try_render(out, assertion, &field_access, field_is_optional) {
+    if field_is_display_as_text
+        && text_accessor::try_render(out, assertion, &field_access, field_is_optional, field_is_enum)
+    {
         return;
     }
 
