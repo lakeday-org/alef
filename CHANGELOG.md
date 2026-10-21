@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Update rustls-webpki and webpki-roots to fix RUSTSEC-2026-0382 and RUSTSEC-2026-0381.
 - Preserve optional PHP constructor-extension defaults and keep omitted legacy fields consistent with generated stubs.
 - Preserve typed PHP error subclasses and named scalar payloads, including nullable values, when native free functions fail.
 - Preserve explicit JSON null in Java nullable primitive builder setters while retaining primitive setter overloads.
