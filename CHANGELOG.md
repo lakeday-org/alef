@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.112.0] - 2026-10-21
 
+### Added
+
+- Add Windows process sampling and eight cold/warm Zig consumer checks with qualified failure controls and compiler receipts (GH#573).
+
 ### Changed (BREAKING)
 
 - Generated Rust native-to-mirror error conversions use `TryFrom` so a newer native variant can fail safely instead of being forced into an existing mirror variant. Replace `MirrorError::from(native)` with `MirrorError::try_from(native)`.
@@ -21,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resolve the Windows diagnostic evidence directory from a context available when GitHub initializes the job.
+- Keep process sampling running after the observed tree exits and preserve its diagnostic artifacts.
 - Retain configured language lint rules when regenerating only one language, while removing withdrawn suppressions.
 - Preserve borrowed string error payloads in Dart and retain unlisted native failures as `StateError` with their original message. Internal failure carriers avoid declared error names.
 - Update rustls-webpki and webpki-roots to fix RUSTSEC-2026-0382 and RUSTSEC-2026-0381.
