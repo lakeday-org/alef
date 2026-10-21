@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve native Zig constructor and static-factory errors and messages, and guard null string and collection results.
 - Update rustls-webpki and webpki-roots to fix RUSTSEC-2026-0382 and RUSTSEC-2026-0381.
 - Preserve optional PHP constructor-extension defaults and keep omitted legacy fields consistent with generated stubs.
 - Preserve typed PHP error subclasses and named scalar payloads, including nullable values, when native free functions fail.
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (BREAKING)
 
+- Zig string and collection wrappers report native conversion failures through error unions, including for infallible Rust functions. Use `try` or `catch` when calling these wrappers.
 - Rename Swift enum case `None` to `none_` so optional fields retain explicitly selected values. Update `Type.none` to `Type.none_`; serialized values are unchanged.
 
 ## [0.111.1] - 2026-10-19
