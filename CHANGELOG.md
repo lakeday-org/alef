@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Resolve Node and pin Python under the shared PATH guard so concurrent native-oracle tests cannot select a missing tool or an unintended interpreter.
-- Consume Rust, Go, Java, PHP, and C streams before asserting fixture errors, including errors after successful stream creation (GH#612).
-- Resolve the Elixir return-type oracle's batch launcher on Windows through the shared tool resolver.
-
 ## [0.112.0] - 2026-10-21
 
 ### Added
@@ -32,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refresh dependency locks, Gradle 9.8.2, Dart 3.13.6, and the Ruby setup action.
 
 ### Fixed
+
+- Resolve Node and pin Python under the shared PATH guard so concurrent native-oracle tests cannot select a missing tool or an unintended interpreter.
+- Consume Rust, Go, Java, PHP, and C streams before asserting fixture errors, including errors after successful stream creation (GH#612).
+- Resolve the Elixir return-type oracle's batch launcher on Windows through the shared tool resolver.
 
 - Omit cfg-gated PHP and Python error payload fields so generated bindings compile with the native feature disabled or enabled.
 
