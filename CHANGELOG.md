@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (BREAKING)
 
+- Reject PHP error variants that share an exception class name but have incompatible payload layouts, with diagnostics naming both owners and fields. Compatible shared classes remain supported.
+
 - Generated Rust native-to-mirror error conversions use `TryFrom` so a newer native variant can fail safely instead of being forced into an existing mirror variant. Replace `MirrorError::from(native)` with `MirrorError::try_from(native)`.
 - Rename Swift enum case `None` to `none_` so optional fields retain explicitly selected values. Update `Type.none` to `Type.none_`; serialized values are unchanged.
 - Zig string and collection wrappers report native conversion failures through error unions, including for infallible Rust functions. Use `try` or `catch` when calling these wrappers.
@@ -24,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refresh dependency locks, Gradle 9.8.2, Dart 3.13.6, and the Ruby setup action.
 
 ### Fixed
+
+- Omit cfg-gated PHP and Python error payload fields so generated bindings compile with the native feature disabled or enabled.
 
 - Resolve the Windows diagnostic evidence directory from a context available when GitHub initializes the job.
 - Keep process sampling running after the observed tree exits and preserve its diagnostic artifacts.

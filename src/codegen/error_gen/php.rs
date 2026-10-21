@@ -3,7 +3,10 @@ use super::{ExceptionNaming, exception_families};
 use crate::codegen::naming::{internal_rust_identifier, public_field_name};
 use crate::core::config::Language;
 use crate::core::ir::{ApiSurface, CoreWrapper, ErrorDef, ErrorVariant, PrimitiveType, TypeRef};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+
+type PayloadLayout = BTreeMap<String, (String, String, String)>;
+type ClassLayouts = BTreeMap<String, (String, PayloadLayout)>;
 
 #[derive(serde::Serialize)]
 struct PayloadField {
@@ -56,6 +59,7 @@ fn payload_fields(variant: &ErrorVariant) -> Vec<PayloadField> {
         .iter()
         .filter_map(|field| {
             if field.binding_excluded
+                || field.cfg.is_some()
                 || field.sensitive
                 || field.sanitized
                 || field.is_boxed
@@ -89,10 +93,56 @@ fn payload_fields(variant: &ErrorVariant) -> Vec<PayloadField> {
         .collect()
 }
 
+fn record_payload_layout(
+    layouts: &mut ClassLayouts,
+    class: &str,
+    owner: String,
+    fields: Vec<PayloadField>,
+) -> anyhow::Result<()> {
+    let layout = fields
+        .into_iter()
+        .map(|field| (field.name, (field.php_name, field.rust_type, field.php_type)))
+        .collect::<PayloadLayout>();
+    if let Some((previous_owner, previous_layout)) = layouts.get(class) {
+        anyhow::ensure!(
+            previous_layout == &layout,
+            "incompatible PHP payload layouts for {}: {} has {:?}; {} has {:?}",
+            class,
+            previous_owner,
+            previous_layout,
+            owner,
+            layout
+        );
+    } else {
+        layouts.insert(class.into(), (owner, layout));
+    }
+    Ok(())
+}
+
+fn validate_payload_layouts(api: &ApiSurface) -> anyhow::Result<()> {
+    let mut layouts = ClassLayouts::new();
+    for error in &api.errors {
+        record_payload_layout(&mut layouts, &error.name, error.name.clone(), Vec::new())?;
+    }
+    for error in &api.errors {
+        for variant in &error.variants {
+            record_payload_layout(
+                &mut layouts,
+                &python_exception_name(&variant.name, &error.name),
+                format!("{}::{}", error.name, variant.name),
+                payload_fields(variant),
+            )?;
+        }
+    }
+    Ok(())
+}
+
 fn classes(api: &ApiSurface, namespace: &str) -> anyhow::Result<Vec<ExceptionClass>> {
+    let families = exception_families(api, ExceptionNaming::Python)?;
+    validate_payload_layouts(api)?;
     let mut seen = HashSet::new();
     let mut classes = Vec::new();
-    for family in exception_families(api, ExceptionNaming::Python)? {
+    for family in families {
         let error = family.error;
         let mut add = |name: String, parent: Option<String>, fields: Vec<PayloadField>| {
             if seen.insert(name.clone()) {
