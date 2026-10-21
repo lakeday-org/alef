@@ -272,6 +272,7 @@ mod assertions;
 mod http;
 mod project;
 mod snippet;
+mod stream_error;
 mod stubs;
 mod test_case;
 mod test_file;

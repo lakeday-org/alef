@@ -3,6 +3,7 @@
 mod collection;
 mod file_rendering;
 mod helpers;
+mod stream_error;
 mod test_function;
 
 #[cfg(test)]

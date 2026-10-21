@@ -8,6 +8,8 @@
    - throws_clause: " throws Exception" or ""
    - expects_error: boolean
    - declared_error_check: string containing the rendered declared-value assertion, or empty
+   - drain_stream: bool — the error fixture drives a streaming call; the lambda reads the
+     stream to its end because a mid-stream failure is thrown by the iterator, not by the call
    - call_expr: the complete function call expression
    - result_var: result variable name
    - returns_void: bool — whether the call returns void (Rust `()` / `Result<(),E>`)
@@ -39,7 +41,15 @@
 {% for line in setup_lines %}
             {{ line }}
 {% endfor %}
+{% if drain_stream %}
+            var _stream = {{ call_expr }};
+            var _it = _stream.iterator();
+            while (_it.hasNext()) {
+                _it.next();
+            }
+{% else %}
             {{ call_expr }};
+{% endif %}
         });
 {% if declared_error_check %}
 {{ declared_error_check }}

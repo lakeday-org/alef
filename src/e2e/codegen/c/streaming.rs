@@ -1,5 +1,6 @@
 //! C e2e streaming adapter test generation.
 
+use super::test_function::emit_c_error_epilogue;
 use crate::core::config::{AdapterPattern, ResolvedCrateConfig};
 use crate::e2e::codegen::assertion_type_skip::{
     streaming_assertion_type_skip_line, streaming_assertion_value_skip_line,
@@ -122,6 +123,7 @@ pub(super) fn render_streaming_test_function(
     client_factory: &str,
     streaming: &CStreamingAdapterMetadata,
     expects_error: bool,
+    errors: &[crate::core::ir::ErrorDef],
     api_key_var: Option<&str>,
     documentation_snippet: bool,
 ) {
@@ -235,10 +237,32 @@ pub(super) fn render_streaming_test_function(
     );
 
     if expects_error {
+        // A stream that fails after its first chunks starts without error: the failure shows
+        // when `_next` returns a null handle and `last_error_code` is set. Read the stream to
+        // its end before judging the call. The error code and message sit in thread-local
+        // storage that the next FFI call clears, so the epilogue runs before any `_free`.
+        let _ = writeln!(out, "    int stream_failed = (stream_handle == 0);");
+        let _ = writeln!(out, "    if (stream_handle != 0) {{");
+        let _ = writeln!(out, "        while (1) {{");
         let _ = writeln!(
             out,
-            "    assert(stream_handle == 0 && \"expected stream-start to fail\");"
+            "            {prefix_upper}AlefHandle {result_var} = {stream_next}(stream_handle);"
         );
+        let _ = writeln!(out, "            if ({result_var} == 0) {{");
+        let _ = writeln!(
+            out,
+            "                stream_failed = ({prefix}_last_error_code() != 0);"
+        );
+        let _ = writeln!(out, "                break;");
+        let _ = writeln!(out, "            }}");
+        let _ = writeln!(out, "            {prefix}_{item_type_snake}_free({result_var});");
+        let _ = writeln!(out, "        }}");
+        let _ = writeln!(out, "    }}");
+        let _ = writeln!(out, "    assert(stream_failed && \"expected the stream to fail\");");
+        emit_c_error_epilogue(out, prefix, fixture, errors, documentation_snippet);
+        let _ = writeln!(out, "    if (stream_handle != 0) {{");
+        let _ = writeln!(out, "        {stream_free}(stream_handle);");
+        let _ = writeln!(out, "    }}");
         if request_var.is_some() {
             let _ = writeln!(out, "    {prefix}_{req_snake}_free({req_handle});");
         }
@@ -569,10 +593,67 @@ mod stream_completion_signal_tests {
             "client_new",
             &adapter(),
             false,
+            &[],
             None,
             false,
         );
         out
+    }
+
+    fn error_driver_body() -> String {
+        let fixture = Fixture {
+            id: "stream_fails_midway".to_string(),
+            description: "stream fails after its first chunks".to_string(),
+            assertions: vec![Assertion {
+                assertion_type: "error".into(),
+                ..Assertion::default()
+            }],
+            ..Fixture::default()
+        };
+        let mut out = String::new();
+        render_streaming_test_function(
+            &mut out,
+            &fixture,
+            "mylib",
+            "chunk",
+            &[],
+            "client_new",
+            &adapter(),
+            true,
+            &[],
+            None,
+            false,
+        );
+        out
+    }
+
+    /// A stream that fails after its first chunks starts without error, so the old assert on a
+    /// null `stream_handle` failed the test for the wrong reason. The driver has to read the
+    /// stream to its end and judge the ABI error code there, before any `_free` call clears it.
+    #[test]
+    fn an_error_fixture_reads_the_stream_before_it_judges_the_error_code() {
+        let body = error_driver_body();
+
+        let read = body
+            .find("mylib_client_chat_stream_next(stream_handle);")
+            .unwrap_or_else(|| panic!("the error driver must call `_next`. Emitted:\n{body}"));
+        let code = body
+            .find("stream_failed = (mylib_last_error_code() != 0);")
+            .unwrap_or_else(|| panic!("the end of the stream must set `stream_failed`. Emitted:\n{body}"));
+        let judge = body
+            .find("assert(stream_failed && \"expected the stream to fail\");")
+            .unwrap_or_else(|| panic!("the driver must assert `stream_failed`. Emitted:\n{body}"));
+        let free = body
+            .find("mylib_client_chat_stream_free(stream_handle);")
+            .unwrap_or_else(|| panic!("the driver must free the stream. Emitted:\n{body}"));
+        assert!(
+            read < code && code < judge && judge < free,
+            "read, take the code, judge, then free. Emitted:\n{body}"
+        );
+        assert!(
+            !body.contains("expected stream-start to fail"),
+            "a start that succeeds is not a failure of the test. Emitted:\n{body}"
+        );
     }
 
     /// The defect: the driver declared `int stream_complete = 0;` and set it to `1` on any clean

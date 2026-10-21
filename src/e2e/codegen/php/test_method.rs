@@ -116,6 +116,7 @@ fn render_php_refusal(markers: &str, refusal: &InertExample) -> String {
 fn render_error_test_body(
     setup_lines: &[String],
     call_expr: &str,
+    drain_stream: bool,
     fixture: &Fixture,
     errors: &[crate::core::ir::ErrorDef],
 ) -> String {
@@ -146,10 +147,26 @@ fn render_error_test_body(
             for line in setup_lines {
                 let _ = writeln!(out, "        {line}");
             }
-            let _ = write!(out, "        {call_expr};");
+            let statement = call_statement("        ", call_expr, drain_stream);
+            out.push_str(statement.trim_end_matches('\n'));
         }
     }
     out
+}
+
+/// Render the call statement of an error-path test.
+///
+/// A streaming call returns a `Generator` that runs only while it is read, and a mid-stream
+/// failure is thrown from there. With `drain_stream` the statement reads the result to its end
+/// inside the guarded block. `is_iterable` keeps a result that is not a list or a generator
+/// (a JSON string from an older binding) from raising a warning instead of the expected error.
+fn call_statement(indent: &str, call_expr: &str, drain_stream: bool) -> String {
+    if !drain_stream {
+        return format!("{indent}{call_expr};\n");
+    }
+    format!(
+        "{indent}$__stream = {call_expr};\n{indent}if (is_iterable($__stream)) {{\n{indent}    foreach ($__stream as $__chunk) {{\n{indent}    }}\n{indent}}}\n"
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -498,7 +515,16 @@ pub(super) fn render_test_method(
     }
 
     let error_test_body = if expects_error {
-        let mut body = render_error_test_body(&setup_lines, &call_expr, fixture, errors);
+        let mut body = render_error_test_body(
+            &setup_lines,
+            &call_expr,
+            crate::e2e::codegen::streaming_assertions::is_streaming_error_call(
+                fixture,
+                call_config.streaming_enabled(),
+            ),
+            fixture,
+            errors,
+        );
         // ~keep `render_error_test_body` ends without a trailing newline on the `None` arm, so the
         // markers have to open their own line rather than being appended to the last statement.
         let markers = crate::e2e::codegen::error_path_assertions::render(fixture, "        // ", "php");

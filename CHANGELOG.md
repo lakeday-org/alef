@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Check the C result of a generated Zig function that returns a string, list or map and cannot fail. A null result, such as the one for an argument that is not valid UTF-8, now returns an error with the native message instead of slicing a null pointer. The declared error set of such a function now lists `UnknownFfiError` and `Cancelled` (GH#595).
 - Describe Elixir return values with their generated public DTO types recursively, including lists and optional values; retain maps for types without a public DTO and preserve input argument types. (GH#596)
 - Raise `TypeError` in the generated Ruby binding when an optional string argument is neither nil nor a string. The binding replaced the failed conversion with an empty string and ran the call with it. (GH#597)
+- Read the stream to its end in the generated Rust, Go, Java, PHP, C, Elixir, Swift and Kotlin e2e tests for a streaming fixture that expects an error. A stream that fails after its first chunks starts without error, so a test that judged the call alone failed with "expected call to fail", and a stream that ended without an error was never caught. The Python, Node, WASM, C#, Ruby, Dart and Zig tests already read the stream. (GH#612)
 
 
 ## [0.111.1] - 2026-10-19

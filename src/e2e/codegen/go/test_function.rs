@@ -326,7 +326,26 @@ pub(super) fn render_test_function_with_facts(
     let effective_returns_result_pre = returns_result || binding_returns_error_pre || client_factory.is_some();
 
     if expects_error {
-        if effective_returns_result_pre && !returns_void {
+        let stream_error_call = effective_returns_result_pre
+            && !returns_void
+            && crate::e2e::codegen::streaming_assertions::is_streaming_error_call(
+                fixture,
+                call_config.streaming_enabled(),
+            );
+        if stream_error_call {
+            // A stream that fails after its first chunks starts without error. The failure
+            // shows through `Err()` once the channel closes, so read the stream to its end
+            // before judging the call.
+            let _ = writeln!(
+                out,
+                "\tstream, err := {call_prefix}.{invocation_function_name}({final_args})"
+            );
+            let _ = writeln!(out, "\tif err == nil {{");
+            let _ = writeln!(out, "\t\tfor range stream.Chan() {{");
+            let _ = writeln!(out, "\t\t}}");
+            let _ = writeln!(out, "\t\terr = stream.Err()");
+            let _ = writeln!(out, "\t}}");
+        } else if effective_returns_result_pre && !returns_void {
             let _ = writeln!(
                 out,
                 "\t_, err := {call_prefix}.{invocation_function_name}({final_args})"

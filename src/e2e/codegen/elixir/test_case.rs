@@ -41,9 +41,15 @@ fn emit_error_assertion(
     out: &mut String,
     indent: &str,
     call_expr: &str,
+    drain_stream: bool,
     fixture: &Fixture,
     errors: &[crate::core::ir::ErrorDef],
 ) {
+    let call_expr = if drain_stream {
+        super::stream_error::bind_stream_outcome(out, indent, call_expr)
+    } else {
+        call_expr
+    };
     match classify("elixir", fixture, errors) {
         DeclaredErrorAssertion::Undeclared => {
             let _ = writeln!(out, "{indent}assert {{:error, _}} = {call_expr}");
@@ -432,7 +438,7 @@ pub(super) fn render_test_case(
             } else {
                 format!("{module_path}.{function_name}({effective_args})")
             };
-            emit_error_assertion(out, "          ", &call_invocation, fixture, errors);
+            emit_error_assertion(out, "          ", &call_invocation, false, fixture, errors);
             let _ = writeln!(out, "      end");
         } else {
             for line in &cleaned_setup_lines {
@@ -443,7 +449,7 @@ pub(super) fn render_test_case(
             } else {
                 format!("{module_path}.{function_name}({effective_args})")
             };
-            emit_error_assertion(out, "      ", &call_invocation, fixture, errors);
+            emit_error_assertion(out, "      ", &call_invocation, false, fixture, errors);
         }
 
         if needs_api_key_skip {
@@ -484,7 +490,11 @@ pub(super) fn render_test_case(
         } else {
             format!("{module_path}.{function_name}({effective_args})")
         };
-        emit_error_assertion(out, "      ", &call_invocation, fixture, errors);
+        let drain_stream = crate::e2e::codegen::streaming_assertions::is_streaming_error_call(
+            fixture,
+            call_config.streaming_enabled(),
+        );
+        emit_error_assertion(out, "      ", &call_invocation, drain_stream, fixture, errors);
         if needs_api_key_skip {
             let _ = writeln!(out, "      end");
         }

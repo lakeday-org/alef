@@ -591,6 +591,10 @@ pub(super) fn render_test_method(
             setup_lines => combined_setup,
             throws_clause => throws_clause,
             expects_error => expects_error,
+            drain_stream => crate::e2e::codegen::streaming_assertions::is_streaming_error_call(
+                fixture,
+                call_config.streaming_enabled(),
+            ),
             declared_error_check => declared_error_check,
             unrenderable_error_assertions => unrenderable_error_assertions.trim_end(),
             call_expr => call_expr,

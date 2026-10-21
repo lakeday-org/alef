@@ -17,6 +17,7 @@ use crate::e2e::codegen::rust::http::render_http_test_function;
 use crate::e2e::codegen::rust::mock_server::render_mock_server_setup;
 
 use super::helpers::{resolve_function_name_for_call, resolve_module_for_call};
+use super::stream_error::read_stream_to_result;
 
 /// The local a streaming call's drained items are bound to.
 ///
@@ -442,6 +443,18 @@ pub fn render_test_function(
     let result_is_option = call_config.result_is_option || rust_overrides.is_some_and(|o| o.result_is_option);
 
     if has_error_assertion {
+        // A streaming call reports a mid-stream error while the stream is read, so the
+        // error-path value is the first error from the start call or from the stream items.
+        let stream_error_call = call_is_async
+            && crate::e2e::codegen::streaming_assertions::is_streaming_error_call(
+                fixture,
+                call_config.streaming_enabled(),
+            );
+        let call_with_await = if stream_error_call {
+            read_stream_to_result(&format!("{call_expr}{await_suffix}"))
+        } else {
+            format!("{call_expr}{await_suffix}")
+        };
         // When a handle (engine) arg is present, the engine creation itself may fail.
         // Wrap the primary call in a match so engine-creation errors propagate as Err
         // instead of panicking via .expect().
@@ -453,7 +466,7 @@ pub fn render_test_function(
                 );
                 let _ = writeln!(out, "        Err(e) => (Err(e), None),");
                 let _ = writeln!(out, "        Ok({handle_name}) => {{");
-                let _ = writeln!(out, "            let {result_var} = {call_expr}{await_suffix};");
+                let _ = writeln!(out, "            let {result_var} = {call_with_await};");
                 let _ = writeln!(out, "            ({result_var}, Some({handle_name}))");
                 let _ = writeln!(out, "        }}");
                 let _ = writeln!(out, "    }};");
@@ -461,12 +474,12 @@ pub fn render_test_function(
                 let _ = writeln!(out, "    let {result_var} = match {handle_name}_result {{");
                 let _ = writeln!(out, "        Err(e) => Err(e),");
                 let _ = writeln!(out, "        Ok({handle_name}) => {{");
-                let _ = writeln!(out, "            {call_expr}{await_suffix}");
+                let _ = writeln!(out, "            {call_with_await}");
                 let _ = writeln!(out, "        }}");
                 let _ = writeln!(out, "    }};");
             }
         } else {
-            let _ = writeln!(out, "    let {result_var} = {call_expr}{await_suffix};");
+            let _ = writeln!(out, "    let {result_var} = {call_with_await};");
         }
         // Check if any assertion accesses fields on the Ok value (not error-path fields).
         // Assertions on `error.*` fields access the Err value and do not need `result_ok`.

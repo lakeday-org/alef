@@ -38,7 +38,10 @@ mod python_typeddict_accessor;
 mod renderers;
 mod snippets;
 
-pub use model::{STREAMING_VIRTUAL_FIELDS, StreamingFieldResolver, is_streaming_virtual_field, resolve_is_streaming};
+pub use model::{
+    STREAMING_VIRTUAL_FIELDS, StreamingFieldResolver, is_streaming_error_call, is_streaming_virtual_field,
+    resolve_is_streaming,
+};
 pub use snippets::RUST_STREAM_CRATE_PATH;
 
 #[cfg(test)]

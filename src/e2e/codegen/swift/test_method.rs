@@ -163,7 +163,11 @@ pub(super) fn render_test_method(
     let method_name = fixture.id.to_upper_camel_case();
     let description = &fixture.description;
     let expects_error = fixture.assertions.iter().any(|a| a.assertion_type == "error");
-    let is_async = call_overrides.and_then(|o| o.r#async).unwrap_or(call_config.r#async);
+    // A streaming call that must fail reports a mid-stream error while the test reads the
+    // `AsyncThrowingStream`, and `for try await` needs an async context.
+    let stream_error_call =
+        crate::e2e::codegen::streaming_assertions::is_streaming_error_call(fixture, call_config.streaming_enabled());
+    let is_async = stream_error_call || call_overrides.and_then(|o| o.r#async).unwrap_or(call_config.r#async);
 
     // Streaming detection (call-level `streaming` opt-out is honored).
     let is_streaming =
@@ -400,7 +404,12 @@ pub(super) fn render_test_method(
             if let Some(setup) = &call_setup {
                 let _ = writeln!(out, "            {setup}");
             }
-            let _ = writeln!(out, "            _ = {call_expr}");
+            if stream_error_call {
+                let _ = writeln!(out, "            let __stream = {call_expr}");
+                let _ = writeln!(out, "            for try await _ in __stream {{}}");
+            } else {
+                let _ = writeln!(out, "            _ = {call_expr}");
+            }
             let _ = writeln!(out, "            XCTFail(\"expected to throw\")");
             render_error_catch_block(out, fixture, errors);
         } else {

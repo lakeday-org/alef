@@ -20,6 +20,19 @@ use super::args::{KotlinArgsContext, build_args_and_setup};
 use super::assertions::render_assertion_with_streaming_context as render_assertion;
 use crate::e2e::escape::escape_kotlin;
 
+/// The call suffix that reads a streaming result to its end.
+///
+/// A stream reports a mid-stream failure while it is read, so an error test applies this suffix
+/// inside its `assertFailsWith` block. Kotlin Android streams are `Flow` values; the JVM binding
+/// returns an `Iterator`.
+fn stream_collect_suffix(kotlin_android_style: bool) -> &'static str {
+    if kotlin_android_style {
+        ".toList()"
+    } else {
+        ".asSequence().toList()"
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render_test_method(
     out: &mut String,
@@ -419,12 +432,10 @@ pub(super) fn render_test_method(
             // For streaming functions, the error fires during collection, not at
             // call time — append the collect suffix so the flow is consumed.
             let call_expr = if is_streaming {
-                let collect_suffix = if kotlin_android_style {
-                    ".toList()"
-                } else {
-                    ".asSequence().toList()"
-                };
-                format!("{call_receiver}.{function_name}({args_str}){collect_suffix}")
+                format!(
+                    "{call_receiver}.{function_name}({args_str}){}",
+                    stream_collect_suffix(kotlin_android_style)
+                )
             } else {
                 format!("{call_receiver}.{function_name}({args_str})")
             };
@@ -508,7 +519,16 @@ pub(super) fn render_test_method(
         for line in &setup_lines {
             let _ = writeln!(out, "            {line}");
         }
-        let _ = writeln!(out, "            {call_receiver}.{function_name}({args_str})");
+        // A streaming call fails while the stream is read, so consume it inside the block.
+        let collect_suffix = if is_streaming {
+            stream_collect_suffix(kotlin_android_style)
+        } else {
+            ""
+        };
+        let _ = writeln!(
+            out,
+            "            {call_receiver}.{function_name}({args_str}){collect_suffix}"
+        );
         let _ = writeln!(out, "        }}");
         crate::e2e::codegen::error_path_assertions::emit(out, fixture, "        // ", lang);
         // Trailing Unit — see comment in the client-factory branch above.

@@ -145,5 +145,18 @@ pub fn resolve_is_streaming(fixture: &crate::e2e::fixture::Fixture, call_streami
         })
 }
 
+/// True when the fixture drives a streaming call and expects an error.
+///
+/// A stream that fails after its first chunks answers the call with success: the error
+/// arrives only when the stream is read. A generated test for such a fixture has to read
+/// the stream to its end before it judges the call. Asserting on the call alone lets a
+/// stream that ends without an error pass.
+///
+/// ~keep Every backend asks this one predicate, so the set of fixtures that read the stream
+/// cannot drift from backend to backend.
+pub fn is_streaming_error_call(fixture: &crate::e2e::fixture::Fixture, call_streaming: Option<bool>) -> bool {
+    fixture.assertions.iter().any(|a| a.assertion_type == "error") && resolve_is_streaming(fixture, call_streaming)
+}
+
 /// Shared streaming-virtual-fields resolver for e2e test codegen.
 pub struct StreamingFieldResolver;
