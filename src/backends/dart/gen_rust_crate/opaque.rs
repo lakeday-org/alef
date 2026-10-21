@@ -61,6 +61,7 @@ pub(super) fn emit_opaque_impl_block(
     config: &ResolvedCrateConfig,
     type_paths: &std::collections::HashMap<String, String>,
     mirror_type_names: &HashSet<String>,
+    errors: &[crate::core::ir::ErrorDef],
 ) {
     let type_name = &ty.name;
 
@@ -158,21 +159,20 @@ pub(super) fn emit_opaque_impl_block(
                 ty,
                 method,
                 source_crate_name,
-                stub_methods,
                 types_needing_from_conversion,
                 opaque_type_names,
+                errors,
             );
             continue;
         }
 
         emit_opaque_method(
             out,
-            ty,
             method,
             source_crate_name,
-            stub_methods,
             types_needing_from_conversion,
             opaque_type_names,
+            errors,
         );
     }
 
@@ -233,12 +233,11 @@ fn emit_streaming_sink_method(
 /// Emit one method inside an `impl TypeName { }` block for an FRB opaque type.
 fn emit_opaque_method(
     out: &mut String,
-    _ty: &TypeDef,
     method: &MethodDef,
     source_crate_name: &str,
-    _stub_methods: &[String],
     types_needing_from_conversion: &HashSet<String>,
     opaque_type_names: &HashSet<String>,
+    errors: &[crate::core::ir::ErrorDef],
 ) {
     use bridge_fn::frb_rust_type_mirror;
 
@@ -264,7 +263,10 @@ fn emit_opaque_method(
     let has_error = method.error_type.is_some();
     let ret_ty = if has_error {
         let ok_ty = frb_rust_type_mirror(&method.return_type, false);
-        format!("Result<{ok_ty}, String>")
+        format!(
+            "Result<{ok_ty}, {}>",
+            super::error_bridge::result_error_type(method.error_type.as_deref(), errors)
+        )
     } else {
         frb_rust_type_mirror(&method.return_type, false)
     };
@@ -287,6 +289,7 @@ fn emit_opaque_method(
         source_crate_name,
         types_needing_from_conversion,
         opaque_type_names,
+        errors,
     );
 
     out.push_str("    }\n");
@@ -301,9 +304,9 @@ fn emit_static_opaque_method(
     ty: &TypeDef,
     method: &MethodDef,
     source_crate_name: &str,
-    _stub_methods: &[String],
     types_needing_from_conversion: &HashSet<String>,
     opaque_type_names: &HashSet<String>,
+    errors: &[crate::core::ir::ErrorDef],
 ) {
     use bridge_fn::frb_rust_type_mirror;
 
@@ -323,7 +326,10 @@ fn emit_static_opaque_method(
     let has_error = method.error_type.is_some();
     let ret_ty = if has_error {
         let ok_ty = frb_rust_type_mirror(&method.return_type, false);
-        format!("Result<{ok_ty}, String>")
+        format!(
+            "Result<{ok_ty}, {}>",
+            super::error_bridge::result_error_type(method.error_type.as_deref(), errors)
+        )
     } else {
         frb_rust_type_mirror(&method.return_type, false)
     };
@@ -346,6 +352,7 @@ fn emit_static_opaque_method(
         source_crate_name,
         types_needing_from_conversion,
         opaque_type_names,
+        errors,
     );
 
     out.push_str("    }\n");
@@ -362,6 +369,7 @@ fn emit_static_opaque_method_body(
     source_crate_name: &str,
     types_needing_from_conversion: &HashSet<String>,
     opaque_type_names: &HashSet<String>,
+    errors: &[crate::core::ir::ErrorDef],
 ) {
     use conversions::frb_rust_type_inner;
 
@@ -467,10 +475,24 @@ fn emit_static_opaque_method_body(
     let wrap_return = build_opaque_return_wrap(&method.return_type, method.returns_ref);
     let has_error = method.error_type.is_some();
 
-    emit_opaque_call_return(out, &call, &wrap_return, method.is_async, has_error);
+    emit_opaque_call_return(
+        out,
+        &call,
+        &wrap_return,
+        method.is_async,
+        has_error,
+        super::error_bridge::error_mapper(method.error_type.as_deref(), errors),
+    );
 }
 
-fn emit_opaque_call_return(out: &mut String, call: &str, wrap_return: &str, is_async: bool, has_error: bool) {
+fn emit_opaque_call_return(
+    out: &mut String,
+    call: &str,
+    wrap_return: &str,
+    is_async: bool,
+    has_error: bool,
+    error_mapper: &str,
+) {
     let template = match (is_async, has_error, wrap_return.is_empty()) {
         (true, true, true) => "rust_opaque_call_await_error.rs.jinja",
         (true, true, false) => "rust_opaque_call_await_map_error.rs.jinja",
@@ -503,6 +525,7 @@ fn emit_opaque_call_return(out: &mut String, call: &str, wrap_return: &str, is_a
             call => call,
             wrap_return => wrap_return,
             wrap_return_impl => wrap_return_impl.as_str(),
+            error_mapper => error_mapper,
         },
     ));
 }
@@ -517,6 +540,7 @@ fn emit_opaque_method_body(
     source_crate_name: &str,
     types_needing_from_conversion: &HashSet<String>,
     opaque_type_names: &HashSet<String>,
+    errors: &[crate::core::ir::ErrorDef],
 ) {
     use conversions::frb_rust_type_inner;
 
@@ -659,7 +683,14 @@ fn emit_opaque_method_body(
 
     let wrap_return = build_opaque_return_wrap(&method.return_type, method.returns_ref);
 
-    emit_opaque_call_return(out, &call, &wrap_return, method.is_async, has_error);
+    emit_opaque_call_return(
+        out,
+        &call,
+        &wrap_return,
+        method.is_async,
+        has_error,
+        super::error_bridge::error_mapper(method.error_type.as_deref(), errors),
+    );
 }
 
 /// Build the return-value wrapping closure for an opaque method return type.

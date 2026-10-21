@@ -212,6 +212,9 @@ impl E2eCodegen for DartE2eCodegen {
 mod assertion_mock_capture;
 mod assertions;
 mod call_field_resolver;
+mod error_assertions;
+#[cfg(test)]
+mod error_render_tests;
 mod http;
 mod project;
 mod snippet;

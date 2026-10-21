@@ -1,0 +1,63 @@
+{# ~keep FRB selects custom serializers for opaque types. Excluding this implementation #}
+{# module keeps it from generating an ordinary wrapper class instead of using the codec. #}
+#[frb(ignore)]
+mod alef_bridge_error {
+    pub struct AlefBridgeError(pub super::AlefBridgeErrorWire);
+
+    impl From<String> for AlefBridgeError {
+        fn from(message: String) -> Self {
+            Self(super::AlefBridgeErrorWire::{{ invalid_input }} { message })
+        }
+    }
+}
+use alef_bridge_error::AlefBridgeError;
+
+pub enum AlefBridgeErrorWire {
+{% for error in errors %}
+    {{ error.name }} { error: {{ error.name }} },
+{% endfor %}
+    {{ invalid_input }} { message: String },
+    {{ native_failure }} { message: String },
+}
+
+#[frb(rust2dart(dart_type = "Object", dart_code = {{ decode_code }}))]
+pub fn alef_encode_bridge_error(value: AlefBridgeError) -> AlefBridgeErrorWire {
+    value.0
+}
+
+#[frb(dart2rust(dart_type = "Object", dart_code = {{ encode_code }}))]
+pub fn alef_decode_bridge_error(value: AlefBridgeErrorWire) -> AlefBridgeError {
+    AlefBridgeError(value)
+}
+
+{% for error in errors %}
+impl TryFrom<{{ error.core_path }}> for {{ error.name }} {
+    type Error = String;
+
+    #[allow(unreachable_patterns, clippy::useless_conversion, reason = "extracted errors may gain variants or contain borrowed strings")]
+    fn try_from(value: {{ error.core_path }}) -> Result<Self, String> {
+{% if error.needs_message %}
+        let message = value.to_string();
+{% endif %}
+        match value {
+{% for arm in error.arms %}
+            {{ arm.pattern }} => Ok(Self::{{ arm.variant }}{% if arm.fields %} {
+{% for field in arm.fields %}
+                {{ field.name }}: {{ field.value }},
+{% endfor %}
+            }{% endif %}),
+{% endfor %}
+            {% if error.needs_message %}_{% else %}other{% endif %} => Err({% if error.needs_message %}message{% else %}other.to_string(){% endif %}),
+        }
+    }
+}
+
+impl From<{{ error.core_path }}> for AlefBridgeError {
+    fn from(value: {{ error.core_path }}) -> Self {
+        Self(match {{ error.name }}::try_from(value) {
+            Ok(error) => AlefBridgeErrorWire::{{ error.name }} { error },
+            Err(message) => AlefBridgeErrorWire::{{ native_failure }} { message },
+        })
+    }
+}
+{% endfor %}
