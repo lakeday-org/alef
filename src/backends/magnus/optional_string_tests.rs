@@ -150,7 +150,11 @@ fn should_report_the_target_of_the_installed_ruby() {
         return;
     };
     let target = ruby_extension_target(&ruby_binary);
-    assert_eq!(target.is_some(), cfg!(windows), "only RubyInstaller on Windows needs a GNU target");
+    assert_eq!(
+        target.is_some(),
+        cfg!(windows),
+        "only RubyInstaller on Windows needs a GNU target"
+    );
 }
 
 #[test]
