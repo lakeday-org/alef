@@ -7,26 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Raise Ruby TypeError for invalid optional string arguments while preserving omitted and nil values. (GH#597)
-- Describe Elixir return values with their public DTO types recursively, including lists and optional values. (GH#596)
-- Preserve native Zig constructor and static-factory errors and messages, and guard null string and collection results.
-- Update rustls-webpki and webpki-roots to fix RUSTSEC-2026-0382 and RUSTSEC-2026-0381.
-- Preserve optional PHP constructor-extension defaults and keep omitted legacy fields consistent with generated stubs.
-- Preserve typed PHP error subclasses and named scalar payloads, including nullable values, when native free functions fail.
-- Preserve explicit JSON null in Java nullable primitive builder setters while retaining primitive setter overloads.
-- Preserve named scalar error payloads as Python exception attributes, including optional values, without changing exception messages or args.
-- Retain extension-native methods such as `default` in Python native stubs while keeping public dataclass declarations accurate.
+## [0.112.0] - 2026-10-21
 
 ### Changed (BREAKING)
 
-- Zig string and collection wrappers report native conversion failures through error unions, including for infallible Rust functions. Use `try` or `catch` when calling these wrappers.
+- Generated Rust native-to-mirror error conversions use `TryFrom` so a newer native variant can fail safely instead of being forced into an existing mirror variant. Replace `MirrorError::from(native)` with `MirrorError::try_from(native)`.
 - Rename Swift enum case `None` to `none_` so optional fields retain explicitly selected values. Update `Type.none` to `Type.none_`; serialized values are unchanged.
+- Zig string and collection wrappers report native conversion failures through error unions, including for infallible Rust functions. Use `try` or `catch` when calling these wrappers.
 
-## [0.111.1] - 2026-10-19
+### Changed
+
+- Refresh dependency locks, Gradle 9.8.2, Dart 3.13.6, and the Ruby setup action.
 
 ### Fixed
+
+- Retain configured language lint rules when regenerating only one language, while removing withdrawn suppressions.
+- Preserve borrowed string error payloads in Dart and retain unlisted native failures as `StateError` with their original message. Internal failure carriers avoid declared error names.
+- Update rustls-webpki and webpki-roots to fix RUSTSEC-2026-0382 and RUSTSEC-2026-0381.
+- Preserve optional PHP constructor-extension defaults and keep omitted legacy fields consistent with generated stubs.
+- Accept null defaults for optional additions to generated Java constructors.
+- Preserve named scalar error payloads as Python exception attributes, including optional values, without changing exception messages or args.
+- Retain extension-native methods such as `default` in Python native stubs while keeping public dataclass declarations accurate.
+- Preserve typed PHP error subclasses and named scalar payloads, including nullable values, when native free functions fail.
+- Preserve explicit JSON null in Java nullable primitive builder setters while retaining primitive setter overloads.
+- Preserve optional data-enum fields and typed error payloads across the Dart bridge, including null and zero values.
+- Assert declared Dart error variants and scalar payload fields in generated e2e tests.
+- Repair Freezed 4 copyWith output for single-variant Dart unions and match all-unit errors as enum values.
+- Raise Ruby TypeError for invalid optional string arguments while preserving omitted and nil values. (GH#597)
+- Describe Elixir return values with their public DTO types recursively, including lists and optional values. (GH#596)
+- Preserve native Zig constructor and static-factory errors and messages, and guard null string and collection results.
+- Default new optional Dart and Zig constructor fields to null while retaining explicitly supplied false and zero values.
+- Preserve typed Zig streaming failures and verify them through the generated wrapper.
 
 - Return the payload from the Python variant getters of an enum marked `#[serde(untagged)]`. The getters looked for a key named after the variant, which an untagged value never has, so every getter returned `None`. Each getter now matches the variant that the value holds. (GH#579)
 - Read `fields_display_as_text` fields through their `.text` accessor in generated Python e2e tests, so a getter that returns `None` fails the test instead of passing through `str()` (GH#580).
