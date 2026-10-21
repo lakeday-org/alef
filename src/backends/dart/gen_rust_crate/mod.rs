@@ -23,6 +23,8 @@ mod conversions;
 mod enum_conversions;
 #[cfg(test)]
 mod enum_conversions_runtime_tests;
+mod enum_fields;
+mod error_bridge;
 mod helpers;
 mod mirror;
 mod mirror_conversions;
@@ -32,6 +34,8 @@ mod mirror_conversions_tests;
 mod mirror_enum_cfg_parity_tests;
 mod newtype_conversions;
 mod opaque;
+#[cfg(test)]
+mod optional_enum_field_tests;
 mod trait_bridge;
 mod trait_types;
 
@@ -41,6 +45,7 @@ use build_rs::{emit_build_rs, emit_frb_yaml};
 // backend actually writes as the baseline its repair pass must leave untouched, and a hand-built
 // string could not prove that. ~keep
 pub(crate) use cargo::emit_cargo_toml;
+pub(crate) use mirror::error_method_dart_name;
 use mirror::{emit_mirror_enum, emit_mirror_error, emit_mirror_struct};
 use trait_bridge::{emit_excluded_bridge_types, emit_trait_bridge, needs_excluded_bridge_type};
 
@@ -348,6 +353,7 @@ fn emit_lib_rs(
             config,
             &type_paths_for_impls,
             &mirror_type_names,
+            &api.errors,
         );
     }
 
@@ -391,6 +397,8 @@ fn emit_lib_rs(
         content.push('\n');
         emit_mirror_error(&mut content, error, source_crate_name);
     }
+
+    error_bridge::emit(&mut content, &api.errors, source_crate_name);
 
     content.push_str("\n// From<SourceT> conversions for bridge return types.\n");
     for ty in api
@@ -566,6 +574,7 @@ fn emit_lib_rs(
             &opaque_type_names,
             stub_methods,
             &api.types,
+            &api.errors,
         )?;
     }
 
