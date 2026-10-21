@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Update rustls-webpki and webpki-roots to fix RUSTSEC-2026-0382 and RUSTSEC-2026-0381.
 - Preserve cancellation and native error messages when generated Zig static factories fail without a declared Rust error type.
 - Return the typed native error from a generated Zig constructor or static function that fails, and keep its message for `_last_error()`, instead of `error.UnknownFfiError`. The declared error set of a static function that has an error type now admits the typed errors (GH#594).
 - Check the C result of a generated Zig function that returns a string, list or map and cannot fail. A null result, such as the one for an argument that is not valid UTF-8, now returns an error with the native message instead of slicing a null pointer. The declared error set of such a function now lists `UnknownFfiError` and `Cancelled` (GH#595).
