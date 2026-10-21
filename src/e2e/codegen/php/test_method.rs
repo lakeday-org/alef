@@ -131,7 +131,7 @@ fn render_error_test_body(
             for line in setup_lines {
                 let _ = writeln!(out, "            {line}");
             }
-            let _ = writeln!(out, "            {call_expr};");
+            out.push_str(&call_statement("            ", call_expr, drain_stream));
             out.push_str("        } catch (\\Exception $e) {\n            $caughtException = $e;\n        }\n");
             out.push_str("        $this->assertInstanceOf(\\Exception::class, $caughtException);\n");
             let _ = write!(

@@ -167,3 +167,13 @@ fn declared_value_naming_a_known_variant_renders_the_registered_skip_instead_of_
         "must not render an assertion that can never pass, got: {body}"
     );
 }
+
+#[test]
+fn declared_value_reads_the_stream_inside_the_try_block() {
+    let fixture = fixture_with_declared_error("RateLimited");
+    let body = render_error_test_body(&[], "Client::stream()", true, &fixture, &[]);
+    let open = body.find("try {").expect("try opens");
+    let read = body.find("foreach ($__stream as $__chunk)").expect("stream is read");
+    let close = body.find("} catch (").expect("catch follows");
+    assert!(open < read && read < close, "{body}");
+}

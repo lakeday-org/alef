@@ -328,3 +328,177 @@ fn kotlin_reads_the_stream_inside_assert_fails_with() {
         "a call that is not a stream keeps its plain shape:\n{plain_test}"
     );
 }
+
+// ---- Runtime: the generated test run against a stub library ----
+//
+// The tests above read the generated text. These run the generated Go and Elixir test files
+// against a stub library whose stream ends either with no error or with an error. The test for
+// a streaming call that must fail has to be red on the first stub and green on the second.
+
+/// The whole generated test file of the stream fixtures, as emitted for one language.
+fn generated_file<C: E2eCodegen>(codegen: &C, toml_src: &str, file_matches: fn(&str) -> bool) -> String {
+    let cfg: NewAlefConfig = toml::from_str(toml_src).expect("config parses");
+    let e2e = cfg.crates[0].e2e.clone().expect("e2e config present");
+    let resolved = cfg.resolve().expect("config resolves").remove(0);
+    let groups = vec![FixtureGroup {
+        category: "streaming".to_string(),
+        fixtures: vec![
+            stream_fixture(STREAM_FIXTURE, "stream_call", None),
+            stream_fixture(PLAIN_FIXTURE, "plain_call", None),
+        ],
+    }];
+    let files = codegen
+        .generate(&groups, &e2e, &resolved, &[], &[], &[], &[])
+        .expect("generation succeeds");
+    files
+        .iter()
+        .find(|f| file_matches(&f.path.to_string_lossy()) && f.content.contains("Midway") | f.content.contains("midway"))
+        .map(|f| f.content.clone())
+        .expect("a test file was emitted")
+}
+
+/// Find a toolchain binary. A missing binary skips the test unless CI marks it required.
+fn toolchain(binary: &str, require_env: &str) -> Option<std::path::PathBuf> {
+    match which::which(binary) {
+        Ok(path) => Some(path),
+        Err(_) if std::env::var_os(require_env).is_some() => {
+            panic!("{require_env} is set but `{binary}` is absent")
+        }
+        Err(_) => None,
+    }
+}
+
+/// Run `go test` over the generated Go file with a stub library. True when the tests pass.
+fn go_test_passes(stream_ends_with_error: bool) -> Option<bool> {
+    let go = toolchain("go", "ALEF_REQUIRE_GO")?;
+    let toml_src = toml_for("go", "[crates.go]\nmodule = \"github.com/test/mylib\"");
+    let test_source = generated_file(&GoCodegen, &toml_src, |p| p.ends_with("streaming_test.go"));
+
+    let root = tempfile::tempdir().expect("temp dir");
+    let lib = root.path().join("lib");
+    let e2e = root.path().join("e2e");
+    std::fs::create_dir_all(&lib).unwrap();
+    std::fs::create_dir_all(&e2e).unwrap();
+    std::fs::write(lib.join("go.mod"), "module github.com/test/mylib\n\ngo 1.21\n").unwrap();
+    let stream_error = if stream_ends_with_error {
+        "errors.New(\"rate limit reached\")"
+    } else {
+        "nil"
+    };
+    std::fs::write(
+        lib.join("lib.go"),
+        format!(
+            r#"package mylib
+
+import (
+	"context"
+	"errors"
+)
+
+type Stream struct {{
+	ch  chan string
+	err error
+}}
+
+func (s *Stream) Chan() <-chan string {{ return s.ch }}
+
+// Err answers only after the channel closes, as a stream that fails while it is read.
+func (s *Stream) Err() error {{ return s.err }}
+
+func StreamCallWithContext(ctx context.Context) (*Stream, error) {{
+	ch := make(chan string, 2)
+	ch <- "a"
+	ch <- "b"
+	close(ch)
+	return &Stream{{ch: ch, err: {stream_error}}}, nil
+}}
+
+func PlainCall() (string, error) {{ return "", errors.New("plain failure") }}
+"#
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        e2e.join("go.mod"),
+        "module github.com/test/mylib/e2e\n\ngo 1.21\n\nrequire github.com/test/mylib v0.0.0\n\nreplace github.com/test/mylib => ../lib\n",
+    )
+    .unwrap();
+    std::fs::write(e2e.join("streaming_test.go"), test_source).unwrap();
+
+    let output = std::process::Command::new(go)
+        .args(["test", "./..."])
+        .current_dir(&e2e)
+        .env("GOWORK", "off")
+        .env("GOFLAGS", "-mod=mod")
+        .env("GOPROXY", "off")
+        .output()
+        .expect("go runs");
+    Some(output.status.success())
+}
+
+#[test]
+fn go_test_is_red_when_the_stream_ends_with_no_error() {
+    if let Some(passes) = go_test_passes(false) {
+        assert!(!passes, "a stream that ends clean must fail the generated Go test");
+    }
+}
+
+#[test]
+fn go_test_is_green_when_the_stream_ends_in_an_error() {
+    if let Some(passes) = go_test_passes(true) {
+        assert!(passes, "a stream that ends in an error must pass the generated Go test");
+    }
+}
+
+/// Run the generated Elixir test file with a stub `MyLib`. True when the tests pass.
+fn elixir_test_passes(stream_ends_with_error: bool) -> Option<bool> {
+    let elixir = toolchain("elixir", "ALEF_REQUIRE_ELIXIR")?;
+    let toml_src = toml_for("elixir", "[crates.elixir]\napp_name = \"mylib\"");
+    let test_source = generated_file(&ElixirCodegen, &toml_src, |p| p.ends_with("streaming_test.exs"));
+
+    let root = tempfile::tempdir().expect("temp dir");
+    let test_path = root.path().join("streaming_test.exs");
+    std::fs::write(&test_path, test_source).unwrap();
+    let stream = if stream_ends_with_error {
+        "Stream.map([1, 2, 3], fn 3 -> raise \"rate limit reached\"; n -> n end)"
+    } else {
+        "[1, 2]"
+    };
+    let script = root.path().join("run.exs");
+    std::fs::write(
+        &script,
+        format!(
+            r#"defmodule MyLib do
+  def stream_call, do: {{:ok, {stream}}}
+  def plain_call, do: {{:error, :plain_failure}}
+end
+
+ExUnit.start(autorun: false)
+Code.require_file({test_path:?})
+%{{failures: failures}} = ExUnit.run()
+System.halt(if failures == 0, do: 0, else: 1)
+"#
+        ),
+    )
+    .unwrap();
+
+    let output = std::process::Command::new(elixir)
+        .arg(&script)
+        .output()
+        .expect("elixir runs");
+    Some(output.status.success())
+}
+
+#[test]
+fn elixir_test_is_red_when_the_stream_ends_with_no_error() {
+    if let Some(passes) = elixir_test_passes(false) {
+        assert!(!passes, "a stream that ends clean must fail the generated Elixir test");
+    }
+}
+
+#[test]
+fn elixir_test_is_green_when_the_stream_ends_in_an_error() {
+    if let Some(passes) = elixir_test_passes(true) {
+        assert!(passes, "a stream that ends in an error must pass the generated Elixir test");
+    }
+}
