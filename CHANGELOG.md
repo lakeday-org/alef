@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Raise Ruby TypeError for invalid optional string arguments while preserving omitted and nil values. (GH#597)
+- Describe Elixir return values with their public DTO types recursively, including lists and optional values. (GH#596)
 - Preserve native Zig constructor and static-factory errors and messages, and guard null string and collection results.
 - Update rustls-webpki and webpki-roots to fix RUSTSEC-2026-0382 and RUSTSEC-2026-0381.
 - Preserve optional PHP constructor-extension defaults and keep omitted legacy fields consistent with generated stubs.
