@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve named scalar error payloads as Python exception attributes, including optional values, without changing exception messages or args.
 - Retain extension-native methods such as `default` in Python native stubs while keeping public dataclass declarations accurate.
 
+### Changed (BREAKING)
+
+- Rename Swift enum case `None` to `none_` so optional fields retain explicitly selected values. Update `Type.none` to `Type.none_`; serialized values are unchanged.
+
 ## [0.111.1] - 2026-10-19
 
 ### Fixed
