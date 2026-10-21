@@ -529,8 +529,8 @@ pub(super) fn build_args_and_setup(
 ///
 /// The replacement names the case, and both halves are read off
 /// `backends::swift::gen_bindings::enums::emit_enum`: it spells the case
-/// `swift_source_ident(variant.name.to_lower_camel_case())` (so a case colliding with a Swift
-/// keyword keeps its backticks) and gives it the raw value `unit_enum_wire_value`, i.e. the
+/// `public_host_identifier(Swift, EnumVariant, variant.name)` (the rule `swift_variant_case`
+/// applies, so a variant `None` becomes `none_` and a keyword keeps its backticks) and gives it the raw value `unit_enum_wire_value`, i.e. the
 /// variant's `serde(rename)` if it has one and the enum's `rename_all` spelling otherwise. Naming
 /// the case rather than emitting `T(rawValue:)!` keeps the failure at compile time, where an
 /// unrecognised value is visible, instead of trapping at test run time. ~keep
@@ -569,7 +569,11 @@ fn ir_typed_swift_expression(
             enum_def.serde_rename_all.as_deref(),
         ) == text
     })?;
-    let case_name = crate::backends::swift::naming::swift_source_ident(&variant.name.to_lower_camel_case());
+    let case_name = crate::codegen::naming::public_host_identifier(
+        crate::core::config::Language::Swift,
+        crate::codegen::naming::PublicIdentifierKind::EnumVariant,
+        &variant.name,
+    );
     Some(format!("{declared}.{case_name}"))
 }
 
@@ -685,10 +689,14 @@ mod tests {
     }
 
     fn swift_args_for(enums: &[EnumDef], target_params: TargetParams<'_>) -> String {
+        swift_args_for_value(enums, target_params, "fine-tune")
+    }
+
+    fn swift_args_for_value(enums: &[EnumDef], target_params: TargetParams<'_>, value: &str) -> String {
         let args = vec![default_typed_arg("purpose")];
         let fixture = Fixture {
             id: "typed".to_string(),
-            input: serde_json::json!({ "purpose": "fine-tune" }),
+            input: serde_json::json!({ "purpose": value }),
             ..Fixture::default()
         };
         let (_setup, args_str) = build_args_and_setup(
@@ -729,6 +737,32 @@ mod tests {
         assert_eq!(
             swift_args_for(&[mode_enum()], TargetParams::Known(&params)),
             "FilePurpose.fineTune"
+        );
+    }
+
+    /// A variant named `None` on an optional enum parameter: `Effort.none` would read as
+    /// `Optional.none`, so the case is `none_`, the same spelling the bindings declare. ~keep
+    #[test]
+    fn a_none_variant_for_an_optional_enum_parameter_names_the_escaped_case() {
+        let params = [ParamDef {
+            name: "purpose".to_string(),
+            ty: TypeRef::Named("Effort".to_string()),
+            optional: true,
+            ..ParamDef::default()
+        }];
+        let effort = EnumDef {
+            name: "Effort".to_string(),
+            has_serde: true,
+            serde_rename_all: Some("lowercase".to_string()),
+            variants: vec![EnumVariant {
+                name: "None".to_string(),
+                ..EnumVariant::default()
+            }],
+            ..EnumDef::default()
+        };
+        assert_eq!(
+            swift_args_for_value(&[effort], TargetParams::Known(&params), "none"),
+            "Effort.none_"
         );
     }
 
