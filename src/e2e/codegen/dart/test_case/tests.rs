@@ -93,21 +93,116 @@ mod dart_error_matcher_tests {
         assert_eq!(out, "");
     }
 
-    /// The defect this fix closes: a declared value that names a real `ErrorVariant` —
-    /// flutter_rust_bridge always decodes the thrown value as a raw `String`, never a typed
-    /// exception hierarchy — must render `throwsA(anything)` (still an honest "the call must
-    /// fail" check) plus a registered skip comment, not a predicate that can never match.
     #[test]
-    fn declared_value_naming_a_known_variant_falls_back_to_throws_anything_and_records_a_skip() {
+    fn declared_value_naming_an_all_unit_variant_asserts_its_enum_value() {
         let fixture = fixture_with_declared_error("Authentication");
         let errors = vec![coded_error_def("Authentication")];
         let mut out = String::new();
         let matcher = dart_error_matcher(&mut out, "    ", &fixture, &errors);
-        assert_eq!(matcher, "throwsA(anything)");
-        assert_eq!(
-            out,
-            "    // skipped: declared error variant 'Authentication' not substantiated by this backend's generated \
-             error type\n"
-        );
+        assert_eq!(matcher, "throwsA(equals(ApiError.authentication))");
+        assert!(out.is_empty(), "{out}");
     }
+}
+
+#[test]
+fn should_assert_dart_error_variant_and_nullable_payload_fields() {
+    use crate::core::ir::{ErrorDef, ErrorVariant, FieldDef, TypeRef};
+    use crate::e2e::fixture::{Assertion, Fixture};
+    let fixture = Fixture {
+        id: "nullable_rejection".into(),
+        assertions: vec![
+            Assertion {
+                assertion_type: "error".into(),
+                value: Some(serde_json::json!("Rejected")),
+                ..Default::default()
+            },
+            Assertion {
+                assertion_type: "equals".into(),
+                field: Some("error.retry_after".into()),
+                value: Some(serde_json::Value::Null),
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let errors = [ErrorDef {
+        name: "RequestError".into(),
+        variants: vec![ErrorVariant {
+            name: "Rejected".into(),
+            fields: vec![FieldDef {
+                name: "retry_after".into(),
+                ty: TypeRef::Duration,
+                optional: true,
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        rust_path: "sample::RequestError".into(),
+        original_rust_path: String::new(),
+        doc: String::new(),
+        exception_base: None,
+        methods: vec![],
+        binding_excluded: false,
+        binding_exclusion_reason: None,
+        version: Default::default(),
+    }];
+    let mut out = String::new();
+    let matcher = dart_error_matcher(&mut out, "    ", &fixture, &errors);
+    assert_eq!(
+        matcher,
+        "throwsA(isA<RequestError_Rejected>().having((e) => e.retryAfter, 'retry_after', null))"
+    );
+    assert!(out.is_empty(), "{out}");
+}
+
+#[test]
+fn should_keep_only_unhandled_dart_error_fields_in_the_skip_ledger() {
+    use crate::core::ir::{ErrorDef, ErrorVariant, FieldDef, TypeRef};
+    use crate::e2e::fixture::{Assertion, Fixture};
+    let fixture = Fixture {
+        id: "rejected".into(),
+        assertions: vec![
+            Assertion {
+                assertion_type: "error".into(),
+                value: Some(serde_json::json!("Rejected")),
+                ..Default::default()
+            },
+            Assertion {
+                assertion_type: "equals".into(),
+                field: Some("error.message".into()),
+                value: Some(serde_json::json!("blocked")),
+                ..Default::default()
+            },
+            Assertion {
+                assertion_type: "equals".into(),
+                field: Some("error.unavailable".into()),
+                value: Some(serde_json::Value::Null),
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let errors = [ErrorDef {
+        name: "RequestError".into(),
+        rust_path: "sample::RequestError".into(),
+        original_rust_path: String::new(),
+        variants: vec![ErrorVariant {
+            name: "Rejected".into(),
+            fields: vec![FieldDef {
+                name: "message".into(),
+                ty: TypeRef::String,
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        doc: String::new(),
+        exception_base: None,
+        methods: vec![],
+        binding_excluded: false,
+        binding_exclusion_reason: None,
+        version: Default::default(),
+    }];
+    let pending = super::super::error_assertions::pending_assertions(&fixture, &errors);
+    assert_eq!(pending.assertions.len(), 2);
+    assert_eq!(pending.assertions[1].field.as_deref(), Some("error.unavailable"));
 }

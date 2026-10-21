@@ -182,7 +182,7 @@ pub(crate) fn emit_mirror_enum(
                     } else {
                         f.name.clone()
                     };
-                    let rust_ty = frb_rust_type_inner(&f.ty);
+                    let rust_ty = frb_rust_type(&f.ty, f.optional);
                     emit_rust_doc(&f.doc, "        ", out);
                     out.push_str(&template_env::render(
                         "rust_mirror_enum_data_variant_field.jinja",
@@ -416,6 +416,22 @@ fn emit_from_impl(out: &mut String, error: &ErrorDef, core_path: &str, error_cfg
         "rust_mirror_error_from_impl_close.rs.jinja",
         crate::alef_context! {},
     ));
+}
+
+/// The Dart method name of the error introspection method `method_name`, as flutter_rust_bridge
+/// surfaces it on the generated error class. `None` when the error has no such bridged method.
+pub(crate) fn error_method_dart_name(error: &ErrorDef, method_name: &str) -> Option<String> {
+    use crate::codegen::naming::{PublicIdentifierKind, public_host_identifier};
+    use crate::core::config::Language;
+
+    let methods: Vec<&crate::core::ir::MethodDef> = error.methods.iter().filter(|m| !m.sanitized).collect();
+    let position = methods.iter().position(|m| m.name == method_name)?;
+    let rust_name = error_bridge_method_names(error, &methods).swap_remove(position);
+    Some(public_host_identifier(
+        Language::Dart,
+        PublicIdentifierKind::Method,
+        &rust_name,
+    ))
 }
 
 fn error_bridge_method_names(error: &ErrorDef, methods: &[&crate::core::ir::MethodDef]) -> Vec<String> {

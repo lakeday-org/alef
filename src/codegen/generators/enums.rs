@@ -780,11 +780,11 @@ pub(crate) fn write_pyo3_variant_accessors(out: &mut String, enum_def: &EnumDef,
             crate::codegen::serde_enum_repr::serde_enum_repr(enum_def),
             crate::codegen::serde_enum_repr::SerdeEnumRepr::Untagged
         );
-        if (variant.serde_untagged || whole_enum_untagged) && variant.fields.len() == 1 {
+        if (variant.serde_untagged || whole_enum_untagged) && variant.is_tuple && variant.fields.len() == 1 {
             write_pyo3_untagged_variant_accessor(out, enum_def, variant, core_path, is_host_enum, &fn_name, false);
             continue;
         }
-        if whole_enum_untagged {
+        if variant.serde_untagged || whole_enum_untagged {
             write_pyo3_untagged_variant_accessor(out, enum_def, variant, core_path, is_host_enum, &fn_name, true);
             continue;
         }
@@ -883,30 +883,26 @@ fn write_pyo3_untagged_variant_accessor(
             false
         }
     };
-    if keep_arm && serialize_whole_value {
-        if let Some(cfg) = variant.cfg.as_deref() {
-            out.push_str(&format!("            #[cfg({cfg})]\n"));
-        }
-        let pattern = if variant.fields.is_empty() {
-            String::new()
-        } else if variant.is_tuple {
-            "(..)".to_string()
+    if keep_arm {
+        let (pattern, payload) = if serialize_whole_value {
+            let pattern = if variant.fields.is_empty() {
+                ""
+            } else if variant.is_tuple {
+                "(..)"
+            } else {
+                " { .. }"
+            };
+            (pattern, "&self.inner")
         } else {
-            " { .. }".to_string()
+            ("(data)", "data")
         };
-        out.push_str(&format!("            {core_path}::{}{pattern} => {{\n", variant.name));
-        out.push_str("                let json = serde_json::to_value(&self.inner)\n");
-        out.push_str("                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;\n");
-        out.push_str("                let json_mod = py.import(\"json\")?;\n");
-        out.push_str("                let value = json_mod.call_method1(\"loads\", (&json.to_string(),))?;\n");
-        out.push_str("                Ok(Some(value.unbind()))\n");
-        out.push_str("            }\n");
-    } else if keep_arm {
         out.push_str(&crate::codegen::template_env::render(
             "generators/enums/untagged_variant_match.jinja",
             crate::alef_context! {
                 core_path => core_path,
                 variant_pascal => &variant.name,
+                pattern => pattern,
+                payload => payload,
                 cfg => variant.cfg.as_deref(),
             },
         ));
