@@ -685,10 +685,14 @@ mod tests {
     }
 
     fn swift_args_for(enums: &[EnumDef], target_params: TargetParams<'_>) -> String {
+        swift_args_for_value(enums, target_params, "fine-tune")
+    }
+
+    fn swift_args_for_value(enums: &[EnumDef], target_params: TargetParams<'_>, value: &str) -> String {
         let args = vec![default_typed_arg("purpose")];
         let fixture = Fixture {
             id: "typed".to_string(),
-            input: serde_json::json!({ "purpose": "fine-tune" }),
+            input: serde_json::json!({ "purpose": value }),
             ..Fixture::default()
         };
         let (_setup, args_str) = build_args_and_setup(
@@ -729,6 +733,32 @@ mod tests {
         assert_eq!(
             swift_args_for(&[mode_enum()], TargetParams::Known(&params)),
             "FilePurpose.fineTune"
+        );
+    }
+
+    /// A variant named `None` on an optional enum parameter: `Effort.none` would read as
+    /// `Optional.none`, so the case is `none_`, the same spelling the bindings declare. ~keep
+    #[test]
+    fn a_none_variant_for_an_optional_enum_parameter_names_the_escaped_case() {
+        let params = [ParamDef {
+            name: "purpose".to_string(),
+            ty: TypeRef::Named("Effort".to_string()),
+            optional: true,
+            ..ParamDef::default()
+        }];
+        let effort = EnumDef {
+            name: "Effort".to_string(),
+            has_serde: true,
+            serde_rename_all: Some("lowercase".to_string()),
+            variants: vec![EnumVariant {
+                name: "None".to_string(),
+                ..EnumVariant::default()
+            }],
+            ..EnumDef::default()
+        };
+        assert_eq!(
+            swift_args_for_value(&[effort], TargetParams::Known(&params), "none"),
+            "Effort.none_"
         );
     }
 
