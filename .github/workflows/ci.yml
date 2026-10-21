@@ -82,6 +82,11 @@ jobs:
         with:
           install-llvm-cov: "false"
           cache-key-prefix: ci-test
+      # RubyInstaller is MinGW, and `rb-sys` refuses to build against its headers with the MSVC
+      # default target. The compiled-Ruby-extension fixture builds for the GNU target instead.
+      - name: Add the Rust GNU target for the Ruby extension fixture
+        if: runner.os == 'Windows'
+        run: rustup target add x86_64-pc-windows-gnu
       # Several `#[test]`s compile alef's own generated output, or alef's own compiler-oracle
       # probes, with the real per-language toolchain rather than mocking it (that is the point
       # of them), so those toolchains have to actually be on PATH here, not just in the

@@ -103,6 +103,56 @@ fn write_native_fixture(directory: &std::path::Path) {
     }
 }
 
+/// The Rust target whose ABI matches the Ruby the extension is loaded into, or `None` when the
+/// host default target already matches.
+///
+/// `rb-sys` refuses to build against Ruby headers from a different operating-system ABI.
+/// RubyInstaller (the Ruby on Windows runners) is MinGW, while the host Rust default there is
+/// MSVC, so the extension must be built for the matching GNU target.
+fn rust_target_for_ruby(target_os: &str, target_cpu: &str) -> Option<&'static str> {
+    if !target_os.starts_with("mingw") {
+        return None;
+    }
+    match target_cpu {
+        "x64" | "x86_64" => Some("x86_64-pc-windows-gnu"),
+        "i386" | "x86" => Some("i686-pc-windows-gnu"),
+        _ => None,
+    }
+}
+
+fn ruby_extension_target(ruby_binary: &std::path::Path) -> Option<&'static str> {
+    let output = std::process::Command::new(ruby_binary)
+        .args([
+            "-rrbconfig",
+            "-e",
+            "print RbConfig::CONFIG['target_os'], ' ', RbConfig::CONFIG['target_cpu']",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let reported = String::from_utf8(output.stdout).unwrap();
+    let (target_os, target_cpu) = reported.split_once(' ').expect("Ruby reports target_os and target_cpu");
+    rust_target_for_ruby(target_os, target_cpu)
+}
+
+#[test]
+fn should_build_for_the_rust_target_matching_the_ruby_abi() {
+    assert_eq!(rust_target_for_ruby("mingw32", "x64"), Some("x86_64-pc-windows-gnu"));
+    assert_eq!(rust_target_for_ruby("mingw-ucrt", "x64"), Some("x86_64-pc-windows-gnu"));
+    assert_eq!(rust_target_for_ruby("mingw32", "i386"), Some("i686-pc-windows-gnu"));
+    assert_eq!(rust_target_for_ruby("linux", "x86_64"), None);
+    assert_eq!(rust_target_for_ruby("darwin23", "arm64"), None);
+}
+
+#[test]
+fn should_report_the_target_of_the_installed_ruby() {
+    let Some(ruby_binary) = crate::test_support::toolchain::RUBY.open() else {
+        return;
+    };
+    let target = ruby_extension_target(&ruby_binary);
+    assert_eq!(target.is_some(), cfg!(windows), "only RubyInstaller on Windows needs a GNU target");
+}
+
 #[test]
 fn should_raise_type_error_in_compiled_ruby_extension() {
     let Some(ruby_binary) = crate::test_support::toolchain::RUBY.open() else {
@@ -110,13 +160,17 @@ fn should_raise_type_error_in_compiled_ruby_extension() {
     };
     let fixture = tempfile::tempdir().unwrap();
     write_native_fixture(fixture.path());
-    let build = std::process::Command::new("task")
+    let rust_target = ruby_extension_target(&ruby_binary);
+    let mut build = std::process::Command::new("task");
+    build
         .args(["build"])
         .env("CARGO_INCREMENTAL", "0")
         .env("CARGO_TARGET_DIR", fixture.path().join("target"))
-        .current_dir(fixture.path())
-        .output()
-        .unwrap();
+        .current_dir(fixture.path());
+    if let Some(target) = rust_target {
+        build.env("CARGO_BUILD_TARGET", target);
+    }
+    let build = build.output().unwrap();
     assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
     let filename = if cfg!(target_os = "macos") {
         "liboptional_string_fixture.dylib"
@@ -131,7 +185,11 @@ fn should_raise_type_error_in_compiled_ruby_extension() {
         "optional_string_fixture.so"
     };
     let extension = fixture.path().join(extension_name);
-    std::fs::copy(fixture.path().join("target/debug").join(filename), &extension).unwrap();
+    let mut artifact_dir = fixture.path().join("target");
+    if let Some(target) = rust_target {
+        artifact_dir.push(target);
+    }
+    std::fs::copy(artifact_dir.join("debug").join(filename), &extension).unwrap();
     let ruby = std::process::Command::new(ruby_binary)
         .arg(fixture.path().join("check.rb"))
         .arg(extension)
