@@ -529,8 +529,8 @@ pub(super) fn build_args_and_setup(
 ///
 /// The replacement names the case, and both halves are read off
 /// `backends::swift::gen_bindings::enums::emit_enum`: it spells the case
-/// `swift_source_ident(variant.name.to_lower_camel_case())` (so a case colliding with a Swift
-/// keyword keeps its backticks) and gives it the raw value `unit_enum_wire_value`, i.e. the
+/// `public_host_identifier(Swift, EnumVariant, variant.name)` (the rule `swift_variant_case`
+/// applies, so a variant `None` becomes `none_` and a keyword keeps its backticks) and gives it the raw value `unit_enum_wire_value`, i.e. the
 /// variant's `serde(rename)` if it has one and the enum's `rename_all` spelling otherwise. Naming
 /// the case rather than emitting `T(rawValue:)!` keeps the failure at compile time, where an
 /// unrecognised value is visible, instead of trapping at test run time. ~keep
@@ -569,7 +569,11 @@ fn ir_typed_swift_expression(
             enum_def.serde_rename_all.as_deref(),
         ) == text
     })?;
-    let case_name = crate::backends::swift::naming::swift_source_ident(&variant.name.to_lower_camel_case());
+    let case_name = crate::codegen::naming::public_host_identifier(
+        crate::core::config::Language::Swift,
+        crate::codegen::naming::PublicIdentifierKind::EnumVariant,
+        &variant.name,
+    );
     Some(format!("{declared}.{case_name}"))
 }
 
