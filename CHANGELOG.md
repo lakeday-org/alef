@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Consume Rust, Go, Java, PHP, and C streams before asserting fixture errors, including errors after successful stream creation (GH#612).
 - Resolve the Elixir return-type oracle's batch launcher on Windows through the shared tool resolver.
 
 ## [0.112.0] - 2026-10-21
