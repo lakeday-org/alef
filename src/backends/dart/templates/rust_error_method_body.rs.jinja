@@ -1,2 +1,7 @@
+{% if fallible %}
+        let real: {{ core_path }} = self.try_into()?;
+        Ok(real.{{ method_name }}(){{ call_suffix }})
+{% else %}
         let real: {{ core_path }} = self.into();
         real.{{ method_name }}(){{ call_suffix }}
+{% endif %}

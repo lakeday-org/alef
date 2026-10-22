@@ -106,6 +106,8 @@ pub fn emit(api: &ApiSurface, config: &ResolvedCrateConfig) -> anyhow::Result<Ve
         .unwrap_or_default();
     let stub_methods: Vec<String> = config.dart.as_ref().map(|c| c.stub_methods.clone()).unwrap_or_default();
 
+    bridge_fn::borrowed_error_inputs::validate_surface(api, config, &exclude_functions, &exclude_types, &stub_methods)?;
+
     let lib_rs = emit_lib_rs(
         &rust_dir,
         api,

@@ -1,6 +1,14 @@
 use minijinja::Environment;
 
+#[cfg(test)]
+#[path = "static_error_registry_tests.rs"]
+mod static_error_registry_tests;
+
 static TEMPLATES: &[(&str, &str)] = &[
+    (
+        "rust_error_static_text_registry.rs.jinja",
+        include_str!("templates/rust_error_static_text_registry.rs.jinja"),
+    ),
     (
         "rust_bridge_result_body.jinja",
         include_str!("templates/rust_bridge_result_body.jinja"),

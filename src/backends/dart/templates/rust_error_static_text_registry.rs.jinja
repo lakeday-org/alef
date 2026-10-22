@@ -1,0 +1,21 @@
+#[frb(ignore)]
+mod {{ module_name }} {
+    // Retain only existing native static references; copying arbitrary mirror text into static
+    // storage leaks memory. Unknown text must remain a fallible conversion. ~keep
+    fn pool() -> &'static std::sync::Mutex<std::collections::HashSet<&'static str>> {
+        static POOL: std::sync::OnceLock<std::sync::Mutex<std::collections::HashSet<&'static str>>> =
+            std::sync::OnceLock::new();
+        POOL.get_or_init(Default::default)
+    }
+
+    pub(super) fn register(text: &'static str) -> String {
+        pool().lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(text);
+        text.to_string()
+    }
+
+    pub(super) fn lookup(text: &str) -> Result<&'static str, String> {
+        pool().lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(text).copied()
+            .ok_or_else(|| "reconstructing borrowed error: text must originate from a native error".to_string())
+    }
+}

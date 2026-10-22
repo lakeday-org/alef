@@ -1,1 +1,5 @@
+{% if borrows_static_str %}
+            _ => return Err("mirror variant has sanitized fields and cannot be reconstructed".to_string()),
+{% else %}
             _ => unreachable!("mirror variant has sanitized fields and cannot be converted to the core error type"),
+{% endif %}

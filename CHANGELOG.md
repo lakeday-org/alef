@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reuse original native static strings in Dart error mirrors without leaking new strings. Reject unknown text during fallible introspection and reject unsupported borrowed-error inputs, including nested DTO and enum fields.
 - Encode Node error metadata as valid JSON, including control characters.
 - Prefer explicit WASM streaming adapters over generic delegation so opening failures reject immediately and mid-stream failures retain typed metadata.
 - Emit error converters, Python constructor validation, Node ESM wrappers and Kotlin bridge exceptions through registered templates.

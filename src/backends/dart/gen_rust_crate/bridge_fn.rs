@@ -1,3 +1,6 @@
+#[path = "bridge_fn/borrowed_error_inputs.rs"]
+pub(super) mod borrowed_error_inputs;
+
 use crate::codegen::mut_writeback;
 use crate::core::ir::{FunctionDef, ParamDef, PrimitiveType, TypeDef, TypeRef};
 
@@ -27,6 +30,7 @@ pub(crate) fn emit_bridge_fn(
     types: &[TypeDef],
     errors: &[crate::core::ir::ErrorDef],
 ) -> anyhow::Result<()> {
+    borrowed_error_inputs::validate(f, errors, types)?;
     let opaque_ahash: ahash::AHashSet<String> = opaque_type_names.iter().cloned().collect();
     mut_writeback::reject_unsupported_writeback(&f.name, &f.params, &f.return_type, &opaque_ahash)?;
     let writeback_plan: Option<WritebackPlan> =

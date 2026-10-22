@@ -1,7 +1,7 @@
 use crate::codegen::cfg::is_host_owned_rust_path;
 use crate::codegen::conversions::{VariantDeclaration, enum_variant_declaration};
 use crate::codegen::shared::binding_fields;
-use crate::core::ir::{CoreWrapper, EnumDef, ErrorDef, FieldDef, PrimitiveType, TypeDef, TypeRef};
+use crate::core::ir::{CoreWrapper, EnumDef, ErrorDef, FieldDef, TypeDef, TypeRef};
 
 use super::conversions::{frb_rust_type, frb_rust_type_inner, primitive_name};
 
@@ -202,80 +202,17 @@ pub(crate) fn emit_mirror_enum(
     out.push_str("}\n");
 }
 
-/// Map the value inside the `Option` bound to `field_expr` (a `&Option<T>`) through
-/// `inner_expr`, which names the value as `v`. When `inner_expr` only clones it, the whole
-/// mapping is `Option::clone`; the `as_ref().map(|v| v.clone())` form fails
-/// `clippy::useless_asref`. ~keep
-fn map_option(field_expr: &str, inner_expr: &str) -> String {
-    if inner_expr == "v.clone()" {
-        format!("{field_expr}.clone()")
-    } else {
-        format!("{field_expr}.as_ref().map(|v| {inner_expr})")
-    }
-}
+#[path = "mirror_field_reconstruction.rs"]
+mod field_reconstruction;
+use field_reconstruction::field_from_expr;
 
-/// Return the conversion expression to reconstruct a real-type field value from a
-/// mirror field binding.
-///
-/// Mirror fields use FRB-widened types: integers → `i64`, floats → `f64`,
-/// `Duration` → `i64` millis. An optional field keeps its `Option<...>` wrapper in
-/// the mirror (`frb_rust_type`), so the conversion maps through the option and a
-/// `None` stays `None`.
-///
-/// `field_expr` is the pattern-binding identifier (e.g. `"f_status"`). The
-/// caller binds it via `ref f_<name>` so its type is `&MirrorFieldType`.
-fn field_from_expr(field: &FieldDef, field_expr: &str) -> String {
-    if field.optional && !matches!(field.ty, TypeRef::Optional(_)) {
-        let inner_field = FieldDef {
-            optional: false,
-            ..field.clone()
-        };
-        let inner_expr = field_from_expr(&inner_field, "v");
-        return map_option(field_expr, &inner_expr);
-    }
-    match &field.ty {
-        TypeRef::Primitive(prim) => {
-            let native = primitive_name(prim);
-            match prim {
-                PrimitiveType::I64 | PrimitiveType::F64 | PrimitiveType::Bool => {
-                    format!("*{field_expr}")
-                }
-                _ => format!("*{field_expr} as {native}"),
-            }
-        }
-        TypeRef::Duration => {
-            format!("std::time::Duration::from_millis(*{field_expr} as u64)")
-        }
-        TypeRef::String if field.core_wrapper == CoreWrapper::Cow => {
-            format!("std::borrow::Cow::Owned({field_expr}.clone())")
-        }
-        TypeRef::String if field.core_wrapper == CoreWrapper::StaticStr => {
-            format!("intern_static_str({field_expr})")
-        }
-        TypeRef::String | TypeRef::Bytes => format!("{field_expr}.clone()"),
-        TypeRef::Char => format!("{field_expr}.chars().next().unwrap_or('\\0')"),
-        TypeRef::Optional(inner) => {
-            let inner_field = FieldDef {
-                name: field.name.clone(),
-                ty: *inner.clone(),
-                optional: false,
-                ..field.clone()
-            };
-            let inner_expr = field_from_expr(&inner_field, "v");
-            map_option(field_expr, &inner_expr)
-        }
-        TypeRef::Vec(inner) => {
-            let inner_field = FieldDef {
-                name: "_x".to_string(),
-                ty: *inner.clone(),
-                optional: false,
-                ..field.clone()
-            };
-            let inner_expr = field_from_expr(&inner_field, "x");
-            format!("{field_expr}.iter().map(|x| {inner_expr}).collect()")
-        }
-        _ => format!("{field_expr}.clone()"),
-    }
+/// Borrowed mirrors cannot recover arbitrary caller-created text without leaking it. ~keep
+pub(super) fn borrows_static_text(error: &ErrorDef) -> bool {
+    error
+        .variants
+        .iter()
+        .flat_map(|variant| &variant.fields)
+        .any(|field| !field.binding_excluded && !field.sanitized && field.core_wrapper == CoreWrapper::StaticStr)
 }
 
 /// Return true if every field in the variant can be safely reconstructed in the
@@ -304,11 +241,7 @@ fn emit_from_impl(out: &mut String, error: &ErrorDef, core_path: &str, error_cfg
         !v.is_unit && !visible_fields.is_empty() && !variant_is_reconstructible(&visible_fields)
     });
 
-    let borrows_static_str = error.variants.iter().any(|v| {
-        let visible_fields: Vec<&FieldDef> = v.fields.iter().filter(|f| !f.binding_excluded).collect();
-        variant_is_reconstructible(&visible_fields)
-            && visible_fields.iter().any(|f| f.core_wrapper == CoreWrapper::StaticStr)
-    });
+    let borrows_static_str = borrows_static_text(error);
     out.push_str(&template_env::render(
         "rust_mirror_error_from_impl_open.rs.jinja",
         crate::alef_context! {
@@ -316,6 +249,7 @@ fn emit_from_impl(out: &mut String, error: &ErrorDef, core_path: &str, error_cfg
             core_path => core_path,
             source_cfg => error_cfg,
             borrows_static_str => borrows_static_str,
+            static_text_module => static_text_module_name(error),
         },
     ));
     for variant in &error.variants {
@@ -433,12 +367,12 @@ fn emit_from_impl(out: &mut String, error: &ErrorDef, core_path: &str, error_cfg
     if any_skipped {
         out.push_str(&template_env::render(
             "rust_mirror_error_sanitized_wildcard_arm.rs.jinja",
-            crate::alef_context! {},
+            crate::alef_context! { borrows_static_str => borrows_static_str },
         ));
     }
     out.push_str(&template_env::render(
         "rust_mirror_error_from_impl_close.rs.jinja",
-        crate::alef_context! {},
+        crate::alef_context! { borrows_static_str => borrows_static_str },
     ));
 }
 
@@ -499,6 +433,22 @@ fn error_bridge_method_names(error: &ErrorDef, methods: &[&crate::core::ir::Meth
             internal_rust_identifier(&name)
         })
         .collect()
+}
+
+pub(super) fn static_text_module_name(error: &ErrorDef) -> String {
+    crate::codegen::naming::internal_rust_identifier(&format!(
+        "alef_static_text_{}",
+        crate::codegen::naming::pascal_to_snake(&error.name)
+    ))
+}
+
+fn introspection_return_type(ty: &TypeRef, fallible: bool) -> String {
+    let value = frb_rust_type_inner(ty);
+    if fallible {
+        format!("Result<{value}, String>")
+    } else {
+        value
+    }
 }
 
 /// Emit a `#[frb(mirror(ErrorName))]` enum + safe `impl From` conversion +
@@ -597,6 +547,12 @@ pub(crate) fn emit_mirror_error(out: &mut String, error: &ErrorDef, source_crate
         }
     }
     out.push_str("}\n");
+    if borrows_static_text(error) {
+        out.push_str(&template_env::render(
+            "rust_error_static_text_registry.rs.jinja",
+            crate::alef_context! { module_name => static_text_module_name(error) },
+        ));
+    }
 
     let bridge_methods: Vec<&crate::core::ir::MethodDef> = error.methods.iter().filter(|m| !m.sanitized).collect();
     if bridge_methods.is_empty() {
@@ -618,10 +574,11 @@ pub(crate) fn emit_mirror_error(out: &mut String, error: &ErrorDef, source_crate
             source_cfg => "",
         },
     ));
+    let fallible = borrows_static_text(error);
     let bridge_names = error_bridge_method_names(error, &bridge_methods);
     for (method, bridge_name) in bridge_methods.into_iter().zip(bridge_names) {
         emit_rust_doc(&method.doc, "    ", out);
-        let ret_ty = frb_rust_type_inner(&method.return_type);
+        let ret_ty = introspection_return_type(&method.return_type, fallible);
         out.push_str(&crate::backends::dart::template_env::render(
             "rust_error_method_open.rs.jinja",
             crate::alef_context! {
@@ -655,6 +612,7 @@ pub(crate) fn emit_mirror_error(out: &mut String, error: &ErrorDef, source_crate
                 core_path => core_path.as_str(),
                 method_name => method.name.as_str(),
                 call_suffix => call_suffix.as_str(),
+                fallible => fallible,
             },
         ));
         out.push_str("    }\n");
@@ -886,7 +844,7 @@ mod tests {
         );
     }
 
-    fn error_with_text_field(wrapper: crate::core::ir::CoreWrapper, optional: bool) -> ErrorDef {
+    pub(super) fn error_with_text_field(wrapper: crate::core::ir::CoreWrapper, optional: bool) -> ErrorDef {
         use crate::core::ir::{ErrorVariant, FieldDef};
 
         let mut error = duration_error(TypeRef::Primitive(crate::core::ir::PrimitiveType::Bool));
@@ -905,34 +863,39 @@ mod tests {
     }
 
     /// A core field of type `&'static str` cannot take the owned `String` the mirror holds, so
-    /// the conversion back to the core error borrows an interned copy. An owned field keeps the
+    /// the conversion back to the core error looks up the original native reference. An owned field keeps the
     /// plain clone and gets no helper. ~keep
     #[test]
-    fn borrowed_error_fields_convert_through_an_interned_static_str() {
+    fn borrowed_error_fields_lookup_original_native_static_str() {
         use crate::core::ir::CoreWrapper;
 
         for optional in [false, true] {
             let mut generated = String::new();
-            emit_mirror_error(
-                &mut generated,
-                &error_with_text_field(CoreWrapper::StaticStr, optional),
-                "demo",
-            );
-            let expected = if optional {
-                "reason: f_reason.as_ref().map(|v| intern_static_str(v))"
+            let error = error_with_text_field(CoreWrapper::StaticStr, optional);
+            emit_mirror_error(&mut generated, &error, "demo");
+            super::super::error_bridge::emit(&mut generated, &[error], "demo");
+            let registration = if optional {
+                "::register(value)"
             } else {
-                "reason: intern_static_str(f_reason)"
+                "::register(reason)"
+            };
+            assert!(generated.contains(registration), "{generated}");
+            assert!(!generated.contains("Box::leak"), "{generated}");
+            let expected = if optional {
+                "reason: f_reason.as_ref().map(|v| lookup_static_str(v)).transpose()?"
+            } else {
+                "reason: lookup_static_str(f_reason)?"
             };
             assert!(generated.contains(expected), "optional={optional}: {generated}");
             assert_eq!(
-                generated.matches("fn intern_static_str").count(),
+                generated.matches("fn lookup_static_str").count(),
                 1,
                 "optional={optional}: {generated}"
             );
 
             let mut owned = String::new();
             emit_mirror_error(&mut owned, &error_with_text_field(CoreWrapper::None, optional), "demo");
-            assert!(!owned.contains("intern_static_str"), "optional={optional}: {owned}");
+            assert!(!owned.contains("lookup_static_str"), "optional={optional}: {owned}");
             assert!(
                 owned.contains("reason: f_reason.clone()"),
                 "optional={optional}: {owned}"
@@ -946,7 +909,11 @@ mod tests {
                 "reason: std::borrow::Cow::Owned(f_reason.clone())"
             };
             assert!(cow.contains(expected), "optional={optional}: {cow}");
-            assert!(!cow.contains("intern_static_str"), "optional={optional}: {cow}");
+            assert!(!cow.contains("lookup_static_str"), "optional={optional}: {cow}");
         }
     }
 }
+
+#[cfg(test)]
+#[path = "mirror_static_text_tests.rs"]
+mod static_text_tests;

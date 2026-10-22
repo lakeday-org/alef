@@ -99,7 +99,7 @@ fn variant_arm(error: &ErrorDef, variant: &ErrorVariant, source_crate: &str) -> 
     crate::alef_context! {
         pattern => variant_pattern(&core_path, variant),
         variant => &variant.name,
-        fields => variant_fields(variant, source_crate),
+        fields => variant_fields(error, variant, source_crate),
     }
 }
 
@@ -136,13 +136,15 @@ fn variant_pattern(core_path: &str, variant: &ErrorVariant) -> String {
     format!("{core_path}::{} {{ {bindings} .. }}", variant.name)
 }
 
-fn variant_fields(variant: &ErrorVariant, source_crate: &str) -> Vec<minijinja::Value> {
+fn variant_fields(error: &ErrorDef, variant: &ErrorVariant, source_crate: &str) -> Vec<minijinja::Value> {
     let mut fields = variant.fields.iter().enumerate().filter(|(_, field)| !field.binding_excluded)
         .enumerate().map(|(visible_index, (index, field))| {
             let binding = if variant.is_tuple { format!("field{index}") } else { internal_rust_identifier(&field.name) };
+            let mut field = field.clone();
+            if variant.is_tuple { field.optional = false; }
             crate::alef_context! {
                 name => if variant.is_tuple { format!("field{visible_index}") } else { internal_rust_identifier(&field.name) },
-                value => field_expression(&binding, field, source_crate),
+                value => field_expression(&binding, &field, source_crate, &super::mirror::static_text_module_name(error)),
             }
         }).collect::<Vec<_>>();
     if variant.is_tuple && fields.is_empty() {
@@ -151,7 +153,7 @@ fn variant_fields(variant: &ErrorVariant, source_crate: &str) -> Vec<minijinja::
     fields
 }
 
-fn field_expression(binding: &str, field: &FieldDef, source_crate: &str) -> String {
+fn field_expression(binding: &str, field: &FieldDef, source_crate: &str, static_text_module: &str) -> String {
     if let TypeRef::Optional(inner_ty) = &field.ty {
         let inner = FieldDef {
             ty: *inner_ty.clone(),
@@ -161,7 +163,7 @@ fn field_expression(binding: &str, field: &FieldDef, source_crate: &str) -> Stri
         let flatten = if field.optional { ".flatten()" } else { "" };
         return format!(
             "{binding}{flatten}.map(|value| {})",
-            field_expression("value", &inner, source_crate)
+            field_expression("value", &inner, source_crate, static_text_module)
         );
     }
     if field.optional {
@@ -171,7 +173,7 @@ fn field_expression(binding: &str, field: &FieldDef, source_crate: &str) -> Stri
         };
         return format!(
             "{binding}.map(|value| {})",
-            field_expression("value", &inner, source_crate)
+            field_expression("value", &inner, source_crate, static_text_module)
         );
     }
     if let TypeRef::Duration = field.ty {
@@ -179,6 +181,9 @@ fn field_expression(binding: &str, field: &FieldDef, source_crate: &str) -> Stri
     }
     if field.sanitized {
         return format!("{binding}.to_string()");
+    }
+    if field.ty == TypeRef::String && field.core_wrapper == crate::core::ir::CoreWrapper::StaticStr {
+        return format!("{static_text_module}::register({binding})");
     }
     if field.ty == TypeRef::String {
         return format!("{binding}.into()");
