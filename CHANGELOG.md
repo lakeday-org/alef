@@ -7,22 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Update the exact ICU case-map pin to 2.4 and verify that accepted NuGet package names retain their collision equivalence under the existing Unicode identifier policy (#673).
-
-- Update CI action pins and available Temurin builds while retaining the prior Windows JDK until its replacement archive is published (#672).
-
-- Map WASM adapter results through configured wrapper names and type overrides, including nested optional and collection returns, while retaining typed errors (#671).
-
-- Keep PHP streaming instance methods, facade delegates and lazy handles on the same Zval return type, preserving delivered chunks and deferred errors (#670).
-
-- Emit Node error metadata without redundant Display conversions so generated converters pass strict clippy while preserving JSON values (#669).
-
 ## [0.113.1] - 2026-10-22
 
 ### Fixed
 
+- Update the exact ICU case-map pin to 2.4 and verify that accepted NuGet package names retain their collision equivalence under the existing Unicode identifier policy (#673).
+- Update CI action pins and available Temurin builds while retaining the prior Windows JDK until its replacement archive is published (#672).
+- Map WASM adapter results through configured wrapper names and type overrides, including nested optional and collection returns, while retaining typed errors (#671).
+- Keep PHP streaming instance methods, facade delegates and lazy handles on the same Zval return type, preserving delivered chunks and deferred errors (#670).
+- Emit Node error metadata without redundant Display conversions so generated converters pass strict clippy while preserving JSON values (#669).
+- Update JSON Schema validation to 0.60 and verify configuration, service overrides and e2e schema validation against the upgraded dependency (#674).
 - Exclude skipped error fields from Swift payload serialization and public error cases, preserving visible payloads without requiring skipped native types to implement Serialize (#668).
 - Preserve typed Dart stream errors and their metadata, including failures after delivered chunks, while retaining the public stream item types (#666).
 - Encode JSON-typed Ruby constructor fields as JSON strings in generated specs and snippets, including optional fields, containers and nested DTOs (#667).
