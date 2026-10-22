@@ -20,10 +20,44 @@ fn unicode_tables_are_exactly_pinned() {
         .and_then(toml::Value::as_table)
         .expect("Cargo.toml has dependencies");
 
-    for (name, expected) in [("icu_casemap", "=2.3.0"), ("unicode-general-category", "=1.1.0")] {
+    for (name, expected) in [("icu_casemap", "=2.4.0"), ("unicode-general-category", "=1.1.0")] {
         let actual = semver::VersionReq::parse(dependency_requirement(dependencies, name))
             .unwrap_or_else(|error| panic!("parse {name} requirement: {error}"));
         let expected = semver::VersionReq::parse(expected).expect("parse expected exact requirement");
         assert_eq!(actual, expected, "{name} must remain reproducibly pinned");
     }
+}
+
+#[test]
+fn upgraded_case_tables_preserve_collisions_for_accepted_nuget_names() {
+    use alef::codegen::coordinates::{nuget_ordinal_fold, validate_nuget_package_id};
+
+    // Unicode 18 adds uppercase partners for these accepted Unicode 16 letters, but the newer
+    // partners remain outside our pinned identifier grammar. Collision classes must stay stable. ~keep
+    let pairs = [
+        ('\u{0277}', '\u{a7dd}'),
+        ('\u{027c}', '\u{a7e2}'),
+        ('\u{ab4b}', '\u{ab6c}'),
+        ('\u{ab4c}', '\u{ab6d}'),
+    ];
+    let mut comparisons = 0;
+    for (index, (left, uppercase)) in pairs.iter().enumerate() {
+        let left = format!("Sample{left}");
+        assert!(validate_nuget_package_id(&left).is_ok(), "{left}");
+        let newer_uppercase = format!("Sample{uppercase}");
+        assert!(
+            validate_nuget_package_id(&newer_uppercase).is_err(),
+            "{newer_uppercase}"
+        );
+        for (other_index, (right, _)) in pairs.iter().enumerate() {
+            let right = format!("sample{right}");
+            assert!(validate_nuget_package_id(&right).is_ok(), "{right}");
+            assert_eq!(
+                nuget_ordinal_fold(&left) == nuget_ordinal_fold(&right),
+                index == other_index
+            );
+            comparisons += 1;
+        }
+    }
+    assert_eq!(comparisons, 16);
 }

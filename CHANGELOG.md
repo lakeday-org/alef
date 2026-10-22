@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Update the exact ICU case-map pin to 2.4 and verify that accepted NuGet package names retain their collision equivalence under the existing Unicode identifier policy (#673).
+
 - Update CI action pins and available Temurin builds while retaining the prior Windows JDK until its replacement archive is published (#672).
 
 - Map WASM adapter results through configured wrapper names and type overrides, including nested optional and collection returns, while retaining typed errors (#671).
