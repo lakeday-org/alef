@@ -194,7 +194,9 @@ fn gen_opaque_method(
 
     let needs_clone = matches!(method.receiver, Some(ReceiverKind::Owned));
 
-    let body = if can_delegate {
+    let body = if let Some(body) = adapter_bodies.get(&adapter_key) {
+        body.clone()
+    } else if can_delegate {
         let let_bindings =
             wasm_newtype_param_bindings(&method.params, mapper, core_import, source_crate_remaps, type_paths);
         let call_args = wasm_call_args(&method.params, opaque_types, false);
@@ -272,8 +274,6 @@ fn gen_opaque_method(
             });
             format!("{let_bindings}{wrapped}")
         }
-    } else if let Some(body) = adapter_bodies.get(&adapter_key) {
-        body.clone()
     } else {
         gen_wasm_unimplemented_body(&method.return_type, &method.name, method.error_type.is_some())
     };

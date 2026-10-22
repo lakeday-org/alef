@@ -1,0 +1,12 @@
+    #[allow(clippy::too_many_arguments)]
+{% if not fallible %}
+    #[must_use]
+{% endif %}
+    #[pyo3(signature = ({{ defaults }}))]#[new]
+    pub fn new({{ "\n        " ~ (params | join(",\n        ")) ~ ",\n    " if multiline else (params | join(", ")) }}) -> {{ "pyo3::PyResult<Self>" if fallible else "Self" }} {
+{% if fallible %}
+{{ json_checks }}        Ok(Self { {{ assignments }} })
+{% else %}
+        Self { {{ assignments }} }
+{% endif %}
+    }

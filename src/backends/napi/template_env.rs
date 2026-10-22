@@ -1,6 +1,7 @@
 use minijinja::{Environment, UndefinedBehavior};
 
 static TEMPLATES: &[(&str, &str)] = &[
+    ("esm_wrapper.mjs.jinja", include_str!("templates/esm_wrapper.mjs.jinja")),
     (
         "converted_field_assignment.jinja",
         include_str!("templates/converted_field_assignment.jinja"),

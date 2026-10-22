@@ -1,0 +1,78 @@
+/// Error a NIF returns. `Typed` reaches Elixir as an exception struct with the error
+/// kind, HTTP status and retry delay as fields; `Message` reaches Elixir as a string.
+pub enum AlefNifError {
+    Typed {
+        module: &'static str,
+        kind: &'static str,
+        message: String,
+        status: u16,
+        retry_after_ms: Option<u64>,
+    },
+    Message(String),
+}
+
+impl From<String> for AlefNifError {
+    fn from(message: String) -> Self {
+        AlefNifError::Message(message)
+    }
+}
+
+impl From<AlefNifError> for String {
+    fn from(error: AlefNifError) -> Self {
+        match error {
+            AlefNifError::Typed { message, .. } | AlefNifError::Message(message) => message,
+        }
+    }
+}
+
+impl AlefNifError {
+    /// Build the exception struct term. Fails only when the VM cannot make an atom.
+    fn encode_typed<'a>(&self, env: rustler::Env<'a>) -> rustler::NifResult<rustler::Term<'a>> {
+        let AlefNifError::Typed { module, kind, message, status, retry_after_ms } = self else {
+            return Err(rustler::Error::BadArg);
+        };
+        let atom = |name: &str| rustler::types::atom::Atom::from_str(env, name);
+        let keys = [
+            atom("__struct__")?.encode(env),
+            atom("__exception__")?.encode(env),
+            atom("kind")?.encode(env),
+            atom("message")?.encode(env),
+            atom("status")?.encode(env),
+            atom("retry_after_ms")?.encode(env),
+        ];
+        let values = [
+            atom(module)?.encode(env),
+            true.encode(env),
+            atom(kind)?.encode(env),
+            message.encode(env),
+            status.encode(env),
+            retry_after_ms.encode(env),
+        ];
+        rustler::Term::map_from_arrays(env, &keys, &values)
+    }
+}
+
+impl rustler::Encoder for AlefNifError {
+    fn encode<'a>(&self, env: rustler::Env<'a>) -> rustler::Term<'a> {
+        match self {
+            AlefNifError::Message(message) => message.encode(env),
+            AlefNifError::Typed { message, .. } => self
+                .encode_typed(env)
+                .unwrap_or_else(|_| message.encode(env)),
+        }
+    }
+}
+
+/// Convert any error a NIF call returns into an `AlefNifError`.
+fn alef_nif_err<E: std::fmt::Display + 'static>(e: E) -> AlefNifError {
+    let message = e.to_string();
+    let boxed: Box<dyn std::any::Any> = Box::new(e);
+{% for rust_path, converter in arms %}
+    let boxed = match boxed.downcast::<{{ rust_path }}>() {
+        Ok(typed) => return {{ converter }}(*typed),
+        Err(other) => other,
+    };
+{% endfor %}
+    drop(boxed);
+    AlefNifError::Message(message)
+}

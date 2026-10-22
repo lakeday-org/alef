@@ -1,6 +1,14 @@
 use minijinja::{AutoEscape, Environment};
 
 static TEMPLATES: &[(&str, &str)] = &[
+    (
+        "node_error_shim_export.json.jinja",
+        include_str!("templates/node_error_shim_export.json.jinja"),
+    ),
+    (
+        "node_error_shim_files.json.jinja",
+        include_str!("templates/node_error_shim_files.json.jinja"),
+    ),
     ("r_authors.jinja", include_str!("templates/r_authors.jinja")),
     ("cargo_env_plain.jinja", include_str!("templates/cargo_env_plain.jinja")),
     (

@@ -55,7 +55,7 @@ pub fn napi_error_properties(error: &ErrorDef) -> Vec<NapiErrorProperty> {
         NapiErrorProperty {
             js_name: "kind".to_string(),
             ts_type: kind_ts,
-            json_expr: "format!(\"{kind:?}\")".to_string(),
+            json_expr: "serde_json::Value::String(kind.to_string()).to_string()".to_string(),
         },
         NapiErrorProperty {
             js_name: "errorCode".to_string(),
@@ -63,45 +63,55 @@ pub fn napi_error_properties(error: &ErrorDef) -> Vec<NapiErrorProperty> {
             json_expr: "error_code.to_string()".to_string(),
         },
     ];
-    for method in &error.methods {
-        match method.name.as_str() {
-            "status_code" => props.push(NapiErrorProperty {
-                js_name: "statusCode".to_string(),
-                ts_type: "number".to_string(),
-                json_expr: "e.status_code().to_string()".to_string(),
-            }),
-            "is_transient" => props.push(NapiErrorProperty {
-                js_name: "isTransient".to_string(),
-                ts_type: "boolean".to_string(),
-                json_expr: "e.is_transient().to_string()".to_string(),
-            }),
-            "error_type" => props.push(NapiErrorProperty {
-                js_name: "errorType".to_string(),
-                ts_type: "string".to_string(),
-                json_expr: "format!(\"{:?}\", e.error_type())".to_string(),
-            }),
-            other => {
-                let Some((_, optional)) = duration_methods(error).into_iter().find(|(m, _)| m.name == other) else {
-                    continue;
-                };
-                let call = millis_expr(&format!("e.{other}()"), optional, "i64");
-                let (ts_type, json_expr) = if optional {
-                    (
-                        "number | null",
-                        format!("match {call} {{ Some(v) => v.to_string(), None => \"null\".to_string() }}"),
-                    )
-                } else {
-                    ("number", format!("({call}).to_string()"))
-                };
-                props.push(NapiErrorProperty {
-                    js_name: heck::ToLowerCamelCase::to_lower_camel_case(other),
-                    ts_type: ts_type.to_string(),
-                    json_expr,
-                });
-            }
-        }
-    }
+    props.extend(
+        error
+            .methods
+            .iter()
+            .filter_map(|method| napi_method_error_property(error, method)),
+    );
     props
+}
+
+fn napi_method_error_property(error: &ErrorDef, method: &crate::core::ir::MethodDef) -> Option<NapiErrorProperty> {
+    let (js_name, ts_type, json_expr) = match method.name.as_str() {
+        "status_code" => ("statusCode", "number", "e.status_code().to_string()"),
+        "is_transient" => ("isTransient", "boolean", "e.is_transient().to_string()"),
+        "error_type" => (
+            "errorType",
+            "string",
+            "serde_json::Value::String(e.error_type().to_string()).to_string()",
+        ),
+        _ => return napi_duration_error_property(error, method),
+    };
+    Some(NapiErrorProperty {
+        js_name: js_name.to_string(),
+        ts_type: ts_type.to_string(),
+        json_expr: json_expr.to_string(),
+    })
+}
+
+fn napi_duration_error_property(error: &ErrorDef, method: &crate::core::ir::MethodDef) -> Option<NapiErrorProperty> {
+    let (_, optional) = duration_methods(error)
+        .into_iter()
+        .find(|(item, _)| item.name == method.name)?;
+    let call = millis_expr(&format!("e.{}()", method.name), optional, "i64");
+    let (ts_type, json_expr) = if optional {
+        (
+            "number | null",
+            format!("match {call} {{ Some(v) => v.to_string(), None => \"null\".to_string() }}"),
+        )
+    } else {
+        ("number", format!("({call}).to_string()"))
+    };
+    Some(NapiErrorProperty {
+        js_name: crate::codegen::naming::public_host_identifier(
+            crate::core::config::Language::Node,
+            crate::codegen::naming::PublicIdentifierKind::Method,
+            &method.name,
+        ),
+        ts_type: ts_type.to_string(),
+        json_expr,
+    })
 }
 
 /// Generate a converter function that maps a core error to `napi::Error`.
@@ -118,18 +128,14 @@ pub fn gen_napi_error_converter(error: &ErrorDef, core_import: &str) -> String {
     let fn_name = format!("{}_to_napi_err", to_snake_case(&error.name));
 
     let unknown_code = crate::core::ir::ApiSurface::FFI_ERROR_CODE_UNKNOWN;
-    let mut arms = Vec::with_capacity(error.variants.len() + 1);
+    let mut arms = Vec::with_capacity(error.variants.len());
     for variant in &error.variants {
         let pattern = error_variant_wildcard_pattern(&rust_path, variant);
         let code = variant
             .taxonomy(&error.rust_path)
             .map_or(unknown_code, |taxonomy| taxonomy.code);
-        arms.push(format!("        {pattern} => (\"{}\", {code}),", variant.name));
+        arms.push((pattern, variant.name.clone(), code));
     }
-    arms.push(format!(
-        "        #[allow(unreachable_patterns)]\n        _ => (\"Unknown\", {unknown_code}),"
-    ));
-
     let props = napi_error_properties(error);
     let json_template = format!(
         "{{{{{}}}}}",
@@ -139,25 +145,18 @@ pub fn gen_napi_error_converter(error: &ErrorDef, core_import: &str) -> String {
             .collect::<Vec<_>>()
             .join(",")
     );
-    let json_args = props
-        .iter()
-        .map(|p| p.json_expr.clone())
-        .collect::<Vec<_>>()
-        .join(",\n        ");
-    let info_block = format!(
-        "    let (kind, error_code): (&str, u32) = match &e {{\n{arms}\n    }};\n    \
-         let info = format!(\n        \"{json_template}\",\n        {json_args}\n    );\n    \
-         error.set_cause(napi::Error::new(\n        napi::Status::GenericFailure,\n        format!(\"{marker}{{info}}\"),\n    ));",
-        arms = arms.join("\n"),
-        marker = NAPI_ERROR_INFO_MARKER,
-    );
+    let json_args: Vec<_> = props.iter().map(|p| p.json_expr.as_str()).collect();
 
     crate::codegen::template_env::render(
         "error_gen/napi_error_converter.jinja",
         crate::alef_context! {
             rust_path => rust_path.as_str(),
             fn_name => fn_name.as_str(),
-            info_block => info_block.as_str(),
+            arms => arms,
+            unknown_code => unknown_code,
+            json_template => json_template,
+            json_args => json_args,
+            marker => NAPI_ERROR_INFO_MARKER,
         },
     )
 }
@@ -168,28 +167,18 @@ pub fn gen_napi_error_converter(error: &ErrorDef, core_import: &str) -> String {
 /// status and retry delay; any other `Display` error becomes a plain `GenericFailure` error. The
 /// downcast lets a call site convert without naming the error type it came from.
 pub fn gen_napi_error_dispatch(errors: &[ErrorDef], core_import: &str) -> String {
-    let mut arms = String::new();
+    let mut converters = Vec::new();
     for error in errors {
         let rust_path = if error.rust_path.is_empty() {
             format!("{core_import}::{}", error.name)
         } else {
             error.rust_path.replace('-', "_")
         };
-        arms.push_str(&format!(
-            "    let boxed = match boxed.downcast::<{rust_path}>() {{\n        Ok(typed) => return {}(*typed),\n        Err(other) => other,\n    }};\n",
-            napi_converter_fn_name(error)
-        ));
+        converters.push((rust_path, napi_converter_fn_name(error)));
     }
-    format!(
-        "/// Convert any error a binding call returns into a `napi::Error`.\n\
-         #[allow(dead_code)]\n\
-         fn alef_napi_err<E: std::fmt::Display + 'static>(e: E) -> napi::Error {{\n    \
-             let message = e.to_string();\n    \
-             let boxed: Box<dyn std::any::Any> = Box::new(e);\n\
-         {arms}    \
-             drop(boxed);\n    \
-             napi::Error::new(napi::Status::GenericFailure, message)\n\
-         }}"
+    crate::codegen::template_env::render(
+        "error_gen/napi_error_dispatch.jinja",
+        crate::alef_context! { converters => converters },
     )
 }
 
@@ -280,7 +269,23 @@ pub fn gen_wasm_error_converter(error: &ErrorDef, core_import: &str, source_rema
         code_variants.push((pattern, code));
     }
     let default_code = to_snake_case(&error.name);
-    let payload_variants = error
+    let code_fn = crate::codegen::template_env::render(
+        "error_gen/wasm_error_code_fn.jinja",
+        crate::alef_context! {
+            rust_path => rust_path.as_str(),
+            code_fn_name => code_fn_name.as_str(),
+            variants => code_variants,
+            default_code => default_code.as_str(),
+        },
+    );
+
+    let converter_fn = render_wasm_converter(error, &rust_path, &fn_name, &code_fn_name);
+
+    format!("{}\n\n{}", code_fn, converter_fn)
+}
+
+fn wasm_payload_variants<'a>(error: &'a ErrorDef, rust_path: &str) -> Vec<(String, Vec<&'a str>)> {
+    error
         .variants
         .iter()
         .filter(|variant| !variant.is_unit && !variant.is_tuple)
@@ -306,69 +311,35 @@ pub fn gen_wasm_error_converter(error: &ErrorDef, core_import: &str, source_rema
                 names,
             ))
         })
-        .collect::<Vec<_>>();
-    let payload_projection = match payload_variants.as_slice() {
-        [] => String::new(),
-        [(pattern, names)] => format!(
-            "    if let {pattern} = &e {{\n{}\n    }}\n",
-            wasm_payload_writes(names, "        ")
-        ),
-        variants => {
-            let arms = variants
-                .iter()
-                .map(|(pattern, names)| {
-                    format!(
-                        "        {pattern} => {{\n{}\n        }}",
-                        wasm_payload_writes(names, "            ")
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(",\n");
-            format!("    match &e {{\n{arms},\n        _ => {{}}\n    }}\n")
-        }
-    };
-
-    let code_fn = crate::codegen::template_env::render(
-        "error_gen/wasm_error_code_fn.jinja",
-        crate::alef_context! {
-            rust_path => rust_path.as_str(),
-            code_fn_name => code_fn_name.as_str(),
-            variants => code_variants,
-            default_code => default_code.as_str(),
-        },
-    );
-
-    let unknown_code = crate::core::ir::ApiSurface::FFI_ERROR_CODE_UNKNOWN;
-    let mut kind_arms = Vec::with_capacity(error.variants.len() + 1);
-    for variant in &error.variants {
-        let pattern = error_variant_wildcard_pattern(&rust_path, variant);
-        let code = variant
-            .taxonomy(&error.rust_path)
-            .map_or(unknown_code, |taxonomy| taxonomy.code);
-        kind_arms.push(format!("        {pattern} => (\"{}\", {code}),", variant.name));
-    }
-    kind_arms.push(format!(
-        "        #[allow(unreachable_patterns)]\n        _ => (\"Unknown\", {unknown_code}),"
-    ));
-    let property_writes = wasm_error_properties(error)
-        .iter()
-        .map(|(name, value)| format!("    js_sys::Reflect::set(&obj, &\"{name}\".into(), &{value}).ok();"))
         .collect::<Vec<_>>()
-        .join("\n");
+}
 
-    let converter_fn = crate::codegen::template_env::render(
+fn render_wasm_converter(error: &ErrorDef, rust_path: &str, fn_name: &str, code_fn_name: &str) -> String {
+    let payload_variants = wasm_payload_variants(error, rust_path);
+    let unknown_code = crate::core::ir::ApiSurface::FFI_ERROR_CODE_UNKNOWN;
+    let kind_arms = error
+        .variants
+        .iter()
+        .map(|variant| {
+            let pattern = error_variant_wildcard_pattern(rust_path, variant);
+            let code = variant
+                .taxonomy(&error.rust_path)
+                .map_or(unknown_code, |taxonomy| taxonomy.code);
+            (pattern, variant.name.clone(), code)
+        })
+        .collect::<Vec<_>>();
+    crate::codegen::template_env::render(
         "error_gen/wasm_error_converter.jinja",
         crate::alef_context! {
-            rust_path => rust_path.as_str(),
-            fn_name => fn_name.as_str(),
-            code_fn_name => code_fn_name.as_str(),
-            kind_arms => kind_arms.join("\n"),
-            property_writes => property_writes,
-            payload_projection => payload_projection,
+            rust_path => rust_path,
+            fn_name => fn_name,
+            code_fn_name => code_fn_name,
+            kind_arms => kind_arms,
+            unknown_code => unknown_code,
+            properties => wasm_error_properties(error),
+            payload_variants => payload_variants,
         },
-    );
-
-    format!("{}\n\n{}", code_fn, converter_fn)
+    )
 }
 
 /// Generate `alef_wasm_err`, the one conversion every generated WASM call site uses.
@@ -378,37 +349,19 @@ pub fn gen_wasm_error_converter(error: &ErrorDef, core_import: &str, source_rema
 /// lets a call site convert without naming the error type it came from. `errors` must be the
 /// errors whose converters the crate emits.
 pub fn gen_wasm_error_dispatch(errors: &[&ErrorDef], core_import: &str, source_remaps: &[(&str, &str)]) -> String {
-    let mut arms = String::new();
-    for error in errors {
-        arms.push_str(&format!(
-            "    let boxed = match boxed.downcast::<{}>() {{\n        Ok(typed) => return {}(*typed),\n        Err(other) => other,\n    }};\n",
-            wasm_error_rust_path(error, core_import, source_remaps),
-            wasm_converter_fn_name(error)
-        ));
-    }
-    format!(
-        "/// Convert any error a binding call returns into the `JsValue` it rejects with.\n\
-         #[allow(dead_code)]\n\
-         fn alef_wasm_err<E: std::fmt::Display + 'static>(e: E) -> wasm_bindgen::JsValue {{\n    \
-             let message = e.to_string();\n    \
-             let boxed: Box<dyn std::any::Any> = Box::new(e);\n\
-         {arms}    \
-             drop(boxed);\n    \
-             wasm_bindgen::JsValue::from_str(&message)\n\
-         }}"
-    )
-}
-
-fn wasm_payload_writes(names: &[&str], indent: &str) -> String {
-    names
+    let arms = errors
         .iter()
-        .map(|name| {
-            format!(
-                "{indent}let {name}_value = serde_wasm_bindgen::to_value({name})\n{indent}    .unwrap_or(wasm_bindgen::JsValue::NULL);\n{indent}js_sys::Reflect::set(&obj, &\"{name}\".into(), &{name}_value).ok();"
+        .map(|error| {
+            (
+                wasm_error_rust_path(error, core_import, source_remaps),
+                wasm_converter_fn_name(error),
             )
         })
-        .collect::<Vec<_>>()
-        .join("\n")
+        .collect::<Vec<_>>();
+    crate::codegen::template_env::render(
+        "error_gen/wasm_error_dispatch.jinja",
+        crate::alef_context! { arms => arms },
+    )
 }
 
 fn wasm_payload_type_is_safe(ty: &crate::core::ir::TypeRef) -> bool {

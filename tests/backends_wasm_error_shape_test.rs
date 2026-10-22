@@ -8,7 +8,7 @@
 use alef::backends::wasm::WasmBackend;
 use alef::core::backend::Backend;
 use alef::core::config::new_config::NewAlefConfig;
-use alef::core::config::{AdapterConfig, AdapterPattern, ResolvedCrateConfig};
+use alef::core::config::{AdapterConfig, AdapterParam, AdapterPattern, ResolvedCrateConfig};
 use alef::core::ir::*;
 
 fn config() -> ResolvedCrateConfig {
@@ -30,7 +30,11 @@ sources = ["src/lib.rs"]
         name: "open_stream".to_string(),
         pattern: AdapterPattern::Streaming,
         core_path: "open_stream".to_string(),
-        params: Vec::new(),
+        params: vec![AdapterParam {
+            name: "req".to_string(),
+            ty: "Request".to_string(),
+            optional: false,
+        }],
         returns: None,
         error_type: Some("ProcessError".to_string()),
         owner_type: Some("Client".to_string()),
@@ -251,6 +255,10 @@ fn the_converter_builds_an_error_with_the_node_property_names() {
 fn the_stream_call_opens_the_stream_before_it_resolves() {
     let lib = lib_rs();
     let body = function_body(&lib, "pub async fn open_stream(");
+    assert!(
+        body.contains("let core_req: test_lib::Request = req.into();") && body.contains("inner.open_stream(core_req)"),
+        "the configured adapter must forward the converted request:\n{body}"
+    );
     let open = body
         .find("inner.open_stream(")
         .unwrap_or_else(|| panic!("the stream call must open the stream:\n{body}"));

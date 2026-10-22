@@ -2,6 +2,18 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "error_gen/rustler_error_converter.jinja",
+        include_str!("templates/error_gen/rustler_error_converter.jinja"),
+    ),
+    (
+        "error_gen/rustler_error_support.jinja",
+        include_str!("templates/error_gen/rustler_error_support.jinja"),
+    ),
+    (
+        "error_gen/wasm_error_dispatch.jinja",
+        include_str!("templates/error_gen/wasm_error_dispatch.jinja"),
+    ),
+    (
         "doc_emission/phpdoc.jinja",
         include_str!("templates/doc_emission/phpdoc.jinja"),
     ),
@@ -232,6 +244,10 @@ static TEMPLATES: &[(&str, &str)] = &[
     (
         "error_gen/napi_error_converter.jinja",
         include_str!("templates/error_gen/napi_error_converter.jinja"),
+    ),
+    (
+        "error_gen/napi_error_dispatch.jinja",
+        include_str!("templates/error_gen/napi_error_dispatch.jinja"),
     ),
     (
         "error_gen/wasm_error_code_fn.jinja",

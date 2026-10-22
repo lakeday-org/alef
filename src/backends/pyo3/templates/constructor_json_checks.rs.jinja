@@ -1,0 +1,9 @@
+{% for ident, public, optional in checks %}
+{% if optional %}
+        if let Some(json) = &{{ ident }} {
+            serde_json::from_str::<serde_json::Value>(json).map_err(|error| pyo3::exceptions::PyValueError::new_err(format!("invalid JSON in `{{ public }}`: {error}")))?;
+        }
+{% else %}
+        serde_json::from_str::<serde_json::Value>(&{{ ident }}).map_err(|error| pyo3::exceptions::PyValueError::new_err(format!("invalid JSON in `{{ public }}`: {error}")))?;
+{% endif %}
+{% endfor %}

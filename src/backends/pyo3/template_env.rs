@@ -2,6 +2,14 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "json_checked_constructor.rs.jinja",
+        include_str!("templates/json_checked_constructor.rs.jinja"),
+    ),
+    (
+        "constructor_json_checks.rs.jinja",
+        include_str!("templates/constructor_json_checks.rs.jinja"),
+    ),
+    (
         "managed_runtime.rs.jinja",
         include_str!("templates/managed_runtime.rs.jinja"),
     ),

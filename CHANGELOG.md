@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Encode Node error metadata as valid JSON, including control characters.
+- Prefer explicit WASM streaming adapters over generic delegation so opening failures reject immediately and mid-stream failures retain typed metadata.
+- Emit error converters, Python constructor validation, Node ESM wrappers and Kotlin bridge exceptions through registered templates.
 - Generate working e2e assertions through enum payload lists: Rust matches variants, Python follows native getters and serde wire shapes, and Node/WASM read bare untagged payloads, including indexed and root values. (GH#663)
 - Share collision-free Python enum payload getter names between runtime bindings, stubs and generated e2e accessors.
 - Preserve configured response delays in embedded Rust e2e mock servers for plain responses and streams.

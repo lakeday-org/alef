@@ -240,12 +240,6 @@ pub(super) fn replace_constructor_with_serde_rename(
         all_defaults.push(format!("{}=None", param_name));
     }
 
-    let param_list = if all_params.join(", ").len() > 100 {
-        format!("\n        {},\n    ", all_params.join(",\n        "))
-    } else {
-        all_params.join(", ")
-    };
-
     let mut all_assignments = assignments.clone();
     if let Some((param_name, _)) = bridge_param
         && let Some(field_name) = bridge_field_name
@@ -254,31 +248,19 @@ pub(super) fn replace_constructor_with_serde_rename(
     }
 
     let json_checks = json_field_checks(&sorted_fields, config_renames, never_skip_cfg_field_names);
-    let new_constructor = if json_checks.is_empty() {
-        format!(
-            "    #[allow(clippy::too_many_arguments)]\n    \
-             #[must_use]\n    \
-             #[pyo3(signature = ({}))]#[new]\n    \
-             pub fn new({}) -> Self {{\n        \
-             Self {{ {} }}\n    \
-             }}",
-            all_defaults.join(", "),
-            param_list,
-            all_assignments.join(", ")
-        )
-    } else {
-        format!(
-            "    #[allow(clippy::too_many_arguments)]\n    \
-             #[pyo3(signature = ({}))]#[new]\n    \
-             pub fn new({}) -> pyo3::PyResult<Self> {{\n{}        \
-             Ok(Self {{ {} }})\n    \
-             }}",
-            all_defaults.join(", "),
-            param_list,
-            json_checks,
-            all_assignments.join(", ")
-        )
-    };
+    let new_constructor = crate::backends::pyo3::template_env::render(
+        "json_checked_constructor.rs.jinja",
+        crate::alef_context! {
+            defaults => all_defaults.join(", "),
+            params => all_params,
+            multiline => all_params.join(", ").len() > 100,
+            assignments => all_assignments.join(", "),
+            fallible => !json_checks.is_empty(),
+            json_checks => json_checks,
+        },
+    )
+    .trim_end_matches('\n')
+    .to_string();
 
     if let Some(start) = impl_block.find("#[pyo3(signature = (")
         && let Some(new_start) = impl_block[..start].rfind("\n")
@@ -322,34 +304,31 @@ fn json_field_checks(
     config_renames: Option<&HashMap<String, String>>,
     never_skip_cfg_field_names: &[String],
 ) -> String {
-    let mut out = String::new();
-    for field in fields {
-        let is_json = match &field.ty {
-            TypeRef::Json => true,
-            TypeRef::Optional(inner) => matches!(inner.as_ref(), TypeRef::Json),
-            _ => false,
-        };
-        if !is_json || (field.cfg.is_some() && !never_skip_cfg_field_names.contains(&field.name)) {
-            continue;
-        }
-        let ident = resolve_param_ident(&field.name, field.serde_rename.as_ref(), config_renames);
-        let public = crate::core::keywords::python_ident(&field.name);
-        let optional = field.optional || matches!(field.ty, TypeRef::Optional(_));
-        let check = format!(
-            "serde_json::from_str::<serde_json::Value>({{value}}).map_err(|error| \
-             pyo3::exceptions::PyValueError::new_err(format!(\"invalid JSON in `{public}`: {{error}}\")))?;"
-        );
-        if optional {
-            let call = check.replace("{value}", "json");
-            out.push_str(&format!(
-                "        if let Some(json) = &{ident} {{\n            {call}\n        }}\n"
-            ));
-        } else {
-            let call = check.replace("{value}", &format!("&{ident}"));
-            out.push_str(&format!("        {call}\n"));
-        }
+    let checks: Vec<_> = fields
+        .iter()
+        .filter_map(|field| {
+            let is_json = match &field.ty {
+                TypeRef::Json => true,
+                TypeRef::Optional(inner) => matches!(inner.as_ref(), TypeRef::Json),
+                _ => false,
+            };
+            if !is_json || (field.cfg.is_some() && !never_skip_cfg_field_names.contains(&field.name)) {
+                return None;
+            }
+            Some((
+                resolve_param_ident(&field.name, field.serde_rename.as_ref(), config_renames),
+                crate::core::keywords::python_ident(&field.name),
+                field.optional || matches!(field.ty, TypeRef::Optional(_)),
+            ))
+        })
+        .collect();
+    if checks.is_empty() {
+        return String::new();
     }
-    out
+    crate::backends::pyo3::template_env::render(
+        "constructor_json_checks.rs.jinja",
+        crate::alef_context! { checks => checks },
+    )
 }
 
 fn insert_constructor_keyword_only_marker(typ: &TypeDef, fields: &[&FieldDef], defaults: &mut Vec<String>) {

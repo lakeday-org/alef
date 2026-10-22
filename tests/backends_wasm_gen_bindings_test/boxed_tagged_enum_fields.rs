@@ -165,8 +165,24 @@ fn test_non_boxed_named_field_in_tagged_enum_variant_is_not_wrapped_in_box() {
         content.contains("plain: Some(plain.into())"),
         "core->binding conversion for a non-boxed variant field must not be deref'd:\n{content}"
     );
+    assert!(plain_field_conversions_are_unboxed(&content), "{content}");
+
+    let mut boxed_field = make_field("plain", TypeRef::Named("InnerConfig".to_string()), false);
+    boxed_field.is_boxed = true;
+    let boxed = generate_tagged_enum_lib_content(boxed_field);
     assert!(
-        !content.contains("Box::new(") && !content.contains("(*plain)"),
-        "non-boxed field must never trigger Box::new or deref codegen:\n{content}"
+        !plain_field_conversions_are_unboxed(&boxed),
+        "the assertion must reject boxing on the actual enum field:\n{boxed}"
     );
+}
+
+fn plain_field_conversions_are_unboxed(content: &str) -> bool {
+    let conversions: Vec<_> = content
+        .lines()
+        .filter(|line| line.contains("plain: val.plain.") || line.contains("plain: Some("))
+        .collect();
+    conversions.len() == 2
+        && conversions
+            .iter()
+            .all(|line| !line.contains("Box::new") && !line.contains("(*plain)"))
 }

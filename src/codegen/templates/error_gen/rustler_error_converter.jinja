@@ -1,0 +1,17 @@
+/// Convert a `{{ rust_path }}` into the NIF error with its kind, status and retry delay.
+fn {{ fn_name }}(e: {{ rust_path }}) -> AlefNifError {
+    let kind = match &e {
+{% for pattern, kind in arms %}
+        {{ pattern }} => "{{ kind }}",
+{% endfor %}
+        #[allow(unreachable_patterns)]
+        _ => "unknown",
+    };
+    AlefNifError::Typed {
+        module: "Elixir.{{ exception_module }}",
+        kind,
+        message: e.to_string(),
+        status: {{ status }},
+        retry_after_ms: {{ retry }},
+    }
+}

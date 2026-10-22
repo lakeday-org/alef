@@ -1,0 +1,13 @@
+#[allow(dead_code)]
+fn alef_wasm_err<E: std::fmt::Display + 'static>(e: E) -> wasm_bindgen::JsValue {
+    let message = e.to_string();
+    let boxed: Box<dyn std::any::Any> = Box::new(e);
+{% for rust_path, converter in arms %}
+    let boxed = match boxed.downcast::<{{ rust_path }}>() {
+        Ok(typed) => return {{ converter }}(*typed),
+        Err(other) => other,
+    };
+{% endfor %}
+    drop(boxed);
+    wasm_bindgen::JsValue::from_str(&message)
+}

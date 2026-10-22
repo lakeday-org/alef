@@ -3,11 +3,39 @@
 fn {{ fn_name }}(e: {{ rust_path }}) -> wasm_bindgen::JsValue {
     let code = {{ code_fn_name }}(&e);
     let (kind, error_code): (&str, u32) = match &e {
-{{ kind_arms }}
+{% for pattern, kind, code in kind_arms %}
+        {{ pattern }} => ("{{ kind }}", {{ code }}),
+{% endfor %}
+        #[allow(unreachable_patterns)]
+        _ => ("Unknown", {{ unknown_code }}),
     };
-    let obj = js_sys::Error::new(&e.to_string());
+    let message = e.to_string();
+    let obj = js_sys::Error::new(&message);
     js_sys::Reflect::set(&obj, &"code".into(), &code.into()).ok();
-{{ property_writes }}
-{{ payload_projection }}
+{% for name, value in properties %}
+    js_sys::Reflect::set(&obj, &"{{ name }}".into(), &{{ value }}).ok();
+{% endfor %}
+{% if payload_variants | length == 1 %}
+    if let {{ payload_variants[0][0] }} = &e {
+{% for name in payload_variants[0][1] %}
+        let {{ name }}_value = serde_wasm_bindgen::to_value({{ name }})
+            .unwrap_or(wasm_bindgen::JsValue::NULL);
+        js_sys::Reflect::set(&obj, &"{{ name }}".into(), &{{ name }}_value).ok();
+{% endfor %}
+    }
+{% elif payload_variants %}
+    match &e {
+{% for pattern, names in payload_variants %}
+        {{ pattern }} => {
+{% for name in names %}
+            let {{ name }}_value = serde_wasm_bindgen::to_value({{ name }})
+                .unwrap_or(wasm_bindgen::JsValue::NULL);
+            js_sys::Reflect::set(&obj, &"{{ name }}".into(), &{{ name }}_value).ok();
+{% endfor %}
+        },
+{% endfor %}
+        _ => {}
+    }
+{% endif %}
     obj.into()
 }

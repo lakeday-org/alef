@@ -7,6 +7,22 @@
 #[allow(dead_code)]
 fn {{ fn_name }}(e: {{ rust_path }}) -> napi::Error {
     let mut error = napi::Error::new(napi::Status::GenericFailure, e.to_string());
-{{ info_block }}
+    let (kind, error_code): (&str, u32) = match &e {
+{% for pattern, name, code in arms %}
+        {{ pattern }} => ("{{ name }}", {{ code }}),
+{% endfor %}
+        #[allow(unreachable_patterns)]
+        _ => ("Unknown", {{ unknown_code }}),
+    };
+    let info = format!(
+        "{{ json_template }}",
+{% for expression in json_args %}
+        {{ expression }}{{ "," if not loop.last else "" }}
+{% endfor %}
+    );
+    error.set_cause(napi::Error::new(
+        napi::Status::GenericFailure,
+        format!("{{ marker }}{info}"),
+    ));
     error
 }

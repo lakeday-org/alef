@@ -1,0 +1,5 @@
+"types": "./index.d.ts",
+{% if include_import %}
+      "import": "./index.mjs",
+{% endif %}
+      "require": "./{{ entrypoint }}",
