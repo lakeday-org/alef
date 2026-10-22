@@ -67,8 +67,10 @@ mod ffi {
         type AlefBridgeError;
 
         fn message(self: &AlefBridgeError) -> String;
+        #[swift_bridge(swift_name = "errorType")]
         fn error_type(self: &AlefBridgeError) -> String;
         fn kind(self: &AlefBridgeError) -> String;
+        fn payload(self: &AlefBridgeError) -> String;
         fn status(self: &AlefBridgeError) -> i32;
         #[swift_bridge(swift_name = "retryAfterMs")]
         fn retry_after_ms(self: &AlefBridgeError) -> i64;
@@ -117,6 +119,7 @@ pub struct AlefBridgeError {
     kind: String,
     status: i32,
     retry_after_ms: i64,
+    payload: std::collections::BTreeMap<String, String>,
 }
 
 impl AlefBridgeError {
@@ -126,6 +129,10 @@ impl AlefBridgeError {
 
     pub fn error_type(&self) -> String {
         self.error_type.clone()
+    }
+
+    pub fn payload(&self) -> String {
+        serde_json::to_string(&self.payload).expect("error payload contains only strings")
     }
 
     pub fn kind(&self) -> String {
@@ -149,6 +156,7 @@ impl From<String> for AlefBridgeError {
             kind: String::new(),
             status: -1,
             retry_after_ms: -1,
+            payload: std::collections::BTreeMap::new(),
         }
     }
 }
@@ -160,15 +168,21 @@ impl From<&str> for AlefBridgeError {
 }
 
 fn alef_bridge_error_demo_error(message: String, e: &demo::DemoError) -> AlefBridgeError {
+    let payload = std::collections::BTreeMap::new();
     let kind = match e {
-        demo::DemoError::InvalidInput => "InvalidInput",
-        demo::DemoError::ProcessingFailed => "ProcessingFailed",
+        demo::DemoError::InvalidInput => {
+            "InvalidInput"
+        },
+        demo::DemoError::ProcessingFailed => {
+            "ProcessingFailed"
+        },
         _ => "",
     };
     AlefBridgeError {
         message,
         error_type: "DemoError".to_string(),
         kind: kind.to_string(),
+        payload,
         status: -1,
         retry_after_ms: -1,
     }

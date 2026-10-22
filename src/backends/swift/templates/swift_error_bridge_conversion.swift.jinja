@@ -1,22 +1,40 @@
+{% set extra = "    " if has_throwing_case else "" %}
 extension {{ name }} {
-    /// Converts the error that the Rust bridge throws. The kind, the HTTP status and the retry
-    /// delay are the values of the Rust error.
-    init(bridgeError error: RustBridge.AlefBridgeError) {
+    init?(bridgeError error: RustBridge.AlefBridgeError) {
         let message = error.message().toString()
         let status = error.status()
         let retryAfterMs = error.retryAfterMs()
-        _ = (status, retryAfterMs)
-        switch error.kind().toString() {
-{{ cases }}        default:
-            self = {{ fallback }}
+        _ = (message, status, retryAfterMs)
+{% if has_throwing_case %}
+        do {
+{% endif %}
+{{ extra }}        switch error.kind().toString() {
+{% for case in cases %}
+{% if case.expression %}
+{{ extra }}        case "{{ case.name }}":
+{{ extra }}            self = {{ case.expression }}
+{% endif %}
+{% endfor %}
+{{ extra }}        default:
+{{ extra }}            return nil
+{{ extra }}        }
+{% if has_throwing_case %}
+        } catch {
+            return nil
         }
+{% endif %}
     }
 {% if not has_kind_method %}
 
-    /// The variant name of the Rust error, for example `RateLimited`.
     public var kind: String {
         switch self {
-{{ kinds }}        }
+{% for case in cases %}
+        case .{{ case.case_name }}: return "{{ case.name }}"
+{% endfor %}
+{% if not has_validation_variant %}
+        case .validation: return "Validation"
+{% endif %}
+        }
     }
 {% endif %}
 }

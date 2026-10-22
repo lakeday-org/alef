@@ -415,11 +415,7 @@ impl Backend for SwiftBackend {
             body.push('\n');
         }
 
-        for error in &api.errors {
-            errors::emit_error(error, &module_name, &mut body, &mapper);
-            body.push('\n');
-        }
-        errors::emit_bridge_conversions(&api.errors, &module_name, &mut body, &mapper);
+        errors::emit_errors(&api.errors, &module_name, &mut body, &mapper);
 
         let first_class_types: std::collections::HashSet<String> = api
             .types
@@ -649,9 +645,7 @@ impl Backend for SwiftBackend {
         }
 
         let rust_bridge_sources = package_root.join("Sources").join("RustBridge");
-        for box_file in boxes::emit_inbound_box_files(api, config, &rust_bridge_sources) {
-            files.push(box_file);
-        }
+        files.extend(boxes::emit_inbound_box_files(api, config, &rust_bridge_sources));
 
         let mut box_exclude = exclude_types.clone();
         for ty in &api.types {
@@ -663,13 +657,7 @@ impl Backend for SwiftBackend {
             files.push(box_file);
         }
 
-        // The error every fallible bridge call throws must conform to `Error` inside the module
-        // that declares it, because `throw` is compiled there. ~keep
-        files.push(GeneratedFile {
-            path: rust_bridge_sources.join("ZSwiftBridgeError.swift"),
-            content: bridge_error_conformance_file(),
-            generated_header: false,
-        });
+        files.push(bridge_artifacts::bridge_error_conformance_file(&rust_bridge_sources));
 
         // Emit class triples for opaque handle types marked with #[swift_bridge(already_declared)]
         if let Some(opaque_file) = opaque_handles::emit_opaque_class_declarations(config, &rust_bridge_sources) {
@@ -1053,14 +1041,4 @@ sources = ["src/lib.rs"]
             build_config.post_build
         );
     }
-}
-
-/// The `Sources/RustBridge` file that makes the bridge error a Swift `Error`.
-pub(crate) fn bridge_error_conformance_file() -> String {
-    crate::backends::swift::template_env::render(
-        "swift_bridge_error_conformance.swift.jinja",
-        crate::alef_context! {
-            header => crate::core::hash::SELF_MARKING_HEADER_LINE,
-        },
-    )
 }

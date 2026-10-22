@@ -792,15 +792,22 @@ pub(crate) fn emit_function_shim(f: &FunctionDef, context: &FunctionShimContext<
         // not poison the shared runtime or affect other in-flight or future calls -- tokio's own
         // task harness polls every spawned task inside `catch_unwind` and reports the panic
         // through that one task's `JoinHandle` only. ~keep
-        Ok(format!(
-            "{cfg_prefix}pub async fn {fn_name}({params_str}){return_annotation} {{\n    \
-            {bindings_str}let __alef_task = {ALEF_TOKIO_RUNTIME_ACCESSOR}.spawn(async move {{ {body} }});\n    \
-            __alef_task.await.unwrap_or_else(|__alef_join_error| {{\n        \
-            Err(AlefBridgeError::from(format!(\"alef: spawned async task failed: {{__alef_join_error}}\")))\n    }})\n}}\n"
+        Ok(crate::backends::swift::template_env::render(
+            "rust_function_shim.rs.jinja",
+            crate::alef_context! {
+                cfg_prefix => cfg_prefix, fn_name => fn_name, params => params_str,
+                return_annotation => return_annotation, bindings => bindings_str,
+                body => body, is_async => true, runtime => ALEF_TOKIO_RUNTIME_ACCESSOR,
+            },
         ))
     } else {
-        Ok(format!(
-            "{cfg_prefix}pub fn {fn_name}({params_str}){return_annotation} {{\n    {bindings_str}{body}\n}}\n"
+        Ok(crate::backends::swift::template_env::render(
+            "rust_function_shim.rs.jinja",
+            crate::alef_context! {
+                cfg_prefix => cfg_prefix, fn_name => fn_name, params => params_str,
+                return_annotation => return_annotation, bindings => bindings_str,
+                body => body, is_async => false,
+            },
         ))
     }
 }

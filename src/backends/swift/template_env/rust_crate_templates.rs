@@ -1,4 +1,20 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
+    (
+        "rust_function_shim.rs.jinja",
+        include_str!("../templates/rust_function_shim.rs.jinja"),
+    ),
+    (
+        "rust_method_async_body.rs.jinja",
+        include_str!("../templates/rust_method_async_body.rs.jinja"),
+    ),
+    (
+        "rust_method_json_header.rs.jinja",
+        include_str!("../templates/rust_method_json_header.rs.jinja"),
+    ),
+    (
+        "rust_bridge_error_extern.rs.jinja",
+        include_str!("../templates/rust_bridge_error_extern.rs.jinja"),
+    ),
     ("rust_build.rs.jinja", include_str!("../templates/rust_build.rs.jinja")),
     (
         "extern_type_decl.jinja",

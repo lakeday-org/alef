@@ -1,0 +1,13 @@
+    extern "Rust" {
+        type {{ bridge_error_type }};
+
+        fn message(self: &{{ bridge_error_type }}) -> String;
+        #[swift_bridge(swift_name = "errorType")]
+        fn error_type(self: &{{ bridge_error_type }}) -> String;
+        fn kind(self: &{{ bridge_error_type }}) -> String;
+        fn payload(self: &{{ bridge_error_type }}) -> String;
+        fn status(self: &{{ bridge_error_type }}) -> i32;
+        #[swift_bridge(swift_name = "retryAfterMs")]
+        fn retry_after_ms(self: &{{ bridge_error_type }}) -> i64;
+    }
+

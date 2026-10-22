@@ -1,3 +1,21 @@
+{% if errors %}
+private func alefBridgeErrorField<T: Decodable>(_ error: RustBridge.AlefBridgeError, _ name: String, as: T.Type) throws -> T {
+    let payload = try JSONDecoder().decode([String: String].self, from: Data(error.payload().toString().utf8))
+    guard let json = payload[name] else {
+        throw DecodingError.keyNotFound(AlefErrorPayloadKey(name), .init(codingPath: [], debugDescription: "Missing error payload field"))
+    }
+    return try JSONDecoder().decode(T.self, from: Data(json.utf8))
+}
+
+private struct AlefErrorPayloadKey: CodingKey {
+    var stringValue: String
+    var intValue: Int? { nil }
+    init(_ value: String) { stringValue = value }
+    init?(stringValue: String) { self.init(stringValue) }
+    init?(intValue: Int) { return nil }
+}
+
+{% endif %}
 /// Converts an error that the Rust bridge throws into the typed Swift error. Any other error
 /// passes through unchanged.
 func alefTypedError(_ error: Error) -> Error {
@@ -5,11 +23,9 @@ func alefTypedError(_ error: Error) -> Error {
     guard let bridgeError = error as? RustBridge.AlefBridgeError else { return error }
     switch bridgeError.errorType().toString() {
 {% for e in errors %}
-{% if not loop.first %}
-    case "{{ e.rust }}": return {{ e.swift }}(bridgeError: bridgeError)
-{% endif %}
+    case "{{ e.rust }}": return ({{ e.swift }}(bridgeError: bridgeError) as Error?) ?? error
 {% endfor %}
-    default: return {{ errors[0].swift }}(bridgeError: bridgeError)
+    default: return error
     }
 {% else %}
     return error

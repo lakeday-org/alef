@@ -1,0 +1,7 @@
+{{ cfg_prefix }}pub {% if is_async %}async {% endif %}fn {{ fn_name }}({{ params }}){{ return_annotation }} {
+    {{ bindings }}{% if is_async %}let __alef_task = {{ runtime }}.spawn(async move { {{ body }} });
+    __alef_task.await.unwrap_or_else(|__alef_join_error| {
+        Err(AlefBridgeError::from(format!("alef: spawned async task failed: {__alef_join_error}")))
+    })
+{% else %}{{ body }}
+{% endif %}}

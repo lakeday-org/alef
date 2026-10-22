@@ -55,8 +55,8 @@ fn method(name: &str, return_type: TypeRef) -> MethodDef {
 /// one carries neither, and the type reports `status_code` and `retry_after`.
 fn api() -> ApiSurface {
     let error = ErrorDef {
-        name: "LlmError".to_string(),
-        rust_path: "demo::LlmError".to_string(),
+        name: "ServiceError".to_string(),
+        rust_path: "demo::ServiceError".to_string(),
         variants: vec![
             variant(
                 "Authentication",
@@ -72,7 +72,7 @@ fn api() -> ApiSurface {
                     field("retry_after", TypeRef::Optional(Box::new(TypeRef::Duration))),
                 ],
             ),
-            variant("ContextWindowExceeded", vec![field("message", TypeRef::String)]),
+            variant("CapacityExceeded", vec![field("message", TypeRef::String)]),
             variant("Timeout", vec![]),
         ],
         methods: vec![
@@ -90,7 +90,7 @@ fn api() -> ApiSurface {
         name: name.to_string(),
         rust_path: format!("demo::{name}"),
         params: vec![ParamDef {
-            name: "prompt".to_string(),
+            name: "input".to_string(),
             ty: TypeRef::String,
             optional: false,
             default: None,
@@ -108,13 +108,13 @@ fn api() -> ApiSurface {
         }],
         return_type: TypeRef::String,
         is_async,
-        error_type: Some("LlmError".to_string()),
+        error_type: Some("ServiceError".to_string()),
         ..FunctionDef::default()
     };
     ApiSurface {
         crate_name: "demo".to_string(),
         version: "0.1.0".to_string(),
-        functions: vec![function("chat", false), function("chat_later", true)],
+        functions: vec![function("send", false), function("send_later", true)],
         errors: vec![error],
         ..ApiSurface::default()
     }
@@ -139,11 +139,11 @@ fn the_bridge_crate_reads_kind_status_and_retry_delay_from_the_rust_error() {
 
     assert!(lib.contains("type AlefBridgeError;"), "{lib}");
     assert!(
-        lib.contains("fn chat(prompt: String) -> Result<String, AlefBridgeError>;"),
+        lib.contains("fn send(input: String) -> Result<String, AlefBridgeError>;"),
         "a fallible bridge function must return the bridge error, not a String: {lib}"
     );
     assert!(
-        lib.contains("demo::LlmError::RateLimited { .. } => \"RateLimited\""),
+        lib.contains("demo::ServiceError::RateLimited {"),
         "the kind is the variant name of the Rust error: {lib}"
     );
     assert!(
@@ -155,7 +155,7 @@ fn the_bridge_crate_reads_kind_status_and_retry_delay_from_the_rust_error() {
         "the retry delay comes from the Rust error in milliseconds: {lib}"
     );
     assert!(
-        lib.contains("demo::chat(prompt).map_err(alef_bridge_error)"),
+        lib.contains("demo::send(input).map_err(alef_bridge_error)"),
         "the shim must convert the core error with the central function: {lib}"
     );
 }
@@ -166,16 +166,16 @@ fn the_swift_error_is_built_from_the_bridge_error_with_status_and_retry_delay() 
     let swift = &files[0].content;
 
     assert!(
-        swift.contains("init(bridgeError error: RustBridge.AlefBridgeError)"),
+        swift.contains("init?(bridgeError error: RustBridge.AlefBridgeError)"),
         "{swift}"
     );
     assert!(
-        swift.contains("self = .authentication(message: message, status: UInt16(clamping: status))"),
+        swift.contains("self = .authentication(message: try alefBridgeErrorField(error, \"message\", as: (String).self), status: UInt16(clamping: status))"),
         "a variant with a status field gets the status of the bridge error: {swift}"
     );
     assert!(
         swift.contains(
-            "self = .rateLimited(message: message, retryAfter: retryAfterMs < 0 ? nil : Duration.milliseconds(retryAfterMs), status: UInt16(clamping: status))"
+            "self = .rateLimited(message: try alefBridgeErrorField(error, \"message\", as: (String).self), retryAfter: retryAfterMs < 0 ? nil : Duration.milliseconds(retryAfterMs), status: UInt16(clamping: status))"
         ),
         "a variant with a retry delay gets it, and a variant without a status field gets one: {swift}"
     );
@@ -207,16 +207,15 @@ fn every_bridge_call_goes_through_the_conversion_helpers() {
         "{swift}"
     );
     assert!(
-        swift.contains("try alefBridgedCall { try RustBridge.chat(_rb_prompt) }"),
+        swift.contains("try alefBridgedCall { try RustBridge.send(_rb_input) }"),
         "a synchronous forwarder must convert the thrown bridge error: {swift}"
     );
     assert!(
-        swift.contains("try await alefBridgedCallAsync { try await RustBridge.chatLater(_rb_prompt) }"),
+        swift.contains("try await alefBridgedCallAsync { try await RustBridge.sendLater(_rb_input) }"),
         "an asynchronous forwarder must convert the thrown bridge error: {swift}"
     );
     assert!(
-        !swift.contains("return try RustBridge.chat(")
-            && !swift.contains("let result = try await RustBridge.chatLater("),
+        swift.matches("RustBridge.send(").count() == 1 && swift.matches("RustBridge.sendLater(").count() == 1,
         "no fallible call may reach the caller without the conversion: {swift}"
     );
 }
@@ -230,4 +229,75 @@ fn the_bridge_error_is_a_swift_error() {
         conformance.contains("extension AlefBridgeError: Swift.Error, @unchecked Sendable"),
         "{conformance}"
     );
+}
+
+#[test]
+fn bridge_error_accessors_use_the_swift_names_called_by_the_facade() {
+    let files = generated();
+    let rust = file(&files, "lib.rs");
+    assert!(rust.contains("#[swift_bridge(swift_name = \"errorType\")]\n        fn error_type"));
+}
+
+#[test]
+fn arbitrary_error_payloads_are_transported_instead_of_fabricated() {
+    let mut input = api();
+    input.errors[0].variants.push(variant(
+        "Rejected",
+        vec![
+            field("request_id", TypeRef::String),
+            field("attempt", TypeRef::Primitive(PrimitiveType::U32)),
+            field("recoverable", TypeRef::Primitive(PrimitiveType::Bool)),
+            field("detail", TypeRef::Optional(Box::new(TypeRef::String))),
+        ],
+    ));
+    let files = SwiftBackend.generate_bindings(&input, &config()).unwrap();
+    let rust = file(&files, "lib.rs");
+    let swift = &files[0].content;
+    assert!(rust.contains("fn payload(self: &AlefBridgeError) -> String;"), "{rust}");
+    assert!(rust.contains("serde_json::to_string(__alef_field_0)"), "{rust}");
+    assert!(
+        swift.contains("alefBridgeErrorField(error, \"request_id\", as: (String).self)"),
+        "{swift}"
+    );
+    assert!(
+        !swift.contains("requestId: \"\", attempt: 0, recoverable: false, detail: nil"),
+        "{swift}"
+    );
+}
+
+#[test]
+fn generated_swift_preserves_error_payloads_and_refuses_missing_values() {
+    let Ok(swiftc) = which::which("swiftc") else {
+        assert!(std::env::var_os("ALEF_REQUIRE_SWIFT").is_none(), "swiftc required");
+        return;
+    };
+    let mut input = api();
+    input.errors[0].variants.push(variant(
+        "Rejected",
+        vec![
+            field("request_id", TypeRef::String),
+            field("attempt", TypeRef::Primitive(PrimitiveType::U32)),
+            field("recoverable", TypeRef::Primitive(PrimitiveType::Bool)),
+            field("detail", TypeRef::Optional(Box::new(TypeRef::String))),
+        ],
+    ));
+    let files = SwiftBackend.generate_bindings(&input, &config()).unwrap();
+    let swift = &files[0].content;
+    let start = swift.find("public enum ServiceError:").expect("typed error enum");
+    let end = swift.find("func alefBridgedCall<T>").expect("bridge helper boundary");
+    let source = include_str!("swift_error_payload_harness.swift")
+        .replace("// GENERATED_ERROR_SURFACE ~keep", &swift[start..end]);
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("main.swift");
+    let binary = directory.path().join("probe");
+    std::fs::write(&path, source).unwrap();
+    let output = std::process::Command::new(swiftc)
+        .args(["-warnings-as-errors"])
+        .arg(&path)
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(std::process::Command::new(binary).status().unwrap().success());
 }

@@ -1,0 +1,10 @@
+    // SAFETY: Swift keeps the receiver alive until this future's task completes.
+{% if receiver_mut %}
+    let client: &'static mut {{ type_name }} = unsafe { &mut *(client as *mut {{ type_name }}) };
+{% else %}
+    let client: &'static {{ type_name }} = unsafe { &*(client as *const {{ type_name }}) };
+{% endif %}
+    let __alef_task = crate::__alef_tokio_runtime().spawn(async move { {{ chain }} });
+    __alef_task.await.unwrap_or_else(|__alef_join_error| {
+        Err(AlefBridgeError::from(format!("alef: spawned async task failed: {__alef_join_error}")))
+    })

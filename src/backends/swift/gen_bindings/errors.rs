@@ -254,19 +254,25 @@ pub(super) fn swift_default_for_type(ty: &TypeRef) -> String {
     }
 }
 
+pub(crate) fn bridge_payload_supported(ty: &TypeRef) -> bool {
+    match ty {
+        TypeRef::Primitive(_) | TypeRef::String | TypeRef::Path | TypeRef::Char => true,
+        TypeRef::Optional(inner) | TypeRef::Vec(inner) => bridge_payload_supported(inner),
+        TypeRef::Map(key, value) => matches!(key.as_ref(), TypeRef::String) && bridge_payload_supported(value),
+        _ => false,
+    }
+}
+
 /// The Swift expression that gives a case value its place in a conversion from the bridge error,
-/// or `None` when the value has no zero value (the variant is then left to the fallback case).
+/// or `None` when its payload cannot be transported without inventing data. ~keep
 ///
 /// `message`, `status` and `retryAfterMs` are the constants the conversion reads from the bridge
 /// error before its `switch`.
-fn bridge_value_expression(value: &AssociatedValue<'_>) -> Option<String> {
+fn bridge_value_expression(value: &AssociatedValue<'_>, error: &ErrorDef) -> Option<String> {
     let Some(field) = value.field else {
         return Some("message".to_string());
     };
-    if value.label == "message" {
-        return Some("message".to_string());
-    }
-    if is_status_field(field) {
+    if is_status_field(field) && has_status_code_method(error) {
         let (inner, optional) = match &field.ty {
             TypeRef::Optional(inner) => (inner.as_ref(), true),
             ty => (ty, field.optional),
@@ -282,7 +288,11 @@ fn bridge_value_expression(value: &AssociatedValue<'_>) -> Option<String> {
             format!("{integer}(clamping: status)")
         });
     }
-    if field.name == "retry_after" {
+    if field.name == "retry_after"
+        && error.methods.iter().any(|method| {
+            method.name == "retry_after" && !method.is_static && !method.is_async && method.params.is_empty()
+        })
+    {
         match crate::codegen::error_gen::duration_shape(&field.ty) {
             Some(crate::codegen::error_gen::DurationShape::Optional) => {
                 return Some("retryAfterMs < 0 ? nil : Duration.milliseconds(retryAfterMs)".to_string());
@@ -293,30 +303,25 @@ fn bridge_value_expression(value: &AssociatedValue<'_>) -> Option<String> {
             None => {}
         }
     }
-    if field.optional || matches!(field.ty, TypeRef::Optional(_)) {
-        return Some("nil".to_string());
-    }
-    match &field.ty {
-        TypeRef::Primitive(PrimitiveType::Bool) => Some("false".to_string()),
-        TypeRef::Primitive(_) => Some("0".to_string()),
-        TypeRef::String | TypeRef::Path | TypeRef::Char | TypeRef::Json => Some("\"\"".to_string()),
-        TypeRef::Vec(_) => Some("[]".to_string()),
-        TypeRef::Map(..) => Some("[:]".to_string()),
-        TypeRef::Duration => Some("Duration.zero".to_string()),
-        _ => None,
-    }
+    bridge_payload_supported(&field.ty).then(|| {
+        let key = serde_json::to_string(&field.name).expect("field names are strings");
+        format!(
+            "try alefBridgeErrorField(error, {key}, as: ({}).self)",
+            value.swift_type
+        )
+    })
 }
 
 /// The Swift expression that builds the case for `variant` from the bridge error constants, or
-/// `None` when a value of the case has no zero value.
-fn bridge_case_expression(variant: &ErrorVariant, mapper: &SwiftMapper) -> Option<String> {
+/// `None` when a value cannot be transported without inventing data. ~keep
+fn bridge_case_expression(variant: &ErrorVariant, mapper: &SwiftMapper, error: &ErrorDef) -> Option<String> {
     let case_name = super::enums::swift_variant_case(&variant.name);
     if variant.is_unit || variant.fields.is_empty() {
         return Some(format!(".{case_name}"));
     }
     let mut arguments: Vec<String> = Vec::new();
     for value in associated_values(variant, mapper) {
-        arguments.push(format!("{}: {}", value.label, bridge_value_expression(&value)?));
+        arguments.push(format!("{}: {}", value.label, bridge_value_expression(&value, error)?));
     }
     Some(format!(".{case_name}({})", arguments.join(", ")))
 }
@@ -341,31 +346,28 @@ pub(crate) fn emit_bridge_conversions(errors: &[ErrorDef], module_name: &str, ou
             .variants
             .iter()
             .find(|v| super::enums::swift_variant_case(&v.name) == "validation");
-        let fallback = declared_validation
-            .and_then(|v| bridge_case_expression(v, mapper))
-            .unwrap_or_else(|| ".validation(message: message, source: \"\")".to_string());
-        let mut cases = String::new();
-        let mut kinds = String::new();
-        for variant in &view.variants {
-            let case_name = super::enums::swift_variant_case(&variant.name);
-            kinds.push_str(&format!("        case .{case_name}: return \"{}\"\n", variant.name));
-            if let Some(expression) = bridge_case_expression(variant, mapper) {
-                cases.push_str(&format!(
-                    "        case \"{}\":\n            self = {expression}\n",
-                    variant.name
-                ));
-            }
+        #[derive(serde::Serialize)]
+        struct BridgeCase {
+            name: String,
+            case_name: String,
+            expression: Option<String>,
         }
-        if declared_validation.is_none() {
-            kinds.push_str("        case .validation: return \"Validation\"\n");
-        }
+        let cases: Vec<BridgeCase> = view
+            .variants
+            .iter()
+            .map(|variant| BridgeCase {
+                name: variant.name.clone(),
+                case_name: super::enums::swift_variant_case(&variant.name),
+                expression: bridge_case_expression(variant, mapper, error),
+            })
+            .collect();
         out.push_str(&crate::backends::swift::template_env::render(
             "swift_error_bridge_conversion.swift.jinja",
             crate::alef_context! {
                 name => &name,
-                cases => cases,
-                kinds => kinds,
-                fallback => fallback,
+                has_throwing_case => cases.iter().any(|case| case.expression.as_deref().is_some_and(|expression| expression.contains("try "))),
+                cases => &cases,
+                has_validation_variant => declared_validation.is_some(),
                 has_kind_method => error.methods.iter().any(|method| method.name == "kind"),
             },
         ));
@@ -382,4 +384,12 @@ pub(crate) fn emit_bridge_conversions(errors: &[ErrorDef], module_name: &str, ou
         },
     ));
     out.push('\n');
+}
+
+pub(super) fn emit_errors(errors: &[ErrorDef], module_name: &str, out: &mut String, mapper: &SwiftMapper) {
+    for error in errors {
+        emit_error(error, module_name, out, mapper);
+        out.push('\n');
+    }
+    emit_bridge_conversions(errors, module_name, out, mapper);
 }

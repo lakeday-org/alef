@@ -18,14 +18,9 @@ pub(crate) fn result_type(ok: &str) -> String {
 
 /// The `extern "Rust"` block that declares the error type and its accessors.
 pub(crate) fn extern_block() -> String {
-    format!(
-        "    extern \"Rust\" {{\n        type {BRIDGE_ERROR_TYPE};\n\n\
-         \x20       fn message(self: &{BRIDGE_ERROR_TYPE}) -> String;\n\
-         \x20       fn error_type(self: &{BRIDGE_ERROR_TYPE}) -> String;\n\
-         \x20       fn kind(self: &{BRIDGE_ERROR_TYPE}) -> String;\n\
-         \x20       fn status(self: &{BRIDGE_ERROR_TYPE}) -> i32;\n\
-         \x20       #[swift_bridge(swift_name = \"retryAfterMs\")]\n\
-         \x20       fn retry_after_ms(self: &{BRIDGE_ERROR_TYPE}) -> i64;\n    }}\n\n"
+    crate::backends::swift::template_env::render(
+        "rust_bridge_error_extern.rs.jinja",
+        crate::alef_context! { bridge_error_type => BRIDGE_ERROR_TYPE },
     )
 }
 
@@ -35,6 +30,7 @@ struct ErrorContext {
     snake: String,
     rust_path: String,
     variants: Vec<VariantContext>,
+    has_payload_fields: bool,
     status_expr: String,
     retry_after_expr: String,
 }
@@ -43,6 +39,58 @@ struct ErrorContext {
 struct VariantContext {
     name: String,
     pattern: String,
+    fields: Vec<PayloadField>,
+}
+
+#[derive(serde::Serialize)]
+struct PayloadField {
+    key: String,
+    binding: String,
+}
+
+fn payload_fields(variant: &crate::core::ir::ErrorVariant) -> Vec<PayloadField> {
+    variant
+        .fields
+        .iter()
+        .enumerate()
+        .filter(|(_, field)| super::super::gen_bindings::errors::bridge_payload_supported(&field.ty))
+        .map(|(index, field)| PayloadField {
+            key: serde_json::to_string(&field.name).expect("field names are strings"),
+            binding: format!("__alef_field_{index}"),
+        })
+        .collect()
+}
+
+fn payload_pattern(rust_path: &str, variant: &crate::core::ir::ErrorVariant) -> String {
+    if variant.is_unit || variant.fields.is_empty() {
+        return crate::codegen::error_gen::error_variant_wildcard_pattern(rust_path, variant);
+    }
+    let fields: Vec<String> = variant
+        .fields
+        .iter()
+        .enumerate()
+        .map(|(index, field)| {
+            let binding = if super::super::gen_bindings::errors::bridge_payload_supported(&field.ty) {
+                format!("__alef_field_{index}")
+            } else {
+                "_".to_string()
+            };
+            if crate::codegen::conversions::is_tuple_variant(&variant.fields) {
+                binding
+            } else {
+                format!(
+                    "{}: {binding}",
+                    crate::codegen::naming::internal_rust_identifier(&field.name)
+                )
+            }
+        })
+        .collect();
+    let joined = fields.join(", ");
+    if crate::codegen::conversions::is_tuple_variant(&variant.fields) {
+        format!("{rust_path}::{}({joined})", variant.name)
+    } else {
+        format!("{rust_path}::{} {{ {joined}, .. }}", variant.name)
+    }
 }
 
 /// The expression that reads the HTTP status of `e`, or `-1` when the error has no `status_code`
@@ -100,9 +148,11 @@ fn error_contexts(api: &ApiSurface, source_crate: &str) -> Vec<ErrorContext> {
                     .iter()
                     .map(|variant| VariantContext {
                         name: variant.name.clone(),
-                        pattern: crate::codegen::error_gen::error_variant_wildcard_pattern(&rust_path, variant),
+                        pattern: payload_pattern(&rust_path, variant),
+                        fields: payload_fields(variant),
                     })
                     .collect(),
+                has_payload_fields: error.variants.iter().any(|variant| !payload_fields(variant).is_empty()),
                 status_expr: status_expr(error),
                 retry_after_expr: retry_after_expr(error),
                 rust_path,

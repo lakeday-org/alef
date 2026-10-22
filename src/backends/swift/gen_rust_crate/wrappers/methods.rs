@@ -396,17 +396,15 @@ pub(crate) fn emit_type_method_shims(
             // continuation resumes, and the continuation resumes only after this future -- which
             // awaits the spawned task to completion -- returns, so the task never outlives the
             // borrow. swift-bridge never drops the future early. ~keep
-            let extend_receiver = match method.receiver {
-                Some(ReceiverKind::RefMut) => format!(
-                    "    // SAFETY: Swift keeps the receiver alive until this future's task completes.\n    let client: &'static mut {type_name} = unsafe {{ &mut *(client as *mut {type_name}) }};\n"
-                ),
-                _ => format!(
-                    "    // SAFETY: Swift keeps the receiver alive until this future's task completes.\n    let client: &'static {type_name} = unsafe {{ &*(client as *const {type_name}) }};\n"
-                ),
-            };
-            format!(
-                "{extend_receiver}    let __alef_task = crate::__alef_tokio_runtime().spawn(async move {{ {chain} }});\n    __alef_task.await.unwrap_or_else(|__alef_join_error| {{\n        Err(AlefBridgeError::from(format!(\"alef: spawned async task failed: {{__alef_join_error}}\")))\n    }})"
+            crate::backends::swift::template_env::render(
+                "rust_method_async_body.rs.jinja",
+                crate::alef_context! {
+                    receiver_mut => matches!(method.receiver, Some(ReceiverKind::RefMut)),
+                    type_name => type_name, chain => chain,
+                },
             )
+            .trim_end()
+            .to_string()
         } else if method.error_type.is_some() {
             let ok_wrap = if method.return_newtype_wrapper.is_some() {
                 let converted = apply_return_newtype_unwrap("v", &method.return_newtype_wrapper);
@@ -521,9 +519,10 @@ pub(crate) fn emit_first_class_dto_method_wrappers(
             params.push(format!("{name}: {ty_str}"));
         }
 
-        out.push_str(&format!("pub fn {fn_name}("));
-        out.push_str(&params.join(", "));
-        out.push_str(&format!(") -> {} {{\n", result_type("String")));
+        out.push_str(&crate::backends::swift::template_env::render(
+            "rust_method_json_header.rs.jinja",
+            crate::alef_context! { fn_name => fn_name, params => params.join(", "), return_type => result_type("String") },
+        ));
 
         let async_uses_transparent_wrapper = method.return_newtype_wrapper.is_some()
             || method.params.iter().any(|param| param.newtype_wrapper.is_some());

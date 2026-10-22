@@ -841,6 +841,17 @@ fn is_extension_param_bridgeable(ty: &TypeRef, api: &ApiSurface) -> bool {
     }
 }
 
+pub(crate) fn bridge_error_conformance_file(directory: &Path) -> GeneratedFile {
+    GeneratedFile {
+        path: directory.join("ZSwiftBridgeError.swift"),
+        content: crate::backends::swift::template_env::render(
+            "swift_bridge_error_conformance.swift.jinja",
+            crate::alef_context! { header => crate::core::hash::SELF_MARKING_HEADER_LINE },
+        ),
+        generated_header: false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::emit_swift_bridge_files;

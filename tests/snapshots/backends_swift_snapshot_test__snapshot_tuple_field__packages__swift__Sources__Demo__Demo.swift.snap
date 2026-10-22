@@ -54,22 +54,19 @@ public enum DemoError: Swift.Error {
 }
 
 extension DemoError {
-    /// Converts the error that the Rust bridge throws. The kind, the HTTP status and the retry
-    /// delay are the values of the Rust error.
-    init(bridgeError error: RustBridge.AlefBridgeError) {
+    init?(bridgeError error: RustBridge.AlefBridgeError) {
         let message = error.message().toString()
         let status = error.status()
         let retryAfterMs = error.retryAfterMs()
-        _ = (status, retryAfterMs)
+        _ = (message, status, retryAfterMs)
         switch error.kind().toString() {
         case "ExtractionFailed":
             self = .extractionFailed
         default:
-            self = .validation(message: message, source: "")
+            return nil
         }
     }
 
-    /// The variant name of the Rust error, for example `RateLimited`.
     public var kind: String {
         switch self {
         case .extractionFailed: return "ExtractionFailed"
@@ -78,12 +75,29 @@ extension DemoError {
     }
 }
 
+private func alefBridgeErrorField<T: Decodable>(_ error: RustBridge.AlefBridgeError, _ name: String, as: T.Type) throws -> T {
+    let payload = try JSONDecoder().decode([String: String].self, from: Data(error.payload().toString().utf8))
+    guard let json = payload[name] else {
+        throw DecodingError.keyNotFound(AlefErrorPayloadKey(name), .init(codingPath: [], debugDescription: "Missing error payload field"))
+    }
+    return try JSONDecoder().decode(T.self, from: Data(json.utf8))
+}
+
+private struct AlefErrorPayloadKey: CodingKey {
+    var stringValue: String
+    var intValue: Int? { nil }
+    init(_ value: String) { stringValue = value }
+    init?(stringValue: String) { self.init(stringValue) }
+    init?(intValue: Int) { return nil }
+}
+
 /// Converts an error that the Rust bridge throws into the typed Swift error. Any other error
 /// passes through unchanged.
 func alefTypedError(_ error: Error) -> Error {
     guard let bridgeError = error as? RustBridge.AlefBridgeError else { return error }
     switch bridgeError.errorType().toString() {
-    default: return DemoError(bridgeError: bridgeError)
+    case "DemoError": return (DemoError(bridgeError: bridgeError) as Error?) ?? error
+    default: return error
     }
 }
 
