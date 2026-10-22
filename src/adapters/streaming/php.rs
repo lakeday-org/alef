@@ -19,6 +19,7 @@ pub(super) fn gen_php_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig
         function_name => format!("{namespace}\\{function}"),
         class_name => format!("{namespace}\\{handle}"),
         handle => &handle,
+        return_type => crate::backends::php::STREAM_RESULT_TYPE,
         stream_type => format!("futures_util::stream::BoxStream<'static, std::result::Result<{item_type}, {error_type}>>"),
         call_args => call_args(adapter).join(", "),
         let_bindings => core_let_bindings_cloned(adapter, &core_import),

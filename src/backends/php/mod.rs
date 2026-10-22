@@ -11,6 +11,9 @@ pub use gen_bindings::PhpBackend;
 pub(crate) use gen_bindings::types::{flat_field_name, is_tagged_data_enum, is_untagged_data_enum};
 pub use gen_bindings::types::{is_php_prop_scalar, php_field_can_be_constructor_param};
 
+pub(crate) const STREAM_RESULT_TYPE: &str =
+    "std::result::Result<ext_php_rs::types::Zval, ext_php_rs::exception::PhpException>";
+
 const VISITOR_EXCLUSION_TOKEN: &str = "visitor";
 
 /// Whether PHP's binding configuration opts out of the synthetic visitor surface.

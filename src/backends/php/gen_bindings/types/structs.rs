@@ -6,7 +6,7 @@ use crate::codegen::shared::partition_methods;
 use crate::codegen::type_mapper::TypeMapper;
 use crate::core::ir::{ApiSurface, EnumDef, FieldDef, TypeDef, TypeRef};
 use ahash::AHashSet;
-use heck::{ToLowerCamelCase, ToPascalCase};
+use heck::ToPascalCase;
 
 use super::super::functions::{
     gen_async_instance_method, gen_async_static_method, gen_instance_method, gen_instance_method_non_opaque,
@@ -180,16 +180,15 @@ pub(crate) fn gen_opaque_struct_methods_with_exclude(
                     String::new()
                 };
 
-                let method_code = format!(
-                    "    #[php(name = \"{}\")]\n    \
-                         pub fn {}(&self{}{}) -> std::result::Result<ext_php_rs::types::Zval, ext_php_rs::exception::PhpException> {{\n    \
-                         {}\n    \
-                         }}",
-                    method_name.to_lower_camel_case(),
-                    method_name,
-                    if params_str.is_empty() { "" } else { ", " },
-                    params_str,
-                    body
+                let method_code = crate::backends::php::template_env::render(
+                    "php_streaming_instance_method.rs.jinja",
+                    crate::alef_context! {
+                        php_name => crate::codegen::naming::to_php_name(method_name),
+                        method_name => method_name,
+                        params => params_str,
+                        return_type => crate::backends::php::STREAM_RESULT_TYPE,
+                        body => body,
+                    },
                 );
                 impl_builder.add_method(&method_code);
             }

@@ -733,6 +733,10 @@ static TEMPLATES: &[(&str, &str)] = &[
         include_str!("templates/php_trait_bridge_api_method.jinja"),
     ),
     (
+        "php_streaming_instance_method.rs.jinja",
+        include_str!("templates/php_streaming_instance_method.rs.jinja"),
+    ),
+    (
         "php_streaming_adapter_method.jinja",
         include_str!("templates/php_streaming_adapter_method.jinja"),
     ),

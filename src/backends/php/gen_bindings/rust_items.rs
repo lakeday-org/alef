@@ -4,9 +4,7 @@ pub(super) fn gen_streaming_adapter_facade_method(
     _opaque_types: &ahash::AHashSet<String>,
     _core_import: &str,
 ) -> String {
-    use heck::ToLowerCamelCase;
-
-    let method_name = adapter.name.to_lower_camel_case();
+    let method_name = crate::codegen::naming::to_php_name(&adapter.name);
     let adapter_name = &adapter.name;
     let owner_type = adapter.owner_type.as_deref().unwrap_or_else(|| {
         panic!(
@@ -31,7 +29,7 @@ pub(super) fn gen_streaming_adapter_facade_method(
         ));
     }
 
-    let return_type = "std::result::Result<Vec<String>, ext_php_rs::exception::PhpException>";
+    let return_type = crate::backends::php::STREAM_RESULT_TYPE;
 
     let rust_method_name = &adapter.name;
     let call_args = adapter

@@ -1,0 +1,4 @@
+    #[php(name = "{{ php_name }}")]
+    pub fn {{ method_name }}(&self{% if params %}, {{ params }}{% endif %}) -> {{ return_type }} {
+    {{ body }}
+    }

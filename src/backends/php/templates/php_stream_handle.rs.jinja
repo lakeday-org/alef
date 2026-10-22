@@ -8,7 +8,7 @@ pub struct {{ handle }} {
 
 impl {{ handle }} {
     /// Wrap an open stream in a PHP generator that yields each chunk as JSON text.
-    fn into_generator(stream: {{ stream_type }}) -> std::result::Result<ext_php_rs::types::Zval, ext_php_rs::exception::PhpException> {
+    fn into_generator(stream: {{ stream_type }}) -> {{ return_type }} {
         const FUNCTION: &str = r#"{{ function_name }}"#;
         const SOURCE: &str = r#"{% include 'php_stream_wrapper.php.jinja' %}"#;
         let to_exception = |e: &dyn std::fmt::Display| ext_php_rs::exception::PhpException::from_message(e.to_string());
