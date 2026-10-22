@@ -109,7 +109,7 @@ fn native_default_typed_receiver_methods_should_json_decode_into_core_type() {
         "receiver must be JSON-decoded into the core type with contextual error:\n{content}"
     );
     assert!(
-        content.contains("let result = obj.validate().map_err(|e| e.to_string())?;"),
+        content.contains("let result = obj.validate().map_err(alef_nif_err)?;"),
         "decoded core value must be passed straight into the delegated call:\n{content}"
     );
     syn::parse_file(&content).expect("generated Rustler source with a default-typed receiver must parse as Rust");

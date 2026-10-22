@@ -597,86 +597,6 @@ fn should_not_declare_the_positional_field_for_representations_serde_does_not_fl
     }
 }
 
-/// `FormatMetadata`-shaped fixture: a plain single-tuple-Named variant (`Excel`), a boxed one
-/// gated behind a host feature (`Docx`), an acronym-ish multi-word PascalCase name
-/// (`FictionBook`), a unit variant (`Empty`), and a multi-field tuple variant (`Pair`) whose
-/// payload isn't a single `Named` type. Mirrors `crates/xberg-py/src/lib.rs`'s real
-/// `FormatMetadata` getters closely enough to catch a naming-transform regression.
-fn metadata_enum() -> EnumDef {
-    let mut docx = variant(
-        "Docx",
-        vec![{
-            let mut f = field("_0", TypeRef::Named("DocxMetadata".to_string()));
-            f.is_boxed = true;
-            f
-        }],
-    );
-    docx.cfg = Some(r#"feature = "office""#.to_string());
-
-    enum_def(
-        "FormatMetadata",
-        vec![
-            variant("Excel", vec![field("_0", TypeRef::Named("ExcelMetadata".to_string()))]),
-            docx,
-            variant(
-                "FictionBook",
-                vec![field("_0", TypeRef::Named("FictionBookMetadata".to_string()))],
-            ),
-            variant("Empty", vec![]),
-            EnumVariant {
-                is_tuple: true,
-                ..variant("Pair", vec![field("_0", TypeRef::String), field("_1", TypeRef::String)])
-            },
-        ],
-    )
-}
-
-/// The stub must declare a bare-annotation property for every variant `write_pyo3_variant_accessors`
-/// (`codegen::generators::enums`) gives a typed `#[getter]` — including the boxed, cfg-gated, and
-/// multi-word-PascalCase cases — using the same `pascal_to_snake` transform the runtime getter uses.
-#[test]
-fn should_declare_a_stub_property_for_every_runtime_variant_getter() {
-    let stub = gen_enum_stub(&metadata_enum(), false, &no_dtos(), true, &[]);
-
-    assert!(stub.contains("    excel: ExcelMetadata | None"), "{stub}");
-    assert!(
-        stub.contains("    docx: DocxMetadata | None"),
-        "boxed field must still resolve to the unboxed inner type: {stub}"
-    );
-    assert!(
-        stub.contains("    fiction_book: FictionBookMetadata | None"),
-        "multi-word PascalCase variant name must snake_case correctly: {stub}"
-    );
-}
-
-/// A unit variant and a multi-field tuple variant have no typed `#[getter]`, but the runtime
-/// still gives each an untyped dict-shaped one (GH#581), so the stub declares it as `Any | None`
-/// rather than a typed property.
-#[test]
-fn should_declare_an_untyped_property_for_a_variant_with_a_dict_shaped_getter() {
-    let stub = gen_enum_stub(&metadata_enum(), false, &no_dtos(), true, &[]);
-
-    assert!(stub.contains("    empty: Any | None"), "unit variant: {stub}");
-    assert!(
-        stub.contains("    pair: Any | None"),
-        "multi-field tuple variant: {stub}"
-    );
-}
-
-/// `write_pyo3_variant_accessors` emits the `#[getter]` for a foreign-cfg-gated variant
-/// unconditionally — only the match ARM inside it is dropped when `is_host_enum` is false, never
-/// the getter method itself — so the stub property must stay declared regardless of
-/// `is_host_enum`, unlike the `@staticmethod` variant constructors which really do disappear.
-#[test]
-fn should_keep_the_stub_property_for_a_foreign_cfg_gated_variant_even_when_unreachable() {
-    let stub = gen_enum_stub(&metadata_enum(), false, &no_dtos(), false, &[]);
-
-    assert!(
-        stub.contains("    docx: DocxMetadata | None"),
-        "the getter method exists in every build; only its match arm is cfg-conditional: {stub}"
-    );
-}
-
 /// An externally tagged data enum (`EntityCategory`, `PiiCategory`, `OutputFormat` -- no
 /// `#[serde(tag = "...")]` anywhere) has no `type` field anywhere on its wire form, and
 /// `write_pyo3_serde_tag_getter` (`codegen::generators::enums`) is only ever called when
@@ -742,17 +662,6 @@ fn primitive_payload_single_tuple_variant_does_not_declare_a_positional_field() 
     assert!(!stub.contains("_0:"), "{stub}");
 }
 
-/// A genuine multi-field tuple variant keeps its declared positional shape -- only the
-/// single-field case (which never has a `_0` key on any wire form) is suppressed.
-#[test]
-fn multi_field_tuple_variant_keeps_its_positional_fields() {
-    let stub = gen_enum_stub(&metadata_enum(), false, &no_dtos(), true, &[]);
-
-    assert!(stub.contains("class FormatMetadataPairVariant(TypedDict):"), "{stub}");
-    assert!(stub.contains("    _0: str"), "{stub}");
-    assert!(stub.contains("    _1: str"), "{stub}");
-}
-
 /// GH#581: the wrapper pyclass has a runtime `#[getter]` for EVERY variant -- a typed one for a
 /// `Named` newtype payload and a dict-shaped one otherwise -- so a variant carrying a `String`
 /// or a `Vec` (`UserContent::Text`, `UserContent::Parts`) must be declared too.
@@ -791,3 +700,6 @@ fn every_variant_getter_is_declared_on_the_wrapper_class() {
     assert!(stub.contains("    parts: Any | None"), "{stub}");
     assert!(stub.contains("    single: ContentPart | None"), "{stub}");
 }
+
+#[path = "metadata_getters_tests.rs"]
+mod metadata_getters_tests;

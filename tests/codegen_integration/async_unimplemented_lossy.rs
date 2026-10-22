@@ -32,7 +32,7 @@ fn test_gen_async_body_wasm_with_error() {
     let result = binding_helpers::gen_async_body("process_async()", &cfg, true, "result", false, "", false, None);
 
     assert!(result.contains("await"));
-    assert!(result.contains("JsValue"));
+    assert!(result.contains(".map_err(alef_wasm_err)?"));
 }
 
 #[test]

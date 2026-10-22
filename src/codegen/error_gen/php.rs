@@ -277,8 +277,7 @@ pub(super) fn classes(api: &ApiSurface, namespace: &str, root: Option<&str>) -> 
     Ok(classes)
 }
 
-/// The exception classes as Rust items. `root` names the project-level exception class that every
-/// family extends (for example `LiterLlmException`).
+/// `root` is the shared parent exception class for every emitted family. ~keep
 pub fn gen_php_error_types(api: &ApiSurface, namespace: &str, root: Option<&str>) -> anyhow::Result<String> {
     Ok(crate::codegen::template_env::render(
         "error_gen/php_error_types.jinja",

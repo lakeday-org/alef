@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Generate nil-safe Go and Swift e2e assertions for optional collection fields, comparing present string values and excluding absent values even when the expected substring is empty.
+- Keep typed-error and payload-getter regression coverage current, including portable Windows compiler discovery and dependency resolution.
 - Keep streaming adapter primitive, unit and fully qualified parameter types valid instead of qualifying them as consumer-crate types.
 - Remove redundant optional static-string registration closures from Dart error bridges and validate fallible borrowed-error reconstruction.
 

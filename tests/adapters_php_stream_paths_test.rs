@@ -104,7 +104,7 @@ fn check_stream_type_resolution(source: &str, dependencies: toml::map::Map<Strin
         manifest.insert("dependencies".into(), toml::Value::Table(dependencies));
         std::fs::write(directory.path().join("Cargo.toml"), toml::to_string(&manifest).unwrap()).unwrap();
         let output = std::process::Command::new("cargo")
-            .args(["check", "--offline", "--quiet"])
+            .args(["check", "--quiet"])
             .current_dir(directory.path())
             .env("CARGO_TARGET_DIR", directory.path().join("target"))
             .output()

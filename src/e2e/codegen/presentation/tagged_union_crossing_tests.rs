@@ -159,8 +159,8 @@ fn an_authored_show_through_a_declared_method_call_crossing_survives() {
             .map(|operation| operation.expression.as_str())
             .collect::<Vec<_>>(),
         vec![
-            "result.document.format.variant.detail",
-            "result.document.format.variant.tags"
+            "result.document.format.variant_payload[\"variant\"][\"detail\"]",
+            "result.document.format.variant_payload[\"variant\"][\"tags\"]"
         ],
         "both fields beneath a declared crossing must survive trimming: {operations:?}"
     );
@@ -190,8 +190,8 @@ fn a_derived_show_through_a_declared_method_call_crossing_survives() {
             .map(|operation| operation.expression.as_str())
             .collect::<Vec<_>>(),
         vec![
-            "result.document.format.variant.detail",
-            "result.document.format.variant.tags"
+            "result.document.format.variant_payload[\"variant\"][\"detail\"]",
+            "result.document.format.variant_payload[\"variant\"][\"tags\"]"
         ],
         "a derived show through a declared crossing must not be silently dropped: {operations:?}"
     );
@@ -301,7 +301,7 @@ fn a_derived_show_through_two_chained_method_call_crossings_survives() {
             .iter()
             .map(|operation| operation.expression.as_str())
             .collect::<Vec<_>>(),
-        vec!["result.document.format.variant.nested.deep.value"],
+        vec!["result.document.format.variant_payload[\"variant\"][\"nested\"][\"Deep\"][\"deep\"][\"value\"]"],
         "a leaf reached through two chained declared crossings must not be silently dropped: {operations:?}"
     );
 }

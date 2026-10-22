@@ -155,7 +155,7 @@ result.body = None
 assert {accessor} is None
 "#
     );
-    let output = Command::new("python3").arg("-c").arg(program).output().unwrap();
+    let output = python_command().arg("-c").arg(program).output().unwrap();
     assert!(
         output.status.success(),
         "accessor: {accessor}\n{}",
@@ -199,8 +199,43 @@ enum UntaggedPart {
     },
 }
 
+fn python_command() -> Command {
+    let candidates = if cfg!(windows) {
+        ["python", "python3"]
+    } else {
+        ["python3", "python"]
+    };
+    let executable = candidates
+        .into_iter()
+        .find_map(|name| which::which(name).ok())
+        .expect("Python is required for the generated accessor runtime tests");
+    Command::new(executable)
+}
+
+fn typescript_command() -> Command {
+    let executable = which::which("tsc").expect("TypeScript is required for the generated accessor runtime tests");
+    Command::new(executable)
+}
+
+#[test]
+fn typescript_compiler_rejects_a_known_type_error() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory.path().join("invalid.ts");
+    std::fs::write(&source, "const value: string = 7;\n").unwrap();
+    let output = typescript_command()
+        .args(["--strict", "--noEmit", "--skipLibCheck"])
+        .arg(source)
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "the compiler must reject a planted type error"
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("TS2322"), "{output:?}");
+}
+
 fn python_runs(program: String) {
-    let output = Command::new("python3").arg("-c").arg(&program).output().unwrap();
+    let output = python_command().arg("-c").arg(&program).output().unwrap();
     assert!(
         output.status.success(),
         "{program}\n{}",
@@ -212,7 +247,7 @@ fn typescript_runs(program: String) {
     let directory = tempfile::tempdir().unwrap();
     let source = directory.path().join("check.ts");
     std::fs::write(&source, &program).unwrap();
-    let compiled = Command::new("tsc")
+    let compiled = typescript_command()
         .args([
             "--strict",
             "--target",
@@ -232,10 +267,12 @@ fn typescript_runs(program: String) {
         String::from_utf8_lossy(&compiled.stdout),
         String::from_utf8_lossy(&compiled.stderr)
     );
-    let executed = Command::new("node")
-        .arg(directory.path().join("check.js"))
-        .output()
-        .unwrap();
+    let javascript = directory.path().join("check.js");
+    assert!(
+        javascript.is_file(),
+        "the compiler must emit the actual JavaScript fixture"
+    );
+    let executed = Command::new("node").arg(javascript).output().unwrap();
     assert!(
         executed.status.success(),
         "{program}\n{}",
