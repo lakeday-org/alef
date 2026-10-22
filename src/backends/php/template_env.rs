@@ -2,6 +2,22 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "php_struct_field_getter.jinja",
+        include_str!("templates/php_struct_field_getter.jinja"),
+    ),
+    (
+        "php_stream_handle.rs.jinja",
+        include_str!("templates/php_stream_handle.rs.jinja"),
+    ),
+    (
+        "php_stream_body.rs.jinja",
+        include_str!("templates/php_stream_body.rs.jinja"),
+    ),
+    (
+        "php_stream_wrapper.php.jinja",
+        include_str!("templates/php_stream_wrapper.php.jinja"),
+    ),
+    (
         "php_constructor_extension_init.jinja",
         include_str!("templates/php_constructor_extension_init.jinja"),
     ),

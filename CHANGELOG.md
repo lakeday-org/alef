@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve PHP stream unit defaults and qualified external types, include the default stream error dependency, and generate stream handles and field getters through templates.
 - Preserve Swift error payloads across the bridge, correct accessor names, and retain the original bridge error when a payload is unsupported or incomplete.
 - Reuse original native static strings in Dart error mirrors without leaking new strings. Reject unknown text during fallible introspection and reject unsupported borrowed-error inputs, including nested DTO and enum fields.
 - Encode Node error metadata as valid JSON, including control characters.

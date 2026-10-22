@@ -1,3 +1,5 @@
+mod streaming_deps;
+
 use crate::backends::php::layout::php_psr4_target;
 use crate::backends::php::naming::php_autoload_namespace;
 use crate::core::backend::GeneratedFile;
@@ -209,12 +211,7 @@ pub(crate) fn scaffold_php_cargo(api: &ApiSurface, config: &ResolvedCrateConfig)
         }
         all_deps.push_str(&format!("tracing = \"{}\"", tv::cargo::TRACING));
     }
-    if has_streaming && !all_deps.contains("futures-util = ") && !all_deps.contains("futures-util =\"") {
-        if !all_deps.is_empty() {
-            all_deps.push('\n');
-        }
-        all_deps.push_str(&format!("futures-util = \"{}\"", tv::cargo::FUTURES_UTIL));
-    }
+    streaming_deps::append_stream_dependencies(config, &mut all_deps);
     if !config.components.is_empty() {
         let alef_version = env!("CARGO_PKG_VERSION");
         for dependency in [

@@ -3,7 +3,7 @@
 mod gen_bindings;
 pub mod layout;
 pub mod naming;
-mod template_env;
+pub(crate) mod template_env;
 pub mod trait_bridge;
 mod type_map;
 

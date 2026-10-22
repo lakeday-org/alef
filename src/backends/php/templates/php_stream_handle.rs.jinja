@@ -1,0 +1,57 @@
+/// The open stream of `{{ core_path }}`, read chunk by chunk by the PHP generator that the
+/// method returns.
+#[php_class]
+#[php(name = r#"{{ class_name }}"#)]
+pub struct {{ handle }} {
+    stream: std::sync::Mutex<Option<{{ stream_type }}>>,
+}
+
+impl {{ handle }} {
+    /// Wrap an open stream in a PHP generator that yields each chunk as JSON text.
+    fn into_generator(stream: {{ stream_type }}) -> std::result::Result<ext_php_rs::types::Zval, ext_php_rs::exception::PhpException> {
+        const FUNCTION: &str = r#"{{ function_name }}"#;
+        const SOURCE: &str = r#"{% include 'php_stream_wrapper.php.jinja' %}"#;
+        let to_exception = |e: &dyn std::fmt::Display| ext_php_rs::exception::PhpException::from_message(e.to_string());
+        let handle = Self { stream: std::sync::Mutex::new(Some(stream)) };
+        let handle = ext_php_rs::convert::IntoZval::into_zval(handle, false).map_err(|e| to_exception(&e))?;
+        let generator = match ext_php_rs::types::ZendCallable::try_from_name(FUNCTION) {
+            Ok(callable) => callable,
+            Err(_) => {
+                ext_php_rs::php_eval::execute(SOURCE).map_err(|e| to_exception(&e))?;
+                ext_php_rs::types::ZendCallable::try_from_name(FUNCTION).map_err(|e| to_exception(&e))?
+            }
+        };
+        generator.try_call(vec![&handle]).map_err(|e| to_exception(&e))
+    }
+}
+
+#[php_impl]
+impl {{ handle }} {
+    /// The next chunk as JSON text, or `null` at the end of the stream. A failure of the stream
+    /// throws here, after the chunks that came before it.
+    pub fn next(&self) -> std::result::Result<Option<String>, ext_php_rs::exception::PhpException> {
+        use futures_util::StreamExt;
+        let mut guard = self.stream.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(stream) = guard.as_mut() else {
+            return Ok(None);
+        };
+        match WORKER_RUNTIME.block_on(stream.next()) {
+            Some(Ok(chunk)) => serde_json::to_string(&chunk)
+                .map(Some)
+                .map_err(|e| ext_php_rs::exception::PhpException::from_message(e.to_string())),
+            Some(Err(e)) => {
+                *guard = None;
+                Err(alef_php_err(e))
+            }
+            None => {
+                *guard = None;
+                Ok(None)
+            }
+        }
+    }
+
+    /// Drop the stream. The generator calls this when it ends or is destroyed.
+    pub fn close(&self) {
+        *self.stream.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+}

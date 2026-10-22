@@ -15,42 +15,12 @@ use super::super::functions::{
 use super::enums::ty_references_untagged_data_enum;
 
 mod constructor_init;
+mod getters;
+use getters::{JSON_TEXT_EXPR, add_php_getter};
 
-/// Returns true if the type is "scalar-compatible" — i.e. ext-php-rs can handle it as a
-/// Check if a type is scalar-compatible for PHP properties, considering enum names.
-/// `#[php(prop)]` without needing a manual getter.  Scalar-compatible means the mapped Rust
-/// type implements `IntoZval` + `FromZval` automatically:
-///   primitives, String, bool, Duration (→ u64), Path (→ String), `Option<scalar>`,
-///   `Vec<primitive>` (the `Vec<T: IntoZval>` blanket impl), and — since ext-php-rs 0.15's
-///   `HashMap<K, V>` conversions (`types/array/conversions/hash_map.rs`) — a String-keyed
-///   `Map<String, V>` whose value type `V` is itself prop-scalar (e.g. `HashMap<String, String>`).
-/// Anything containing a Named struct (that isn't an enum), a Map with a non-scalar value
-/// (nested struct or `Json`), nested Vec, Json, or Bytes requires a getter.
-/// Enums are mapped as String in the PHP binding, so they count as scalar.
-///
-/// This function is public so that `alef-e2e` can determine which fields require
-/// `->getCamelCase()` getter-method syntax vs. `->camelCase` property syntax.
-pub fn is_php_prop_scalar(ty: &TypeRef, enum_names: &AHashSet<String>) -> bool {
-    is_php_prop_scalar_with_enums(ty, enum_names)
-}
-
-fn is_php_prop_scalar_with_enums(ty: &TypeRef, enum_names: &AHashSet<String>) -> bool {
-    match ty {
-        TypeRef::Primitive(_) | TypeRef::String | TypeRef::Char | TypeRef::Duration | TypeRef::Path => true,
-        TypeRef::Optional(inner) => is_php_prop_scalar_with_enums(inner, enum_names),
-        TypeRef::Vec(inner) => {
-            matches!(inner.as_ref(), TypeRef::Primitive(_) | TypeRef::String | TypeRef::Char)
-                || matches!(inner.as_ref(), TypeRef::Named(n) if enum_names.contains(n))
-        }
-        TypeRef::Named(n) if enum_names.contains(n) => true,
-        // `HashMap<K, V, H>` implements `IntoZval`/`FromZval` for any `K: Into<ArrayKey>` +
-        // `V: IntoZval`/`FromZval` (ext-php-rs 0.15 `hash_map.rs`). Alef only models String-keyed
-        // maps, so recurse on the value type; a Map of Json or a non-enum struct is
-        // still not representable and falls through to the `false` arm below.
-        TypeRef::Map(k, v) => matches!(k.as_ref(), TypeRef::String) && is_php_prop_scalar_with_enums(v, enum_names),
-        TypeRef::Named(_) | TypeRef::Json | TypeRef::Bytes | TypeRef::Unit => false,
-    }
-}
+mod scalar;
+pub use scalar::is_php_prop_scalar;
+use scalar::is_php_prop_scalar_with_enums;
 
 mod constructor_param;
 
@@ -1000,42 +970,3 @@ fn gen_struct_methods_impl(
 #[cfg(test)]
 #[path = "structs/tests.rs"]
 mod tests;
-
-/// The expression that turns a serde-serializable `v` into `Option<String>` for a getter: a JSON
-/// string is returned as its bare text, anything else as JSON text.
-const JSON_TEXT_EXPR: &str = "serde_json::to_value(v).ok().and_then(|json| match json { serde_json::Value::String(text) => Some(text), other => serde_json::to_string(&other).ok() })";
-
-/// Emit the read paths of a field. A field that has no `#[php(prop)]` (`as_property`) gets a
-/// `#[php(getter)]` method, which ext-php-rs registers as the readable property (`$obj->toolCalls`),
-/// and a plain `getToolCalls()` method that calls it. The README reads replies through the
-/// property, and existing callers use the method. The method has its own Rust name because two
-/// functions cannot share one. A field with a prop keeps the plain method only.
-fn add_php_getter(
-    impl_builder: &mut ImplBuilder,
-    getter_ident: &str,
-    field_name: &str,
-    ret: &str,
-    body: &str,
-    as_property: bool,
-) {
-    if !as_property {
-        impl_builder.add_method(&format!("pub fn {getter_ident}(&self) -> {ret} {{\n    {body}\n}}"));
-        return;
-    }
-    impl_builder.add_method(&format!(
-        "#[php(getter)]\npub fn {getter_ident}(&self) -> {ret} {{\n    {body}\n}}"
-    ));
-    let php_name = format!("get{}", pascal_case_php(field_name));
-    impl_builder.add_method(&format!(
-        "#[php(name = \"{php_name}\")]\npub fn read_{field_name}(&self) -> {ret} {{\n    self.{getter_ident}()\n}}"
-    ));
-}
-
-fn pascal_case_php(field_name: &str) -> String {
-    let camel = crate::codegen::naming::to_php_name(field_name);
-    let mut chars = camel.chars();
-    chars
-        .next()
-        .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
-        .unwrap_or_default()
-}

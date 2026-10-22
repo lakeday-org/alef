@@ -1,0 +1,12 @@
+{% if as_property %}
+#[php(getter)]
+{% endif %}
+pub fn {{ getter_ident }}(&self) -> {{ return_type }} {
+    {{ body }}
+}
+{% if as_property %}
+#[php(name = "{{ method }}")]
+pub fn read_{{ field_name }}(&self) -> {{ return_type }} {
+    self.{{ getter_ident }}()
+}
+{% endif %}
