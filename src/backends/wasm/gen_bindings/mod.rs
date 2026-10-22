@@ -1,5 +1,6 @@
 //! WASM (wasm-bindgen) backend: orchestration and `Backend` trait implementation.
 
+pub(crate) mod adapters;
 mod cfg;
 mod components;
 pub mod enums;
@@ -202,7 +203,7 @@ impl Backend for WasmBackend {
         opaque_names_vec.extend(bridge_type_aliases.iter().cloned());
         let opaque_names_set: AHashSet<String> = opaque_names_vec.iter().cloned().collect();
 
-        let adapter_bodies = crate::adapters::build_adapter_bodies(config, Language::Wasm)?;
+        let adapter_bodies = adapters::build_bodies(config, &mapper)?;
 
         let streaming_item_types: ahash::AHashMap<String, String> = config
             .adapters

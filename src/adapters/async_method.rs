@@ -60,7 +60,7 @@ fn is_builtin_type(ty: &str) -> bool {
 /// Build the call arguments with `.into()` conversion.
 /// For `String`/`&str` params, passes `.as_str()` / `.as_deref()` so the
 /// call site receives `&str` when the core method expects it.
-fn call_args(adapter: &AdapterConfig) -> Vec<String> {
+pub(crate) fn call_args(adapter: &AdapterConfig) -> Vec<String> {
     adapter
         .params
         .iter()
@@ -325,24 +325,8 @@ fn gen_elixir_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> St
     )
 }
 
-fn gen_wasm_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> String {
-    let core_path = &adapter.core_path;
-    let raw_returns = adapter.returns.as_deref().unwrap_or("JsValue");
-
-    let map_expr = if raw_returns == "bytes::Bytes" {
-        ".map(|b| b.to_vec())".to_string()
-    } else {
-        format!(".map({raw_returns}::from)")
-    };
-
-    let args = call_args(adapter);
-    let call_str = args.join(", ");
-
-    format!(
-        "self.inner.{core_path}({call_str}).await\n        \
-         {map_expr}\n        \
-         .map_err(|e| JsValue::from_str(&e.to_string()))"
-    )
+fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
+    crate::backends::wasm::gen_bindings::adapters::generate_body(adapter, config)
 }
 
 fn gen_ffi_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {

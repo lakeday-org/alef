@@ -2,6 +2,10 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "adapter_result_body",
+        include_str!("templates/adapter_result_body.jinja"),
+    ),
+    (
         "gen_unregistration_fn",
         include_str!("templates/gen_unregistration_fn.jinja"),
     ),

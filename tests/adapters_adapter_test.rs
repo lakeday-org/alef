@@ -892,10 +892,9 @@ fn test_sync_function_wasm() {
 
     let body = &bodies["calc"];
 
-    assert!(body.contains("JsValue"), "WASM body should use JsValue. Got: {}", body);
     assert!(
-        body.contains("JsValue::from_str"),
-        "WASM body should convert errors to JsValue strings"
+        body.contains(".map_err(alef_wasm_err)"),
+        "WASM body should use the shared typed error converter: {body}"
     );
 }
 

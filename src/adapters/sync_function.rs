@@ -34,7 +34,7 @@ pub fn generate_body(
 }
 
 /// Build the call arguments with `.into()` conversion.
-fn call_args(adapter: &AdapterConfig) -> Vec<String> {
+pub(crate) fn call_args(adapter: &AdapterConfig) -> Vec<String> {
     adapter
         .params
         .iter()
@@ -129,18 +129,8 @@ fn gen_elixir_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> St
     )
 }
 
-fn gen_wasm_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> String {
-    let core_path = &adapter.core_path;
-    let returns = adapter.returns.as_deref().unwrap_or("JsValue");
-
-    let args = call_args(adapter);
-    let call_str = args.join(", ");
-
-    format!(
-        "{core_path}({call_str})\n        \
-         .map({returns}::from)\n        \
-         .map_err(|e| JsValue::from_str(&e.to_string()))"
-    )
+fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
+    crate::backends::wasm::gen_bindings::adapters::generate_body(adapter, config)
 }
 
 fn gen_ffi_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
