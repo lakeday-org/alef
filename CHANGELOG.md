@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Render Go and Swift optional-field compiler regression programs through registered templates and verify every runtime case is emitted.
-
 ## [0.113.0] - 2026-10-22
 
 ### Added
@@ -19,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Render Go and Swift optional-field compiler regression programs through registered templates and verify every runtime case is emitted.
 - Generate nil-safe Go and Swift e2e assertions for optional collection fields, comparing present string values and excluding absent values even when the expected substring is empty.
 - Keep typed-error and payload-getter regression coverage current, including portable Windows compiler discovery and dependency resolution.
 - Keep streaming adapter primitive, unit and fully qualified parameter types valid instead of qualifying them as consumer-crate types.
