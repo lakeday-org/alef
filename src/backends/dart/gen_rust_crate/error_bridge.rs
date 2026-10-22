@@ -2,13 +2,26 @@ use crate::codegen::naming::{PublicIdentifierKind, internal_rust_identifier, pub
 use crate::core::config::Language;
 use crate::core::ir::{ErrorDef, ErrorVariant, FieldDef, TypeRef};
 
-pub(super) fn uses_typed_error(error_type: Option<&str>, errors: &[ErrorDef]) -> bool {
-    error_type.is_some_and(|name| {
-        errors.iter().any(|error| {
-            !error.binding_excluded
-                && (error.rust_path == name || error.original_rust_path == name || error.name == name)
-        })
+pub(super) fn typed_error_definition<'a>(error_type: Option<&str>, errors: &'a [ErrorDef]) -> Option<&'a ErrorDef> {
+    let name = error_type?;
+    errors.iter().find(|error| {
+        !error.binding_excluded
+            && [&error.rust_path, &error.original_rust_path, &error.name]
+                .iter()
+                .any(|path| path.as_str() == name || path.replace('-', "_") == name)
     })
+}
+
+pub(super) fn uses_typed_error(error_type: Option<&str>, errors: &[ErrorDef]) -> bool {
+    typed_error_definition(error_type, errors).is_some()
+}
+
+pub(super) fn core_error_path(error: &ErrorDef, source_crate: &str) -> String {
+    if error.rust_path.is_empty() {
+        format!("{source_crate}::{}", error.name)
+    } else {
+        error.rust_path.replace('-', "_")
+    }
 }
 
 pub(super) fn result_error_type(error_type: Option<&str>, errors: &[ErrorDef]) -> &'static str {
@@ -46,7 +59,7 @@ pub(super) fn emit(out: &mut String, errors: &[ErrorDef], source_crate: &str) {
         encode_arms.push(format!("{dart_name} error => AlefBridgeErrorWire.{dart_factory}(error: error)"));
         crate::alef_context! {
             name => &error.name,
-            core_path => if error.rust_path.is_empty() { format!("{source_crate}::{}", error.name) } else { error.rust_path.replace('-', "_") },
+            core_path => core_error_path(error, source_crate),
             needs_message => error.variants.iter().any(|variant| variant.is_tuple && variant.fields.iter().all(|field| field.binding_excluded)),
             arms => error.variants.iter().map(|variant| variant_arm(error, variant, source_crate)).collect::<Vec<_>>(),
         }
@@ -91,11 +104,7 @@ fn carrier_name(preferred: &str, errors: &[&ErrorDef]) -> String {
 }
 
 fn variant_arm(error: &ErrorDef, variant: &ErrorVariant, source_crate: &str) -> minijinja::Value {
-    let core_path = if error.rust_path.is_empty() {
-        format!("{source_crate}::{}", error.name)
-    } else {
-        error.rust_path.replace('-', "_")
-    };
+    let core_path = core_error_path(error, source_crate);
     crate::alef_context! {
         pattern => variant_pattern(&core_path, variant),
         variant => &variant.name,

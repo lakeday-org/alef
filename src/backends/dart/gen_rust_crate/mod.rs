@@ -36,6 +36,7 @@ mod newtype_conversions;
 mod opaque;
 #[cfg(test)]
 mod optional_enum_field_tests;
+mod streaming;
 mod trait_bridge;
 mod trait_types;
 
@@ -308,6 +309,7 @@ fn emit_lib_rs(
         .adapters
         .iter()
         .filter(|a| matches!(a.pattern, AdapterPattern::Streaming))
+        .filter(|adapter| !adapter.skip_languages.iter().any(|language| language == "dart"))
         .filter_map(|a| {
             a.owner_type.as_deref().map(|owner| {
                 let key = format!("{}.{}", owner, a.name);
@@ -343,6 +345,7 @@ fn emit_lib_rs(
     for ty in api.types.iter().filter(|t| {
         !exclude_types.contains(&t.name) && !t.is_trait && t.is_opaque && !t.binding_excluded && !t.methods.is_empty()
     }) {
+        streaming::emit_transports(&mut content, ty, stub_methods, &streaming_adapters, config, &api.errors);
         content.push('\n');
         opaque::emit_opaque_impl_block(
             &mut content,

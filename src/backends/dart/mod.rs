@@ -17,7 +17,7 @@ pub(crate) mod gen_ffi;
 pub(crate) mod gen_rust_crate;
 pub(crate) mod ident;
 pub mod naming;
-mod template_env;
+pub(crate) mod template_env;
 pub(crate) mod type_map;
 
 #[cfg(test)]

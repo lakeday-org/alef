@@ -1,0 +1,53 @@
+use futures_util::StreamExt;
+use std::sync::OnceLock;
+static FRB_STREAM_TOKIO_RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+// The entire stream runs on a worker; deep consumer futures need a larger stack. ~keep
+const FRB_STREAM_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;
+let _rt = FRB_STREAM_TOKIO_RT.get_or_init(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(FRB_STREAM_RUNTIME_STACK_SIZE_BYTES)
+        .build()
+        .expect("failed to build tokio runtime for FRB streaming")
+});
+let inner = self.inner.clone();
+{% for binding in bindings %}
+{{ binding }}
+{% endfor %}
+_rt.spawn(async move {
+    match inner.{{ core_path }}({{ call_args }}).await {
+        Ok(mut stream) => {
+            while let Some(item) = stream.next().await {
+                match item {
+                    Ok(chunk) => {
+{% if transport and transport.unit_item %}
+                        let _: () = chunk.into();
+                        let value = {{ transport.carrier }}({{ transport.wire }}::Item);
+{% else %}
+                        let value: {{ item_type }} = chunk.into();
+{% if transport %}
+                        let value = {{ transport.carrier }}({{ transport.wire }}::Item { value });
+{% endif %}
+{% endif %}
+                        if sink.add(value).is_err() { break; }
+                    }
+                    Err(error) => {
+                        {% if transport %}
+                        let _ = sink.add({{ transport.carrier }}::from(error));
+{% else %}
+                        let _ = sink.add_error(error.to_string());
+{% endif %}
+                        break;
+                    }
+                }
+            }
+        }
+        Err(error) => {
+            {% if transport %}
+                        let _ = sink.add({{ transport.carrier }}::from(error));
+{% else %}
+                        let _ = sink.add_error(error.to_string());
+{% endif %}
+        }
+    }
+});

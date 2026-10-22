@@ -1,0 +1,39 @@
+{# ~keep FRB hard-codes StreamSink errors to AnyhowException. The success codec decodes #}
+{# the envelope and throws typed errors while retaining the public Stream<Item> surface. #}
+{% if source_cfg %}#[cfg({{ source_cfg }})]
+{% endif %}#[frb(ignore)]
+mod {{ transport.module }} {
+    pub struct {{ transport.carrier }}(pub super::{{ transport.wire }});
+}
+{% if source_cfg %}#[cfg({{ source_cfg }})]
+{% endif %}use {{ transport.module }}::{{ transport.carrier }};
+
+{% if source_cfg %}#[cfg({{ source_cfg }})]
+{% endif %}pub enum {{ transport.wire }} {
+    Item{% if not transport.unit_item %} { value: {{ item_type }} }{% endif %},
+    Error { error: {{ error_type }} },
+    NativeFailure { message: String },
+}
+
+{% if source_cfg %}#[cfg({{ source_cfg }})]
+{% endif %}impl From<{{ core_error_type }}> for {{ transport.carrier }} {
+    fn from(value: {{ core_error_type }}) -> Self {
+        Self(match {{ error_type }}::try_from(value) {
+            Ok(error) => {{ transport.wire }}::Error { error },
+            Err(message) => {{ transport.wire }}::NativeFailure { message },
+        })
+    }
+}
+
+{% if source_cfg %}#[cfg({{ source_cfg }})]
+{% endif %}#[frb(rust2dart(dart_type = "{{ dart_type }}", dart_code = {{ decode_code }}))]
+pub fn {{ transport.converter }}(value: {{ transport.carrier }}) -> {{ transport.wire }} {
+    value.0
+}
+
+{% if source_cfg %}#[cfg({{ source_cfg }})]
+{% endif %}#[frb(dart2rust(dart_type = "{{ dart_type }}", dart_code = {{ encode_code }}))]
+pub fn {{ transport.decoder }}(value: {{ transport.wire }}) -> {{ transport.carrier }} {
+    {{ transport.carrier }}(value)
+}
+

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve typed Dart stream errors and their metadata, including failures after delivered chunks, while retaining the public stream item types (#666).
 - Encode JSON-typed Ruby constructor fields as JSON strings in generated specs and snippets, including optional fields, containers and nested DTOs (#667).
 
 ## [0.113.0] - 2026-10-22

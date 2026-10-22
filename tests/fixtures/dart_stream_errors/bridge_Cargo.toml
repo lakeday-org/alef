@@ -1,0 +1,11 @@
+[package]
+name = "stream-sample-dart"
+version = "1.0.0"
+edition = "2024"
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+flutter_rust_bridge = "=2.13.0"
+futures-util = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "net"] }
+stream_sample = { package = "stream-sample", path = "../core" }

@@ -1,3 +1,4 @@
+use super::streaming::emit_streaming_sink_method;
 use std::collections::HashSet;
 
 use crate::codegen::naming::{PublicIdentifierKind, public_host_identifier};
@@ -141,7 +142,7 @@ pub(super) fn emit_opaque_impl_block(
         if method.sanitized {
             let adapter_key = format!("{type_name}.{method_name}");
             if let Some(adapter) = streaming_adapters.get(&adapter_key) {
-                emit_streaming_sink_method(out, method_name, adapter, types_needing_from_conversion, config);
+                emit_streaming_sink_method(out, method_name, adapter, errors, config);
             } else {
                 out.push_str(&crate::backends::dart::template_env::render(
                     "rust_skipped_sanitized_method_comment.rs.jinja",
@@ -177,57 +178,6 @@ pub(super) fn emit_opaque_impl_block(
     }
 
     out.push_str("}\n");
-}
-
-/// Emit a `pub fn method_name(&self, params..., sink: StreamSink<ItemType>)` method
-/// for a streaming adapter. FRB v2 recognises the `StreamSink<T>` parameter and generates
-/// a `Stream<T>` accessor on the Dart side.
-fn emit_streaming_sink_method(
-    out: &mut String,
-    method_name: &str,
-    adapter: &AdapterConfig,
-    _types_needing_from_conversion: &HashSet<String>,
-    config: &ResolvedCrateConfig,
-) {
-    let item_type = adapter.item_type.as_deref().unwrap_or("()");
-    let params: Vec<String> = adapter
-        .params
-        .iter()
-        .map(|p| {
-            let ty = if p.optional {
-                format!("Option<{}>", p.ty)
-            } else {
-                p.ty.clone()
-            };
-            format!("{}: {ty}", p.name)
-        })
-        .collect();
-    let params_str = if params.is_empty() {
-        String::new()
-    } else {
-        format!(", {}", params.join(", "))
-    };
-
-    let (body, _struct_def) =
-        crate::adapters::streaming::generate_body(adapter, crate::core::config::Language::Dart, config)
-            .unwrap_or_else(|_| {
-                (
-                    String::from(
-                        "compile_error!(\"alef cannot generate this Dart streaming adapter; configure a supported adapter body or exclude the method\")",
-                    ),
-                    None,
-                )
-            });
-
-    out.push_str(&crate::backends::dart::template_env::render(
-        "rust_streaming_sink_method.rs.jinja",
-        crate::alef_context! {
-            method_name => method_name,
-            params_str => params_str.as_str(),
-            item_type => item_type,
-            body => body.as_str(),
-        },
-    ));
 }
 
 /// Emit one method inside an `impl TypeName { }` block for an FRB opaque type.

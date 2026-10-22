@@ -6,6 +6,14 @@ mod static_error_registry_tests;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "rust_streaming_transport.rs.jinja",
+        include_str!("templates/rust_streaming_transport.rs.jinja"),
+    ),
+    (
+        "rust_streaming_body.rs.jinja",
+        include_str!("templates/rust_streaming_body.rs.jinja"),
+    ),
+    (
         "rust_error_static_text_registry.rs.jinja",
         include_str!("templates/rust_error_static_text_registry.rs.jinja"),
     ),

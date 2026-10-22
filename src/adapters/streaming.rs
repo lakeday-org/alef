@@ -1,5 +1,8 @@
+mod dart;
 mod php;
 mod type_paths;
+
+pub(crate) use dart::{generate_body as dart_body, transport_names as dart_transport_names};
 
 use heck::ToSnakeCase;
 use php::gen_php_body;
@@ -36,7 +39,7 @@ pub fn generate_body(
         Language::Rust | Language::C | Language::Jni => {
             anyhow::bail!("Rust/C/JNI do not need generated binding adapters")
         }
-        Language::Dart => Ok(gen_dart_body(adapter, config)),
+        Language::Dart => Ok(dart_body(adapter, config, false)),
         Language::Kotlin | Language::KotlinAndroid | Language::Swift | Language::Gleam | Language::Zig => {
             anyhow::bail!("Phase 1: {language} backend not yet implemented")
         }
@@ -679,53 +682,6 @@ fn gen_r_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String,
          }})"
     );
 
-    (body, None)
-}
-
-fn gen_dart_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String, Option<String>) {
-    let core_path = &adapter.core_path;
-    let item_type = adapter.item_type.as_deref().unwrap_or("()");
-    let core_import = config.core_import_name();
-    let args = call_args(adapter);
-    let call_str = args.join(", ");
-    let let_bindings = core_let_bindings(adapter, &core_import);
-    let bindings_block = if let_bindings.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n        ", let_bindings.join("\n        "))
-    };
-    let body = format!(
-        "use futures_util::StreamExt;\n        \
-         use std::sync::OnceLock;\n        \
-         static FRB_STREAM_TOKIO_RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();\n        \
-         // 16 MiB: the whole stream is driven by `_rt.spawn`, i.e. on a worker thread.\n        \
-         // tokio's ~2 MB default worker stack can overflow on a deep extraction future (a\n        \
-         // nested archive member, a multi-stage OCR pipeline), and a stack overflow aborts\n        \
-         // the process with SIGBUS instead of raising a catchable panic.\n        \
-         const FRB_STREAM_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;\n        \
-         let _rt = FRB_STREAM_TOKIO_RT.get_or_init(|| {{\n            \
-             tokio::runtime::Builder::new_multi_thread()\n                \
-                 .enable_all()\n                \
-                 .thread_stack_size(FRB_STREAM_RUNTIME_STACK_SIZE_BYTES)\n                \
-                 .build()\n                \
-                 .expect(\"failed to build tokio runtime for FRB streaming\")\n        \
-         }});\n        \
-         let inner = self.inner.clone();\n        \
-         {bindings_block}\
-         _rt.spawn(async move {{\n            \
-             match inner.{core_path}({call_str}).await {{\n                \
-                 Ok(mut stream) => {{\n                    \
-                     while let Some(item) = stream.next().await {{\n                        \
-                         match item {{\n                            \
-                             Ok(chunk) => {{ let _ = sink.add({item_type}::from(chunk)); }}\n                            \
-                             Err(e) => {{ let _ = sink.add_error(e.to_string()); break; }}\n                        \
-                         }}\n                    \
-                     }}\n                \
-                 }}\n                \
-                 Err(e) => {{ let _ = sink.add_error(e.to_string()); }}\n            \
-             }}\n        \
-         }});"
-    );
     (body, None)
 }
 
