@@ -875,7 +875,7 @@ mod tests {
             emit_mirror_error(&mut generated, &error, "demo");
             super::super::error_bridge::emit(&mut generated, &[error], "demo");
             let registration = if optional {
-                "::register(value)"
+                "reason.map(alef_static_text_api_error::register)"
             } else {
                 "::register(reason)"
             };

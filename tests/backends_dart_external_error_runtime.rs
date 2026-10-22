@@ -342,24 +342,41 @@ fn main() {
 
 const ROUND_TRIP_DRIVER: &str = r#"
 fn main() {
-    let denied: consumer_core::ConsumerError = (&ConsumerError::Denied { reason: "private_network".into() }).into();
-    match denied {
-        consumer_core::ConsumerError::Denied { reason } => assert_eq!(reason, "private_network"),
+    let native_text = "private_network";
+    let denied = ConsumerError::try_from(consumer_core::ConsumerError::Denied { reason: native_text }).unwrap();
+    let restored = consumer_core::ConsumerError::try_from(&denied).unwrap();
+    match restored {
+        consumer_core::ConsumerError::Denied { reason } => {
+            assert_eq!(reason, native_text);
+            assert!(std::ptr::eq(reason, native_text));
+        }
         other => panic!("borrowed field changed variant: {other:?}"),
     }
-    let again: consumer_core::ConsumerError = (&ConsumerError::Denied { reason: "private_network".into() }).into();
+    let again = consumer_core::ConsumerError::try_from(&denied).unwrap();
     match again {
-        consumer_core::ConsumerError::Denied { reason } => assert_eq!(reason, "private_network"),
+        consumer_core::ConsumerError::Denied { reason } => {
+            assert_eq!(reason, native_text);
+            assert!(std::ptr::eq(reason, native_text));
+        }
         other => panic!("borrowed field changed variant on the second conversion: {other:?}"),
     }
     for expected in [None, Some("borrowed payload")] {
-        let mirror = ConsumerError::OptionalBorrowed { reason: expected.map(String::from) };
-        match consumer_core::ConsumerError::from(&mirror) {
-            consumer_core::ConsumerError::OptionalBorrowed { reason } => assert_eq!(reason, expected),
+        let mirror = ConsumerError::try_from(consumer_core::ConsumerError::OptionalBorrowed { reason: expected }).unwrap();
+        match consumer_core::ConsumerError::try_from(&mirror).unwrap() {
+            consumer_core::ConsumerError::OptionalBorrowed { reason } => {
+                assert_eq!(reason, expected);
+                if let (Some(actual), Some(original)) = (reason, expected) {
+                    assert!(std::ptr::eq(actual, original));
+                }
+            }
             other => panic!("optional borrowed field changed variant: {other:?}"),
         }
     }
-    let owned: consumer_core::ConsumerError = (&ConsumerError::Owned { reason: "owned payload".into() }).into();
+    let unknown = ConsumerError::Denied { reason: "unregistered mirror text".into() };
+    assert!(consumer_core::ConsumerError::try_from(&unknown).unwrap_err().contains("reconstructing borrowed error"));
+    let unknown_optional = ConsumerError::OptionalBorrowed { reason: Some("unregistered optional text".into()) };
+    assert!(consumer_core::ConsumerError::try_from(&unknown_optional).is_err());
+    let owned = consumer_core::ConsumerError::try_from(&ConsumerError::Owned { reason: "owned payload".into() }).unwrap();
     match owned {
         consumer_core::ConsumerError::Owned { reason } => assert_eq!(reason, "owned payload"),
         other => panic!("owned field changed variant: {other:?}"),

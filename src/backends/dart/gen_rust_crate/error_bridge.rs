@@ -153,6 +153,27 @@ fn variant_fields(error: &ErrorDef, variant: &ErrorVariant, source_crate: &str) 
     fields
 }
 
+fn optional_field_expression(
+    binding: &str,
+    flatten: &str,
+    field: &FieldDef,
+    source_crate: &str,
+    static_text_module: &str,
+) -> String {
+    let mapper = if !field.sanitized
+        && field.ty == TypeRef::String
+        && field.core_wrapper == crate::core::ir::CoreWrapper::StaticStr
+    {
+        format!("{static_text_module}::register")
+    } else {
+        format!(
+            "|value| {}",
+            field_expression("value", field, source_crate, static_text_module)
+        )
+    };
+    format!("{binding}{flatten}.map({mapper})")
+}
+
 fn field_expression(binding: &str, field: &FieldDef, source_crate: &str, static_text_module: &str) -> String {
     if let TypeRef::Optional(inner_ty) = &field.ty {
         let inner = FieldDef {
@@ -161,20 +182,14 @@ fn field_expression(binding: &str, field: &FieldDef, source_crate: &str, static_
             ..field.clone()
         };
         let flatten = if field.optional { ".flatten()" } else { "" };
-        return format!(
-            "{binding}{flatten}.map(|value| {})",
-            field_expression("value", &inner, source_crate, static_text_module)
-        );
+        return optional_field_expression(binding, flatten, &inner, source_crate, static_text_module);
     }
     if field.optional {
         let inner = FieldDef {
             optional: false,
             ..field.clone()
         };
-        return format!(
-            "{binding}.map(|value| {})",
-            field_expression("value", &inner, source_crate, static_text_module)
-        );
+        return optional_field_expression(binding, "", &inner, source_crate, static_text_module);
     }
     if let TypeRef::Duration = field.ty {
         return format!("{binding}.as_millis() as i64");
