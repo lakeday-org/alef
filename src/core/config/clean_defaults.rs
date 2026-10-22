@@ -160,20 +160,10 @@ mod tests {
         assert_eq!(argv.steps.len(), 1);
         let step = &argv.steps[0];
         assert_eq!(step.command, "rm");
-        for expected in [
-            "-rf",
-            "__pycache__",
-            ".pytest_cache",
-            ".mypy_cache",
-            ".ruff_cache",
-            "dist",
-        ] {
-            assert!(
-                step.args.iter().any(|a| a == expected),
-                "expected arg {expected:?} in {:?}",
-                step.args
-            );
-        }
+        assert_eq!(
+            step.args,
+            ["-rf", "__pycache__", ".pytest_cache", ".ruff_cache", "dist"]
+        );
     }
 
     /// RED (pre-fix)/GREEN (post-fix): a Python package output directory containing shell

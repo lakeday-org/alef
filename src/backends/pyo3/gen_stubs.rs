@@ -653,7 +653,7 @@ module_name = "test_lib"
     }
 
     /// A class-level attribute annotation and a same-named `def` in one `.pyi` class body is a
-    /// redefinition (`mypy: Name "providers" already defined`). The attribute wins, matching the
+    /// redefinition of `providers`. The attribute wins, matching the
     /// binding, which drops the same-named `#[pymethods]` wrapper.
     #[test]
     fn class_stub_emits_a_field_and_same_named_method_once() {

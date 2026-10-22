@@ -1777,8 +1777,8 @@ fn test_pyi_stub_escapes_python_keyword_variant_names() {
 }
 
 /// Opaque types with a `[workspace.client_constructors.TypeName]` entry must emit a `def
-/// __init__(self, ...) -> None: ...` stub so mypy accepts `TypeName(params...)` call sites.
-/// Without it mypy infers a no-arg `__init__` and rejects every construction call site.
+/// __init__(self, ...) -> None: ...` stub so type checkers accept `TypeName(params...)` call sites.
+/// Without it a type checker infers a no-arg `__init__` and rejects every construction call site.
 #[test]
 fn test_opaque_type_with_constructor_emits_init_stub() {
     let backend = Pyo3Backend;

@@ -11,8 +11,7 @@ use crate::core::ir::{ApiSurface, MethodDef, TypeDef, TypeRef};
 
 /// Builtin type names that a struct field can shadow. When a field is named after one of these
 /// (e.g. a field `bytes`), that name refers to the field variable inside the class body, so any
-/// annotation using the builtin resolves to the field instead of the type — and mypy `--strict`
-/// rejects it (`Variable "X.bytes" is not valid as a type [valid-type]`). Qualifying such
+/// annotation using the builtin resolves to the field instead of the type. Qualifying such
 /// annotations as `builtins.<name>` breaks the shadowing; `gen_stubs.rs` emits `import builtins`
 /// whenever the body references it.
 /// The builtins shadowed by a field name in `typ`, using the resolved Python stub field names.
@@ -176,9 +175,9 @@ pub(super) fn gen_type_stub(
     for method in &typ.methods {
         if !method.is_static {
             // The attribute above already binds this name in the class body, so a same-named
-            // `def` is a redefinition (`mypy: Name "x" already defined`). The binding drops the
-            // matching `#[pymethods]` wrapper for the same reason — see the pyo3 `gen_bindings`
-            // collision guard — so the stub must not advertise it either. ~keep
+            // `def` is a redefinition. The binding drops the matching `#[pymethods]` wrapper for the
+            // same reason — see the pyo3 `gen_bindings` collision guard — so the stub must not
+            // advertise it either. ~keep
             if emitted_attribute_names.contains(&method.name) {
                 continue;
             }

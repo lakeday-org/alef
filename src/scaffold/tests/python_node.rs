@@ -228,6 +228,16 @@ fn test_scaffold_python_production_features() {
     assert!(content.contains("urls.repository"));
     assert!(content.contains("repository ="));
     assert!(content.contains("[tool.pyrefly]"));
+    let manifest: toml::Value = toml::from_str(content).expect("valid Python manifest");
+    let dev = manifest["dependency-groups"]["dev"]
+        .as_array()
+        .expect("dev dependencies");
+    assert_eq!(
+        dev.len(),
+        1,
+        "the only development dependency should be the type checker"
+    );
+    assert!(dev[0].as_str().expect("dependency string").starts_with("pyrefly>="));
     assert!(!content.contains("[tool.ruff]"), "ruff config moved to poly.toml");
 }
 
@@ -293,10 +303,6 @@ keywords = ["zebra", "apple", "banana"]
         "ruff config must not be emitted into pyproject.toml — it lives in poly.toml. got:\n{content}"
     );
 
-    assert!(
-        !content.contains("[tool.mypy]"),
-        "mypy config must not be emitted — pyrefly replaces it. got:\n{content}"
-    );
     assert!(
         content.contains("[tool.pyrefly]") && content.contains("preset = \"strict\""),
         "should emit [tool.pyrefly] with strict preset. got:\n{content}"

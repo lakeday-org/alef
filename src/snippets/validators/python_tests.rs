@@ -369,7 +369,6 @@ fn pyrefly_command_matches_scaffolded_python_tooling() {
 #[test]
 fn unavailable_diagnostic_names_only_the_supported_checker() {
     assert_eq!(PYREFLY_UNAVAILABLE, "pyrefly is not available for Python type-checking");
-    assert!(!PYREFLY_UNAVAILABLE.contains("mypy"));
 }
 
 #[test]

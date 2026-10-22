@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generated Elixir tests for a mid-stream error now read the stream. The test accepts `{:error, reason}` from the call, or the exception that the enumeration raises, and fails when the stream ends without an error.
 - The Python constructor of a class with a JSON-typed field now raises `ValueError` that names the field when the string is not valid JSON. Before, the conversion dropped the field and the call went on without it.
 
+### Changed
+
+- Keep Python tooling guidance and cleanup defaults aligned with Pyrefly.
+
 ## [0.112.0] - 2026-10-21
 
 ### Added
@@ -15045,7 +15049,7 @@ could actually install.
 - **pyo3** (#174): `.pyi` stub field annotations that shadow a builtin (e.g. a
   field named `bytes`) are now qualified as `builtins.bytes` for both the field
   and `__init__` signatures, and `gen_stubs` auto-imports `builtins` — fixing a
-  `mypy --strict` `valid-type` error. Salvages the #173 regression test onto
+  strict type-checking error. Salvages the #173 regression test onto
   main (the `binding_fields` converter filter has been present since 0.31.0).
 
 ## [0.32.0] - 2026-07-04
@@ -15495,8 +15499,8 @@ could actually install.
 
 - **scaffold**: emit a single repo-root `poly.toml` that drives lint, format, git hooks, and
   commit-message policy, replacing `.pre-commit-config.yaml` and the per-tool config files
-  (`[tool.ruff]`, `[tool.mypy]`, `phpstan.neon`, `.php-cs-fixer.dist.php`, `.lintr`, `.typos.toml`,
-  `.rumdl.toml`). Python type-checking moves from mypy to pyrefly. The emitted config excludes
+  (`[tool.ruff]`, `phpstan.neon`, `.php-cs-fixer.dist.php`, `.lintr`, `.typos.toml`,
+  `.rumdl.toml`). Python type-checking uses Pyrefly. The emitted config excludes
   Jinja templates from poly (reformatting them corrupts `{{ }}` placeholders) and carries
   generated-test-code lint allowances so regenerated e2e/test-app suites stay clean.
 
@@ -15540,14 +15544,14 @@ could actually install.
 
 - **snippets**: `typecheck` validation level. Ordered between `compile` and `run`, it statically
   type-checks a snippet without executing it, and for compiled languages without needing the native
-  library. Each language runs its strict static checker: `python -m mypy`, `tsc --noEmit`,
+  library. Each language runs its strict static checker: a Python static type checker, `tsc --noEmit`,
   `cargo check`, `go vet`, `javac -Xlint:all -Werror`, `dotnet build -warnaserror`,
   `swiftc -typecheck -warnings-as-errors`, `kotlinc -Werror`, `dart analyze --fatal-infos`, and
   `cc -fsyntax-only -Wall -Werror`. This catches dual-representation mistakes (a config field typed
   against a flattened union alias that rejects the documented data-enum constructor) that
   `py_compile` and a lenient compile cannot see. A matching `snippet:typecheck-only` ceiling
-  annotation sits alongside `syntax-only` and `compile-only`. mypy is optional: when it is not
-  installed the Python snippet is reported as unavailable rather than failing.
+  annotation sits alongside `syntax-only` and `compile-only`. When the Python static checker is not
+  installed, the Python snippet is reported as unavailable rather than failing.
 
 ### Fixed
 
@@ -15592,7 +15596,7 @@ could actually install.
   `register_fn`, emit only the bridge's duck-typed registration. The function loop no longer also
   emits the auto-wrapped core version, which collided (`E0428`) with the bridge definition and no
   longer type-checks against a registry that takes `Arc<dyn Trait>`.
-- **pyo3**: the generated Python package now type-checks clean under `mypy`. Data-enum config fields
+- **pyo3**: the generated Python package now passes strict static checking. Data-enum config fields
   are annotated against their public class (so `EmbeddingConfig(model=EmbeddingModelType.plugin(...))`
   is accepted) instead of a flattened union alias that shadowed the class; constructors accept the
   public dataclass/dict for factory parameters; data-enum `__init__` signatures match the runtime
@@ -15792,7 +15796,7 @@ could actually install.
 - **pyo3 (Python): qualify builtin containers shadowed by a data-enum variant factory name.**
   A data enum with a `List` variant emits a `def list(...)` `@staticmethod` factory, which shadows the
   builtin `list` within the class body — so a sibling factory annotated `entries: list[MetadataEntry]`
-  resolves to the factory and mypy rejects the `.pyi`
+  resolves to the factory and the type checker rejects the `.pyi`
   (`Function ... is not valid as a type [valid-type]`). Factory annotations now qualify a shadowed
   builtin container (`list`/`dict`/`set`/`tuple`/`frozenset`/`type`) as `builtins.<name>[...]`, and the
   stub emits `import builtins` when referenced.

@@ -2,7 +2,7 @@
 //!
 //! Emits the single config that drives `poly lint`, `poly fmt`, `poly hooks`,
 //! and `poly commit` — replacing the former `.pre-commit-config.yaml` and the
-//! per-tool config files (`[tool.ruff]`, `[tool.mypy]`, `phpstan.neon`,
+//! per-tool config files (`[tool.ruff]`, `phpstan.neon`,
 //! `.php-cs-fixer.dist.php`, `.lintr`, `.typos.toml`).
 //!
 //! poly covers most languages natively with zero system dependencies (ruff for

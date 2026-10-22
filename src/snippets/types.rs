@@ -282,7 +282,7 @@ impl std::str::FromStr for Language {
 pub enum ValidationLevel {
     Syntax,
     Compile,
-    /// Static type-checking without executing the code (e.g. `mypy` for Python, `tsc` for
+    /// Static type-checking without executing the code (e.g. `pyrefly check` for Python, `tsc` for
     /// TypeScript). Deeper than `Compile` for dynamically-typed languages whose compile step is
     /// only a bytecode/syntax pass; equivalent to `Compile` for languages whose compiler already
     /// type-checks. Ordered between `Compile` and `Run` so it is the strongest static guarantee

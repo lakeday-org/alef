@@ -17,14 +17,7 @@ pub(super) fn python_config(output_dir: &str) -> CleanConfig {
         argv_clean: Some(cd_and_run(
             output_dir,
             "rm",
-            &[
-                "-rf",
-                "__pycache__",
-                ".pytest_cache",
-                ".mypy_cache",
-                ".ruff_cache",
-                "dist",
-            ],
+            &["-rf", "__pycache__", ".pytest_cache", ".ruff_cache", "dist"],
         )),
     }
 }

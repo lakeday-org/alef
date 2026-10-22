@@ -252,7 +252,6 @@ pub mod pypi {
     // same limitation documented on `gem`'s constraints. The floor admits every 1.x at build time.
     pub const MATURIN_BUILD_REQUIRES: &str = "maturin>=1.0,<2.0";
 
-    // Replaces mypy: pyrefly is a fast single-binary Rust type-checker, run as a
     // Floor raised from >=1.2.0 in response to alef issue #457: pyrefly 1.2.0 and 1.2.1 report
     // zero errors for an open (non-PEP-728) kwargs `TypedDict` unpacked with `**helper(...)` even
     // under `preset = "strict"` -- confirmed empirically by running both versions against the
