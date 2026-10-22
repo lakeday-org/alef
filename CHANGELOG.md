@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.113.1] - 2026-10-22
+
 ### Fixed
 
 - Exclude skipped error fields from Swift payload serialization and public error cases, preserving visible payloads without requiring skipped native types to implement Serialize (#668).
