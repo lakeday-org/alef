@@ -6,6 +6,8 @@
 //! - `build.rs` — calls `swift_bridge_build::parse_bridges` to run codegen at build time
 
 pub(crate) mod bridge_error;
+#[cfg(test)]
+mod bridge_error_skipped_fields_tests;
 mod callback_files;
 pub(crate) mod cargo;
 #[cfg(test)]

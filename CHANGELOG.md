@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Exclude skipped error fields from Swift payload serialization and public error cases, preserving visible payloads without requiring skipped native types to implement Serialize (#668).
 - Preserve typed Dart stream errors and their metadata, including failures after delivered chunks, while retaining the public stream item types (#666).
 - Encode JSON-typed Ruby constructor fields as JSON strings in generated specs and snippets, including optional fields, containers and nested DTOs (#667).
 

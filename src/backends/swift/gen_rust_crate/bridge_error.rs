@@ -6,7 +6,7 @@
 //! converted once, in `alef_bridge_error`, and the Swift facade converts the thrown value into the
 //! typed Swift error.
 
-use crate::core::ir::{ApiSurface, ErrorDef, PrimitiveType, TypeRef};
+use crate::core::ir::{ApiSurface, ErrorDef, FieldDef, PrimitiveType, TypeRef};
 
 /// Name of the opaque error type in the bridge module.
 pub(crate) const BRIDGE_ERROR_TYPE: &str = "AlefBridgeError";
@@ -48,12 +48,16 @@ struct PayloadField {
     binding: String,
 }
 
+fn payload_field_supported(field: &FieldDef) -> bool {
+    !field.binding_excluded && super::super::gen_bindings::errors::bridge_payload_supported(&field.ty)
+}
+
 fn payload_fields(variant: &crate::core::ir::ErrorVariant) -> Vec<PayloadField> {
     variant
         .fields
         .iter()
         .enumerate()
-        .filter(|(_, field)| super::super::gen_bindings::errors::bridge_payload_supported(&field.ty))
+        .filter(|(_, field)| payload_field_supported(field))
         .map(|(index, field)| PayloadField {
             key: serde_json::to_string(&field.name).expect("field names are strings"),
             binding: format!("__alef_field_{index}"),
@@ -70,7 +74,7 @@ fn payload_pattern(rust_path: &str, variant: &crate::core::ir::ErrorVariant) -> 
         .iter()
         .enumerate()
         .map(|(index, field)| {
-            let binding = if super::super::gen_bindings::errors::bridge_payload_supported(&field.ty) {
+            let binding = if payload_field_supported(field) {
                 format!("__alef_field_{index}")
             } else {
                 "_".to_string()

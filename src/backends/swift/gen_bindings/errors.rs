@@ -39,11 +39,10 @@ fn is_status_field(field: &FieldDef) -> bool {
 /// error converted from the bridge fills it and `statusCode` reads it back.
 fn swift_view(error: &ErrorDef) -> ErrorDef {
     let mut view = error.clone();
-    if !has_status_code_method(error) {
-        return view;
-    }
+    let has_status = has_status_code_method(error);
     for variant in &mut view.variants {
-        if variant.fields.iter().any(is_status_field) {
+        variant.fields.retain(|field| !field.binding_excluded);
+        if !has_status || variant.fields.iter().any(is_status_field) {
             continue;
         }
         variant.is_unit = false;

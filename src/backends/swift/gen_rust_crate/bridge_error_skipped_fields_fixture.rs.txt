@@ -1,0 +1,28 @@
+#[derive(Debug)]
+#[cfg_attr(alef, derive(thiserror::Error))]
+pub enum SampleFailure {
+    Hidden(#[cfg_attr(alef, alef(skip))] serde_json::Error),
+    Named {
+        message: String,
+        #[cfg_attr(alef, alef(skip))]
+        source: serde_json::Error,
+    },
+    Mixed(
+        #[cfg_attr(alef, alef(skip))] serde_json::Error,
+        String,
+        #[cfg_attr(alef, alef(skip))] serde_json::Error,
+    ),
+    Secrets {
+        #[cfg_attr(alef, alef(skip))]
+        token: String,
+        message: String,
+    },
+}
+
+impl std::fmt::Display for SampleFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("sample failure")
+    }
+}
+
+impl std::error::Error for SampleFailure {}
