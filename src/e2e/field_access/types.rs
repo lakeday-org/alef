@@ -402,6 +402,9 @@ pub struct IrEnumMap {
     /// through an enum can only be rendered once the generator knows which variant the segment
     /// names and what that variant holds. ~keep
     pub variant_shapes: HashMap<String, Vec<VariantShape>>,
+    /// Serde keys apply after a Python getter switches traversal into parsed JSON. ~keep
+    pub struct_wire_fields: HashMap<String, HashMap<String, String>>,
+    pub struct_wire_kinds: HashMap<String, HashMap<String, WireValueKind>>,
     pub root_type: Option<String>,
 }
 
@@ -421,6 +424,22 @@ pub struct VariantShape {
     /// bindings carry such an enum as the bare union of its payloads, so the variant's value is
     /// the enum value itself and the variant name is not a property.
     pub untagged_newtype: bool,
+    /// The backend allocates this public getter separately from its constructor. ~keep
+    pub python_getter: String,
+    /// Serialized enums may surround the payload with variant or content keys. ~keep
+    pub python_wire_prefix: Vec<String>,
+    /// Wire keys remain separate from public getter names. ~keep
+    pub python_wire_fields: HashMap<String, String>,
+    pub wire_kinds: HashMap<String, WireValueKind>,
+}
+
+/// Checks that keep dynamic JSON traversal typed without unchecked casts. ~keep
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum WireValueKind {
+    #[default]
+    Unknown,
+    String,
+    Collection,
 }
 
 #[derive(Debug, Clone)]

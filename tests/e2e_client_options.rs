@@ -98,6 +98,22 @@ fn generate(codegen: &dyn E2eCodegen, cfg: &NewAlefConfig, group: FixtureGroup) 
 const RUST_FACTORIES: &str = "crate_name = \"demo_client\"\nclient_factory = \"create_client\"\nclient_factory_from_json = \"create_client_from_json\"";
 
 #[test]
+fn rust_embedded_mock_preserves_response_delay_for_plain_and_streaming_routes() {
+    let cfg = build_config("rust", RUST_FACTORIES);
+    for streaming in [false, true] {
+        let mut group = build_group(None);
+        let mock = group.fixtures[0].mock_response.as_mut().unwrap();
+        mock.delay_ms = Some(137);
+        mock.stream_chunks = streaming.then(|| vec![serde_json::json!({"text": "hello"})]);
+        let output = generate(&RustE2eCodegen, &cfg, group);
+        assert!(
+            output.contains("delay_ms: Some(137)"),
+            "streaming={streaming}: {output}"
+        );
+    }
+}
+
+#[test]
 fn rust_writes_client_options_into_the_json_the_factory_reads() {
     let cfg = build_config("rust", RUST_FACTORIES);
     let content = generate(&RustE2eCodegen, &cfg, build_group(options()));

@@ -1,0 +1,8 @@
+{% if field %}
+{{ enum_name }}::{{ variant }} { {{ field }}: v, .. } => v
+{% else %}
+{{ enum_name }}::{{ variant }}(v) => v
+{% endif %}
+{% if fallback %}
+, _ => panic!("expected {{ enum_name }}::{{ variant }}")
+{% endif %}

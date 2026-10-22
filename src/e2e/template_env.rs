@@ -2,6 +2,26 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "typescript/json_member.ts.jinja",
+        include_str!("templates/typescript/json_member.ts.jinja"),
+    ),
+    (
+        "typescript/json_guard.ts.jinja",
+        include_str!("templates/typescript/json_guard.ts.jinja"),
+    ),
+    (
+        "rust/mock_route_delays.rs.jinja",
+        include_str!("templates/rust/mock_route_delays.rs.jinja"),
+    ),
+    (
+        "rust/variant_match_arms.rs.jinja",
+        include_str!("templates/rust/variant_match_arms.rs.jinja"),
+    ),
+    (
+        "rust/variant_match.rs.jinja",
+        include_str!("templates/rust/variant_match.rs.jinja"),
+    ),
+    (
         "rust/shared_runtime.rs.jinja",
         include_str!("templates/rust/shared_runtime.rs.jinja"),
     ),

@@ -7,7 +7,7 @@ use super::super::optional_renderers::{
 };
 use super::super::parse::parse_path;
 use super::super::python_renderer::{
-    python_element_owner_type, render_python_element_with_optionals, render_python_with_optionals,
+    PythonAccessContext, python_element_owner_type, render_python_element_with_optionals, render_python_with_optionals,
 };
 use super::super::renderers::{render_accessor, render_swift_with_first_class_map};
 use super::super::types::{FieldResolver, PathSegment};
@@ -103,14 +103,18 @@ impl FieldResolver {
         let effective = self.resolve(element_path);
         let segments = parse_path(effective);
         let segments = self.inject_array_indexing(segments);
+        let steps = self.python_element_access_steps(effective, &array_effective);
         render_python_element_with_optionals(
             &segments,
             element_var,
             &self.optional_fields,
             &self.python_typeddict_map,
             &self.python_map_value_edges,
-            owner_type,
-            element_in_json,
+            PythonAccessContext {
+                owner_type,
+                steps: &steps,
+                start_in_json: element_in_json,
+            },
         )
     }
 
@@ -443,18 +447,26 @@ impl FieldResolver {
             // `render_wasm`, which knows nothing about optionality, so a fixture with an
             // `Option<T>` field got `result.document?.nodes` for node and the `TS18048`
             // `result.document.nodes` for wasm. Only the map lowering differs. ~keep
-            "typescript" | "node" => render_typescript_with_optionals(
-                &self.bare_variant_segments(&segments),
-                result_var,
-                &self.optional_fields,
-                TypescriptMapAccess::Index,
-            ),
-            "wasm" => render_typescript_with_optionals(
-                &self.bare_variant_segments(&segments),
-                result_var,
-                &self.optional_fields,
-                TypescriptMapAccess::MapGet,
-            ),
+            "typescript" | "node" => self
+                .typescript_json_union_accessor(&segments, result_var, TypescriptMapAccess::Index)
+                .unwrap_or_else(|| {
+                    render_typescript_with_optionals(
+                        &segments,
+                        result_var,
+                        &self.optional_fields,
+                        TypescriptMapAccess::Index,
+                    )
+                }),
+            "wasm" => self
+                .typescript_json_union_accessor(&segments, result_var, TypescriptMapAccess::MapGet)
+                .unwrap_or_else(|| {
+                    render_typescript_with_optionals(
+                        &segments,
+                        result_var,
+                        &self.optional_fields,
+                        TypescriptMapAccess::MapGet,
+                    )
+                }),
             "java" => render_java_with_optionals(&segments, result_var, &self.optional_fields),
             "kotlin" => render_kotlin_with_optionals(&segments, result_var, &self.optional_fields),
             // kotlin_android data classes expose fields as Kotlin properties (no parens),
@@ -505,7 +517,7 @@ impl FieldResolver {
                 &self.optional_fields,
                 &self.python_typeddict_map,
                 &self.python_map_value_edges,
-                &self.python_json_crossings(&segments),
+                &self.python_access_steps(&segments),
             ),
             _ => render_accessor(&segments, language, result_var),
         }

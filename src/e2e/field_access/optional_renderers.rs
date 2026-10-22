@@ -431,10 +431,19 @@ fn push_rust_field_or_variant(
 ) {
     if let Some(arms) = variant_matches.get(path_so_far) {
         let inner = std::mem::take(out);
-        *out = format!("(match &{inner} {{ {arms} }})");
+        *out = crate::e2e::template_env::render(
+            "rust/variant_match.rs.jinja",
+            minijinja::context! {
+                value => inner, arms,
+            },
+        )
+        .trim_end()
+        .to_string();
     } else {
         out.push('.');
-        out.push_str(&name.to_snake_case());
+        out.push_str(&crate::codegen::naming::internal_rust_identifier(
+            &crate::codegen::naming::pascal_to_snake(name),
+        ));
     }
 }
 

@@ -48,12 +48,20 @@
 use super::optional_renderers::{push_key_field_name, push_key_index_suffix};
 use super::renderers::quoted_key_literal;
 use super::types::{PathSegment, PythonMapValueEdges, PythonTypedDictMap};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-struct PythonAccessOwner<'a> {
-    owner_type: Option<String>,
-    json_crossings: &'a HashSet<String>,
-    start_in_json: bool,
+#[derive(Clone)]
+pub(super) struct PythonAccessStep {
+    pub native_suffix: Option<String>,
+    pub json_keys: Vec<String>,
+    pub kind: super::types::WireValueKind,
+    pub starts_json: bool,
+}
+
+pub(super) struct PythonAccessContext<'a> {
+    pub owner_type: Option<String>,
+    pub steps: &'a HashMap<String, PythonAccessStep>,
+    pub start_in_json: bool,
 }
 
 /// Render a Python accessor expression, wrapping every point where the chain crosses an
@@ -70,7 +78,7 @@ pub(super) fn render_python_with_optionals(
     optional_fields: &HashSet<String>,
     typeddict_map: &PythonTypedDictMap,
     map_value_edges: &PythonMapValueEdges,
-    json_crossings: &HashSet<String>,
+    json_crossings: &HashMap<String, PythonAccessStep>,
 ) -> String {
     render_python_with_optionals_from_owner(
         segments,
@@ -78,9 +86,9 @@ pub(super) fn render_python_with_optionals(
         optional_fields,
         typeddict_map,
         map_value_edges,
-        PythonAccessOwner {
+        PythonAccessContext {
             owner_type: typeddict_map.root_type.clone(),
-            json_crossings,
+            steps: json_crossings,
             start_in_json: false,
         },
     )
@@ -97,8 +105,7 @@ pub(super) fn render_python_element_with_optionals(
     optional_fields: &HashSet<String>,
     typeddict_map: &PythonTypedDictMap,
     map_value_edges: &PythonMapValueEdges,
-    owner_type: Option<String>,
-    start_in_json: bool,
+    context: PythonAccessContext<'_>,
 ) -> String {
     render_python_with_optionals_from_owner(
         segments,
@@ -106,11 +113,7 @@ pub(super) fn render_python_element_with_optionals(
         optional_fields,
         typeddict_map,
         map_value_edges,
-        PythonAccessOwner {
-            owner_type,
-            json_crossings: &HashSet::new(),
-            start_in_json,
-        },
+        context,
     )
 }
 
@@ -120,13 +123,13 @@ fn render_python_with_optionals_from_owner(
     optional_fields: &HashSet<String>,
     typeddict_map: &PythonTypedDictMap,
     map_value_edges: &PythonMapValueEdges,
-    owner: PythonAccessOwner<'_>,
+    context: PythonAccessContext<'_>,
 ) -> String {
-    let PythonAccessOwner {
+    let PythonAccessContext {
         owner_type,
-        json_crossings,
+        steps: json_crossings,
         start_in_json,
-    } = owner;
+    } = context;
     let last_index = segments.len().saturating_sub(1);
     let mut crossings: Vec<usize> = Vec::new();
     let mut path_so_far = String::new();
@@ -143,9 +146,11 @@ fn render_python_with_optionals_from_owner(
         result_var,
         typeddict_map,
         map_value_edges,
-        owner_type.clone(),
-        json_crossings,
-        start_in_json,
+        PythonAccessContext {
+            owner_type: owner_type.clone(),
+            steps: json_crossings,
+            start_in_json,
+        },
     );
     for &index in crossings.iter().rev() {
         let condition = render_python_accessor_from_owner(
@@ -153,9 +158,11 @@ fn render_python_with_optionals_from_owner(
             result_var,
             typeddict_map,
             map_value_edges,
-            owner_type.clone(),
-            json_crossings,
-            start_in_json,
+            PythonAccessContext {
+                owner_type: owner_type.clone(),
+                steps: json_crossings,
+                start_in_json,
+            },
         );
         expression = format!("({expression} if {condition} else None)");
     }
@@ -240,9 +247,11 @@ pub(super) fn render_python_accessor(
         result_var,
         map,
         map_value_edges,
-        map.root_type.clone(),
-        &HashSet::new(),
-        false,
+        PythonAccessContext {
+            owner_type: map.root_type.clone(),
+            steps: &HashMap::new(),
+            start_in_json: false,
+        },
     )
 }
 
@@ -254,53 +263,42 @@ fn render_python_accessor_from_owner(
     result_var: &str,
     map: &PythonTypedDictMap,
     map_value_edges: &PythonMapValueEdges,
-    owner_type: Option<String>,
-    json_crossings: &HashSet<String>,
-    start_in_json: bool,
+    context: PythonAccessContext<'_>,
 ) -> String {
     let mut out = result_var.to_string();
-    let mut current_type = owner_type;
+    let mut current_type = context.owner_type;
+    let json_crossings = context.steps;
     // ~keep Below a dict-shaped variant getter the value is `json.loads` output, so every field
     // is a dict lookup whatever the IR says about the type that owns it. `json_crossings` holds
     // the tracked path keys of those getters; the getter itself is still read as an attribute.
-    let mut in_json = start_in_json;
+    let mut in_json = context.start_in_json;
     let mut path_so_far = String::new();
     for seg in segments {
         push_key_field_name(&mut path_so_far, seg);
+        let owner = current_type.as_deref();
+        let step = json_crossings.get(&path_so_far);
         match seg {
             PathSegment::Field(f) => {
-                push_segment_field(&mut out, f, in_json, current_type.as_deref(), map);
+                push_variant_field(&mut out, f, in_json, owner, map, step);
                 current_type = map.advance(current_type.as_deref(), f);
             }
             PathSegment::ArrayField { name, index } => {
                 if !name.is_empty() {
-                    push_segment_field(&mut out, name, in_json, current_type.as_deref(), map);
+                    push_variant_field(&mut out, name, in_json, owner, map, step);
                     current_type = map.advance(current_type.as_deref(), name);
                 }
                 out.push_str(&format!("[{index}]"));
             }
             PathSegment::MapAccess { field, key } => {
-                push_segment_field(&mut out, field, in_json, current_type.as_deref(), map);
-                // ~keep The key/index suffix itself is unaffected by `TypedDict`-ness (the map is
-                // a plain `dict` whatever the owning struct's DTO style), mirroring
-                // `render_dot_access`. The owner cursor, however, MUST advance to the map's VALUE
-                // type here: everything after `extras[key]` belongs to the value, and classifying
-                // it against the type that merely OWNS `extras` answers a question about the
-                // wrong type. See [`advance_through_map_access`] for the no-edge case.
-                current_type = advance_through_map_access(current_type, field, map_value_edges);
-                if key.chars().all(|c| c.is_ascii_digit()) {
-                    let idx: usize = key.parse().unwrap_or(0);
-                    out.push_str(&format!("[{idx}]"));
-                } else {
-                    out.push_str(&format!(".get({})", quoted_key_literal(key)));
-                }
+                push_variant_field(&mut out, field, in_json, owner, map, step);
+                push_python_map_key(&mut out, &mut current_type, field, key, map_value_edges);
             }
             PathSegment::Length => {
                 let current = std::mem::take(&mut out);
                 out = format!("len({current})");
             }
         }
-        if json_crossings.contains(&path_so_far) {
+        if json_crossings.get(&path_so_far).is_some_and(|step| step.starts_json) {
             in_json = true;
         }
         push_key_index_suffix(&mut path_so_far, seg);
@@ -308,8 +306,48 @@ fn render_python_accessor_from_owner(
     out
 }
 
+fn push_python_map_key(
+    out: &mut String,
+    current_type: &mut Option<String>,
+    field: &str,
+    key: &str,
+    map_value_edges: &PythonMapValueEdges,
+) {
+    // ~keep Map values own suffix fields; their containing struct cannot classify them.
+    *current_type = advance_through_map_access(std::mem::take(current_type), field, map_value_edges);
+    if key.chars().all(|character| character.is_ascii_digit()) {
+        let index: usize = key.parse().unwrap_or(0);
+        out.push_str(&format!("[{index}]"));
+    } else {
+        out.push_str(&format!(".get({})", quoted_key_literal(key)));
+    }
+}
+
 /// Append the access for one segment's field: a dict lookup below a dict-shaped variant getter,
 /// otherwise the `TypedDict`-aware access of [`push_field_access`].
+fn push_variant_field(
+    out: &mut String,
+    field: &str,
+    in_json: bool,
+    owner_type: Option<&str>,
+    map: &PythonTypedDictMap,
+    step: Option<&PythonAccessStep>,
+) {
+    if let Some(step) = step {
+        if in_json {
+            out.push_str(&super::python_access_steps::json_keys(
+                step.json_keys.iter().map(String::as_str),
+            ));
+            return;
+        }
+        if let Some(suffix) = &step.native_suffix {
+            out.push_str(suffix);
+            return;
+        }
+    }
+    push_segment_field(out, field, in_json, owner_type, map);
+}
+
 fn push_segment_field(
     out: &mut String,
     field: &str,
@@ -412,7 +450,7 @@ mod tests {
                 &optional,
                 &map,
                 &PythonMapValueEdges::new(),
-                &HashSet::new(),
+                &HashMap::new(),
             ),
             r#"result["markdown"]"#,
             "a crossing at the LAST segment needs no ternary guard"
@@ -438,7 +476,7 @@ mod tests {
                 &optional,
                 &map,
                 &PythonMapValueEdges::new(),
-                &HashSet::new(),
+                &HashMap::new(),
             ),
             r#"(result["markdown"]["content"] if result["markdown"] else None)"#
         );
@@ -484,7 +522,7 @@ mod tests {
                 &optional,
                 &map,
                 &PythonMapValueEdges::new(),
-                &HashSet::new(),
+                &HashMap::new(),
             ),
             "(result.choices[0].message.tool_calls[0].function.name if result.choices[0].message.tool_calls else None)"
         );

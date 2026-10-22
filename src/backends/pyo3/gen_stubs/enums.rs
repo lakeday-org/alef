@@ -276,10 +276,11 @@ fn gen_data_enum_variant_accessor_stubs(lines: &mut Vec<String>, enum_def: &Enum
     let mut declared: AHashSet<String> = AHashSet::new();
     for variant in &enum_def.variants {
         if let Some(accessor) = variant_accessor(variant) {
-            declared.insert(accessor.py_name.clone());
+            let name = crate::codegen::generators::dict_getter_py_name(enum_def, variant);
+            declared.insert(name.clone());
             lines.push(format!(
                 "    {}: {} | None",
-                accessor.py_name,
+                name,
                 python_type(&TypeRef::Named(accessor.inner_type_name.to_string()))
             ));
             continue;

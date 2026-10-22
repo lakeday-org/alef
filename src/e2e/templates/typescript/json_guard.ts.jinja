@@ -1,0 +1,16 @@
+{% if guard == "array" %}
+((value: unknown): unknown[] => {
+    if (!Array.isArray(value)) throw new Error("expected array payload");
+    return value;
+})({{ value }})
+{% elif guard == "string" %}
+((value: unknown): string => {
+    if (typeof value !== "string") throw new Error("expected string payload");
+    return value;
+})({{ value }})
+{% else %}
+((value: unknown): number => {
+    if (typeof value !== "string" && !Array.isArray(value)) throw new Error("expected sized payload");
+    return value.length;
+})({{ value }})
+{% endif %}

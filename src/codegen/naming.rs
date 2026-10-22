@@ -23,10 +23,13 @@ pub mod case;
 pub mod host;
 pub mod identifiers;
 pub mod languages;
+mod python_enum;
 pub mod surfaces;
 pub mod symbols;
 pub mod ts_property_key;
 pub mod wire;
+
+pub(crate) use python_enum::python_enum_payload_getter_name;
 
 pub use case::{
     pascal_to_camel, pascal_to_pascal, pascal_to_screaming_snake, pascal_to_snake, to_class_name, to_constant_name,

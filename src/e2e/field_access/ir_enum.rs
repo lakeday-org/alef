@@ -81,6 +81,8 @@ pub(super) fn build_ir_enum_map(type_defs: &[TypeDef], enums: &[EnumDef]) -> IrE
         data_carrying_enum_names: data_carrying_enum_names(enums),
         enum_wire_variants: build_enum_wire_variants(enums),
         variant_shapes: build_variant_shapes(enums),
+        struct_wire_fields: super::python_wire_shapes::struct_fields(type_defs),
+        struct_wire_kinds: super::python_wire_shapes::struct_kinds(type_defs),
         root_type: None,
     }
 }
@@ -107,6 +109,10 @@ fn build_variant_shapes(enums: &[EnumDef]) -> HashMap<String, Vec<VariantShape>>
                         .map(|field| (field.name.clone(), named_type(&field.ty).map(str::to_string)))
                         .collect(),
                     python_json_getter: crate::codegen::generators::enums::variant_accessor(variant).is_none(),
+                    python_getter: crate::codegen::generators::enums::dict_getter_py_name(enum_def, variant),
+                    python_wire_prefix: super::python_wire_shapes::variant_prefix(enum_def, variant),
+                    python_wire_fields: super::python_wire_shapes::variant_fields(enum_def, variant),
+                    wire_kinds: super::python_wire_shapes::variant_kinds(variant),
                     untagged_newtype: enum_def.serde_untagged && variant.is_tuple && variant.fields.len() == 1,
                 })
                 .collect();

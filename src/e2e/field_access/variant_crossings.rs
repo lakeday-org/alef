@@ -14,7 +14,7 @@
 //! that names no single variant is left alone, and the renderer keeps its previous output.
 use std::collections::{HashMap, HashSet};
 
-use heck::{ToSnakeCase, ToUpperCamelCase};
+use crate::codegen::naming::{internal_rust_identifier, pascal_to_snake};
 
 use super::optional_renderers::{push_key_field_name, push_key_index_suffix};
 use super::parse::segment_name;
@@ -43,28 +43,56 @@ pub(super) struct VariantCrossing {
     /// The segment names a newtype variant of an untagged enum, whose napi and wasm value is the
     /// enum value itself.
     bare_value: bool,
+    python_getter: String,
+    python_wire_prefix: Vec<String>,
+    python_wire_fields: HashMap<String, String>,
+    pub(super) output_type: Option<String>,
+    kind: super::types::WireValueKind,
 }
 
 impl VariantCrossing {
+    pub(super) fn python_step(&self) -> super::python_renderer::PythonAccessStep {
+        let field_key = match &self.bind {
+            VariantBind::Tuple => None,
+            VariantBind::Field(field) => self.python_wire_fields.get(field).map(String::as_str),
+        };
+        let native_keys = super::python_access_steps::json_keys(field_key);
+        let json_keys = self
+            .python_wire_prefix
+            .iter()
+            .map(String::as_str)
+            .chain(field_key)
+            .map(str::to_string)
+            .collect();
+        super::python_renderer::PythonAccessStep {
+            native_suffix: Some(format!(".{}{native_keys}", self.python_getter)),
+            json_keys,
+            kind: self.kind,
+            starts_json: self.python_json,
+        }
+    }
+
     /// The arms of the `match` that reads this segment, without the surrounding braces.
     fn rust_arms(&self, module: Option<&str>) -> String {
         let variant = &self.variant;
+        let type_name = internal_rust_identifier(&self.enum_name);
         let enum_name = match module {
-            Some(module) => format!("{module}::{}", self.enum_name),
-            None => self.enum_name.clone(),
+            Some(module) => format!("{module}::{type_name}"),
+            None => type_name,
         };
-        let arm = match &self.bind {
-            VariantBind::Tuple => format!("{enum_name}::{variant}(v) => v"),
-            VariantBind::Field(field) => format!(
-                "{enum_name}::{variant} {{ {}: v, .. }} => v",
-                crate::core::keywords::rust_raw_ident(field)
-            ),
+        let field = match &self.bind {
+            VariantBind::Tuple => None,
+            VariantBind::Field(field) => Some(internal_rust_identifier(field)),
         };
-        if self.only_variant {
-            arm
-        } else {
-            format!("{arm}, _ => panic!(\"expected {enum_name}::{variant}\")")
-        }
+        crate::e2e::template_env::render(
+            "rust/variant_match_arms.rs.jinja",
+            minijinja::context! {
+                enum_name, variant => internal_rust_identifier(variant), field,
+                fallback => !self.only_variant,
+            },
+        )
+        .trim_end()
+        .to_string()
     }
 }
 
@@ -77,13 +105,42 @@ struct FoundVariant<'a> {
     by_name: bool,
 }
 
+impl FoundVariant<'_> {
+    fn into_crossing(self, owner: &str, key: &str, segment_index: usize, only_variant: bool) -> VariantCrossing {
+        let field = match &self.bind {
+            VariantBind::Tuple => self.shape.fields.first().map(|(name, _)| name),
+            VariantBind::Field(name) => Some(name),
+        };
+        let kind = field
+            .and_then(|name| self.shape.wire_kinds.get(name))
+            .copied()
+            .unwrap_or_default();
+        VariantCrossing {
+            kind,
+            key: key.to_string(),
+            enum_name: owner.to_string(),
+            variant: self.shape.name.clone(),
+            bind: self.bind,
+            only_variant,
+            python_json: self.shape.python_json_getter,
+            segment_index,
+            bare_value: self.by_name && self.shape.untagged_newtype,
+            python_getter: self.shape.python_getter.clone(),
+            python_wire_prefix: self.shape.python_wire_prefix.clone(),
+            python_wire_fields: self.shape.python_wire_fields.clone(),
+            output_type: self.next,
+        }
+    }
+}
+
 /// The variant of `shapes` that `name` reads, with how to bind it and the declared type of what
 /// it binds. A variant named like the segment wins; otherwise the one struct variant that
 /// declares a field of that name. Two variants declaring the same field name is ambiguous and
 /// answers `None`, because one `match` arm cannot read both.
 fn find_variant<'a>(shapes: &'a [VariantShape], name: &str) -> Option<FoundVariant<'a>> {
-    let pascal = name.to_upper_camel_case();
-    if let Some(shape) = shapes.iter().find(|shape| shape.name == pascal)
+    if let Some(shape) = shapes
+        .iter()
+        .find(|shape| shape.name == name || pascal_to_snake(&shape.name) == name)
         && let [(field, next)] = shape.fields.as_slice()
     {
         let bind = if shape.is_tuple {
@@ -98,15 +155,16 @@ fn find_variant<'a>(shapes: &'a [VariantShape], name: &str) -> Option<FoundVaria
             by_name: true,
         });
     }
-    let snake = name.to_snake_case();
-    let declares =
-        |shape: &&VariantShape| !shape.is_tuple && shape.fields.iter().any(|(field, _)| field.to_snake_case() == snake);
+    let snake = pascal_to_snake(name);
+    let declares = |shape: &&VariantShape| {
+        !shape.is_tuple && shape.fields.iter().any(|(field, _)| pascal_to_snake(field) == snake)
+    };
     let mut declaring = shapes.iter().filter(declares);
     let shape = declaring.next()?;
     if declaring.next().is_some() {
         return None;
     }
-    let (field, next) = shape.fields.iter().find(|(field, _)| field.to_snake_case() == snake)?;
+    let (field, next) = shape.fields.iter().find(|(field, _)| pascal_to_snake(field) == snake)?;
     Some(FoundVariant {
         shape,
         bind: VariantBind::Field(field.clone()),
@@ -131,25 +189,9 @@ impl FieldResolver {
                 break;
             };
             cursor = if let Some(shapes) = map.variant_shapes.get(&owner) {
-                let Some(FoundVariant {
-                    shape,
-                    bind,
-                    next,
-                    by_name,
-                }) = find_variant(shapes, name)
-                else {
-                    break;
-                };
-                crossings.push(VariantCrossing {
-                    key: key.clone(),
-                    enum_name: owner.clone(),
-                    variant: shape.name.clone(),
-                    bind,
-                    only_variant: shapes.len() == 1,
-                    python_json: by_name && shape.python_json_getter,
-                    segment_index,
-                    bare_value: by_name && shape.untagged_newtype,
-                });
+                let Some(found) = find_variant(shapes, name) else { break };
+                let next = found.next.clone();
+                crossings.push(found.into_crossing(&owner, &key, segment_index, shapes.len() == 1));
                 next
             } else {
                 map.enum_field_types
@@ -188,39 +230,10 @@ impl FieldResolver {
             .collect()
     }
 
-    /// `segments` with each newtype-variant segment of an untagged enum folded into the segment
-    /// before it, for the napi and wasm bindings, where that variant's value is the enum value
-    /// itself: `content.parts[0].text` reads as `content[0].text`. A segment with no previous
-    /// field segment to fold into is kept.
-    pub(super) fn bare_variant_segments(&self, segments: &[PathSegment]) -> Vec<PathSegment> {
-        let bare: HashSet<usize> = self
-            .variant_crossings(segments)
+    pub(super) fn first_bare_variant(&self, segments: &[PathSegment]) -> Option<usize> {
+        self.variant_crossings(segments)
             .into_iter()
-            .filter(|crossing| crossing.bare_value)
+            .find(|crossing| crossing.bare_value)
             .map(|crossing| crossing.segment_index)
-            .collect();
-        let mut out: Vec<PathSegment> = Vec::with_capacity(segments.len());
-        for (index, segment) in segments.iter().enumerate() {
-            if bare.contains(&index)
-                && let Some(PathSegment::Field(owner)) = out.last()
-            {
-                let folded = match segment {
-                    PathSegment::Field(_) => PathSegment::Field(owner.clone()),
-                    PathSegment::ArrayField { index, .. } => PathSegment::ArrayField {
-                        name: owner.clone(),
-                        index: *index,
-                    },
-                    other => {
-                        out.push(other.clone());
-                        continue;
-                    }
-                };
-                out.pop();
-                out.push(folded);
-                continue;
-            }
-            out.push(segment.clone());
-        }
-        out
     }
 }

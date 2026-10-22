@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Generate working e2e assertions through enum payload lists: Rust matches variants, Python follows native getters and serde wire shapes, and Node/WASM read bare untagged payloads, including indexed and root values. (GH#663)
+- Share collision-free Python enum payload getter names between runtime bindings, stubs and generated e2e accessors.
+- Preserve configured response delays in embedded Rust e2e mock servers for plain responses and streams.
 - Generated Node packages load with a named ESM import such as `import { createClient } from "pkg"`. A generated `index.mjs` re-declares each export by name, and `package.json` maps the `import` condition to it (#620).
 - Generated Node bindings throw errors that carry `kind`, `errorCode`, `statusCode`, `retryAfter` (milliseconds), `isTransient` and `errorType`. A generated `binding.cjs` moves these from the native error onto the thrown error, and the `.d.ts` declares them (#621).
 - Generated Node `chatStream`-style calls reject when the stream fails to open, instead of resolving and failing on the first read (#622).

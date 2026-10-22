@@ -7,6 +7,9 @@ use crate::core::ir::{EnumDef, EnumVariant, TypeRef};
 use ahash::AHashSet;
 use std::collections::HashSet;
 
+mod payload_names;
+pub(crate) use payload_names::dict_getter_py_name;
+
 /// Returns true if any variant of the enum has data fields.
 /// These enums cannot be represented as flat integer enums in bindings.
 pub fn enum_has_data_variants(enum_def: &EnumDef) -> bool {
@@ -662,9 +665,6 @@ fn pyo3_getter_fn_name(name: &str) -> String {
 /// `is_boxed` mirrors the field's `Box<T>`/`Option<Box<T>>` wrapping and only matters to the
 /// runtime clone expression; the stub type annotation (`Inner | None`) is identical either way.
 pub(crate) struct VariantAccessor<'a> {
-    /// snake_case Python-visible getter name (before any `r#` raw-identifier escaping needed to
-    /// embed it as a Rust fn name).
-    pub(crate) py_name: String,
     pub(crate) variant_pascal: &'a str,
     pub(crate) inner_type_name: &'a str,
     pub(crate) is_boxed: bool,
@@ -689,33 +689,10 @@ pub(crate) fn variant_accessor(variant: &EnumVariant) -> Option<VariantAccessor<
         return None;
     };
     Some(VariantAccessor {
-        py_name: crate::codegen::naming::pascal_to_snake(&variant.name),
         variant_pascal: &variant.name,
         inner_type_name,
         is_boxed: field.is_boxed,
     })
-}
-
-/// The Python-visible name of the dict-shaped `#[getter]` for `variant`.
-///
-/// A struct variant also gets a `@staticmethod` constructor under its bare snake_case name
-/// (`AssistantPart.text(...)`), and a class attribute holds one object per name: the constructor
-/// registered after the getter shadows it, so the payload became unreachable while the stub
-/// declared it. The constructor keeps the bare name because callers build values with it; the
-/// getter takes `<name>_payload`. Tuple variants build with `from_<name>` and keep the bare getter
-/// name. The stub emitter calls this too, so the declared names and the runtime names stay equal.
-/// The rule keys on the constructor list, not on whether a foreign `cfg` drops the constructor, so
-/// the getter name does not change with the feature set. ~keep
-pub(crate) fn dict_getter_py_name(enum_def: &EnumDef, variant: &EnumVariant) -> String {
-    let snake = crate::codegen::naming::pascal_to_snake(&variant.name);
-    let has_bare_constructor = collect_pyo3_variant_constructors(enum_def)
-        .iter()
-        .any(|ctor| ctor.variant_name == variant.name && ctor.snake_name == snake);
-    if has_bare_constructor {
-        format!("{snake}_payload")
-    } else {
-        snake
-    }
 }
 
 /// Generate variant accessor properties for a data enum.
@@ -971,3 +948,6 @@ mod declaration_cfg_tests;
 mod pyo3_tests;
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod payload_names_tests;
