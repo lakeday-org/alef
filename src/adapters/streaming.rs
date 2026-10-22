@@ -1,7 +1,9 @@
 mod php;
+mod type_paths;
 
 use heck::ToSnakeCase;
 use php::gen_php_body;
+use type_paths::source_type;
 
 use crate::core::config::{AdapterConfig, Language, ResolvedCrateConfig};
 
@@ -56,20 +58,15 @@ fn core_let_bindings(adapter: &AdapterConfig, core_import: &str) -> Vec<String> 
         .params
         .iter()
         .map(|p| {
+            let ty = source_type(&p.ty, core_import);
             if p.optional {
                 format!(
-                    "let core_{name} = {name}.map(|v| -> {core_import}::{ty} {{ v.into() }});",
+                    "let core_{name} = {name}.map(|v| -> {ty} {{ v.into() }});",
                     name = p.name,
-                    core_import = core_import,
-                    ty = p.ty,
+                    ty = ty,
                 )
             } else {
-                format!(
-                    "let core_{name}: {core_import}::{ty} = {name}.into();",
-                    name = p.name,
-                    core_import = core_import,
-                    ty = p.ty,
-                )
+                format!("let core_{name}: {ty} = {name}.into();", name = p.name, ty = ty,)
             }
         })
         .collect()
@@ -82,20 +79,15 @@ fn core_let_bindings_cloned(adapter: &AdapterConfig, core_import: &str) -> Vec<S
         .params
         .iter()
         .map(|p| {
+            let ty = source_type(&p.ty, core_import);
             if p.optional {
                 format!(
-                    "let core_{name} = {name}.as_ref().map(|v| -> {core_import}::{ty} {{ v.clone().into() }});",
+                    "let core_{name} = {name}.as_ref().map(|v| -> {ty} {{ v.clone().into() }});",
                     name = p.name,
-                    core_import = core_import,
-                    ty = p.ty,
+                    ty = ty,
                 )
             } else {
-                format!(
-                    "let core_{name}: {core_import}::{ty} = {name}.clone().into();",
-                    name = p.name,
-                    core_import = core_import,
-                    ty = p.ty,
-                )
+                format!("let core_{name}: {ty} = {name}.clone().into();", name = p.name, ty = ty,)
             }
         })
         .collect()

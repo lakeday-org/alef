@@ -1,4 +1,4 @@
-use super::{call_args, core_let_bindings_cloned, php_stream_handle_name};
+use super::{call_args, core_let_bindings_cloned, php_stream_handle_name, source_type};
 use crate::core::config::{AdapterConfig, ResolvedCrateConfig};
 
 pub(super) fn gen_php_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String, Option<String>) {
@@ -26,33 +26,4 @@ pub(super) fn gen_php_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig
     let body = crate::backends::php::template_env::render("php_stream_body.rs.jinja", context.clone());
     let handle = crate::backends::php::template_env::render("php_stream_handle.rs.jinja", context);
     (body.trim_end().to_string(), Some(handle.trim_end().to_string()))
-}
-
-fn source_type(name: &str, core_import: &str) -> String {
-    if name.contains("::")
-        || matches!(
-            name,
-            "()" | "String"
-                | "bool"
-                | "u8"
-                | "u16"
-                | "u32"
-                | "u64"
-                | "i8"
-                | "i16"
-                | "i32"
-                | "i64"
-                | "u128"
-                | "i128"
-                | "usize"
-                | "isize"
-                | "char"
-                | "f32"
-                | "f64"
-        )
-    {
-        name.to_string()
-    } else {
-        format!("{core_import}::{name}")
-    }
 }
