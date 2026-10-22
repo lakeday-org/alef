@@ -7,13 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Generate nil-safe Go and Swift e2e assertions for optional collection fields, comparing present string values and excluding absent values even when the expected substring is empty.
-- Keep typed-error and payload-getter regression coverage current, including portable Windows compiler discovery and dependency resolution.
-- Keep streaming adapter primitive, unit and fully qualified parameter types valid instead of qualifying them as consumer-crate types.
-- Remove redundant optional static-string registration closures from Dart error bridges and validate fallible borrowed-error reconstruction.
-
 ## [0.113.0] - 2026-10-22
 
 ### Added
@@ -22,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Generate nil-safe Go and Swift e2e assertions for optional collection fields, comparing present string values and excluding absent values even when the expected substring is empty.
+- Keep typed-error and payload-getter regression coverage current, including portable Windows compiler discovery and dependency resolution.
+- Keep streaming adapter primitive, unit and fully qualified parameter types valid instead of qualifying them as consumer-crate types.
+- Remove redundant optional static-string registration closures from Dart error bridges and validate fallible borrowed-error reconstruction.
 - Preserve PHP stream unit defaults and qualified external types, include the default stream error dependency, and generate stream handles and field getters through templates.
 - Preserve Swift error payloads across the bridge, correct accessor names, and retain the original bridge error when a payload is unsupported or incomplete.
 - Reuse original native static strings in Dart error mirrors without leaking new strings. Reject unknown text during fallible introspection and reject unsupported borrowed-error inputs, including nested DTO and enum fields.
