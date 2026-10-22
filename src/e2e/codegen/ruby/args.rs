@@ -329,6 +329,11 @@ pub(super) fn build_args_and_setup(
                                     }
                                 }
                                 let snake_key = k.to_snake_case();
+                                let literal = if result_is_simple {
+                                    json_to_ruby(vv)
+                                } else {
+                                    super::values::typed_field_value(vv, k, opts_type, type_defs, module_name)
+                                };
                                 let pointer = format!("/{k}");
                                 let rb_val = if let Some(file) = docs_files.iter().find(|file| file.field == pointer) {
                                     crate::e2e::template_env::render(
@@ -342,14 +347,14 @@ pub(super) fn build_args_and_setup(
                                         if raw.contains(crate::e2e::codegen::MOCK_URL_PLACEHOLDER) {
                                             format!(
                                                 "{}.gsub('{}', {base_var})",
-                                                json_to_ruby(vv),
+                                                literal,
                                                 crate::e2e::codegen::MOCK_URL_PLACEHOLDER
                                             )
                                         } else {
-                                            json_to_ruby(vv)
+                                            literal
                                         }
                                     } else {
-                                        json_to_ruby(vv)
+                                        literal
                                     }
                                 };
                                 Some(format!("{snake_key}: {rb_val}"))

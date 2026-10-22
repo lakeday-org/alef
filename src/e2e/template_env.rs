@@ -2,6 +2,14 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "ruby/json_field_runtime.rb.jinja",
+        include_str!("templates/ruby/json_field_runtime.rb.jinja"),
+    ),
+    (
+        "ruby/typed_constructor.jinja",
+        include_str!("templates/ruby/typed_constructor.jinja"),
+    ),
+    (
         "go/optional_wildcard_runtime.go.jinja",
         include_str!("templates/go/optional_wildcard_runtime.go.jinja"),
     ),

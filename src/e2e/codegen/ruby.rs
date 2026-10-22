@@ -267,3 +267,6 @@ mod tests;
 #[cfg(test)]
 #[path = "ruby/stream_error_tests.rs"]
 mod stream_error_tests;
+
+#[cfg(test)]
+mod json_field_value_tests;

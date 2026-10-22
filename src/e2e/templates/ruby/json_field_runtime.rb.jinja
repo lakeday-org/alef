@@ -1,0 +1,26 @@
+require 'json'
+
+module Sample
+  Request = Struct.new(:payload, :rows, :index, :nested, keyword_init: true)
+  Nested = Struct.new(:payload, keyword_init: true)
+end
+
+rejected = false
+begin
+  JSON.parse({ 'limit' => 7 })
+rescue TypeError
+  rejected = true
+end
+raise 'raw Hash must fail the String JSON contract' unless rejected
+
+{% for case in cases %}
+actual = {{ case.actual }}
+expected = {{ case.expected }}
+raise {{ case.name }} unless actual == expected
+{% endfor %}
+request = {{ constructor }}
+raise 'constructor JSON field must be a String' unless request.payload.is_a?(String)
+raise 'constructor JSON value changed' unless JSON.parse(request.payload) == { 'limit' => 7 }
+raise 'nested DTO JSON field must be a String' unless request.nested.payload.is_a?(String)
+raise 'nested DTO JSON value changed' unless JSON.parse(request.nested.payload) == [1, false]
+puts 'PASS: {{ count }} JSON field cases, raw Hash negative control, and typed constructors'

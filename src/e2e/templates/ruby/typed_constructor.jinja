@@ -1,0 +1,1 @@
+{{ type_name }}.new({% for field in fields %}{{ field.name }}: {{ field.value }}{% if not loop.last %}, {% endif %}{% endfor %})

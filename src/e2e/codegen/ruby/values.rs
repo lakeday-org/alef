@@ -47,6 +47,120 @@ pub(super) fn json_to_ruby(value: &serde_json::Value) -> String {
     }
 }
 
+pub(super) fn typed_field_value(
+    value: &serde_json::Value,
+    field_name: &str,
+    containing_type: &str,
+    type_defs: &[crate::core::ir::TypeDef],
+    module_name: &str,
+) -> String {
+    let type_name = containing_type.rsplit("::").next().unwrap_or(containing_type);
+    let field = type_defs.iter().find(|ty| ty.name == type_name).and_then(|ty| {
+        ty.fields.iter().find(|field| {
+            field.name == field_name
+                || crate::codegen::naming::wire_field_name(
+                    &field.name,
+                    field.serde_rename.as_deref(),
+                    ty.serde_rename_all.as_deref(),
+                ) == field_name
+        })
+    });
+    field.map_or_else(
+        || json_to_ruby(value),
+        |field| {
+            if field.optional && value.is_null() {
+                "nil".into()
+            } else {
+                typed_ruby_value(value, &field.ty, type_defs, module_name)
+            }
+        },
+    )
+}
+
+fn typed_ruby_value(
+    value: &serde_json::Value,
+    ty: &crate::core::ir::TypeRef,
+    type_defs: &[crate::core::ir::TypeDef],
+    module_name: &str,
+) -> String {
+    use crate::core::ir::TypeRef;
+    match (value, ty) {
+        (value, TypeRef::Json) => crate::e2e::escape::ruby_string_literal(&value.to_string()),
+        (serde_json::Value::Null, TypeRef::Optional(_)) => "nil".into(),
+        (value, TypeRef::Optional(inner)) => typed_ruby_value(value, inner, type_defs, module_name),
+        (serde_json::Value::Array(values), TypeRef::Vec(inner)) => {
+            let items: Vec<_> = values
+                .iter()
+                .map(|value| typed_ruby_value(value, inner, type_defs, module_name))
+                .collect();
+            format!("[{}]", items.join(", "))
+        }
+        (serde_json::Value::Object(values), TypeRef::Map(_, inner)) => {
+            let entries: Vec<_> = values
+                .iter()
+                .map(|(key, value)| {
+                    format!(
+                        "{} => {}",
+                        crate::e2e::escape::ruby_string_literal(key),
+                        typed_ruby_value(value, inner, type_defs, module_name)
+                    )
+                })
+                .collect();
+            format!("{{ {} }}", entries.join(", "))
+        }
+        (serde_json::Value::Object(_), TypeRef::Named(name)) => {
+            render_typed_object(value, name, type_defs, module_name).unwrap_or_else(|| json_to_ruby(value))
+        }
+        _ => json_to_ruby(value),
+    }
+}
+
+fn render_typed_object(
+    value: &serde_json::Value,
+    type_name: &str,
+    type_defs: &[crate::core::ir::TypeDef],
+    module_name: &str,
+) -> Option<String> {
+    let type_def = type_defs.iter().find(|ty| ty.name == type_name)?;
+    let fields: Vec<_> = value
+        .as_object()?
+        .iter()
+        .map(|(key, value)| typed_object_field(key, value, type_def, type_defs, module_name))
+        .collect();
+    Some(
+        crate::e2e::template_env::render(
+            "ruby/typed_constructor.jinja",
+            crate::alef_context! { type_name => qualify_ruby_type(module_name, type_name), fields => fields },
+        )
+        .trim_end()
+        .to_string(),
+    )
+}
+
+fn typed_object_field(
+    key: &str,
+    value: &serde_json::Value,
+    type_def: &crate::core::ir::TypeDef,
+    type_defs: &[crate::core::ir::TypeDef],
+    module_name: &str,
+) -> minijinja::Value {
+    let field = type_def.fields.iter().find(|field| {
+        field.name == key
+            || crate::codegen::naming::wire_field_name(
+                &field.name,
+                field.serde_rename.as_deref(),
+                type_def.serde_rename_all.as_deref(),
+            ) == key
+    });
+    let name = crate::codegen::naming::public_field_name(
+        crate::core::config::Language::Ruby,
+        field.map_or(key, |field| field.name.as_str()),
+        None,
+    );
+    let value = typed_field_value(value, key, &type_def.name, type_defs, module_name);
+    crate::alef_context! { name => name, value => value }
+}
+
 /// Classify a fixture string value that maps to a `bytes` argument.
 ///
 /// Returns true if the value looks like a file path (e.g. "pdf/fake_memo.pdf").
