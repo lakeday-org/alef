@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use std::process::Command;
 
 use crate::core::ir::{EnumDef, EnumVariant, FieldDef, TypeDef, TypeRef};
@@ -113,7 +114,7 @@ fn main() {{
 "#
     );
     std::fs::write(&source, code).unwrap();
-    let compile = Command::new("rustc")
+    let compile = probe_command(&["rustc"], dir.path())
         .arg("--edition=2024")
         .arg(&source)
         .arg("-o")
@@ -125,7 +126,7 @@ fn main() {{
         "generated assertions must compile:\n{assertions}\n{}",
         String::from_utf8_lossy(&compile.stderr)
     );
-    Command::new(binary).output().unwrap()
+    Command::new(binary).current_dir(dir.path()).output().unwrap()
 }
 
 #[test]
@@ -155,7 +156,12 @@ result.body = None
 assert {accessor} is None
 "#
     );
-    let output = python_command().arg("-c").arg(program).output().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let output = python_command(directory.path())
+        .arg("-c")
+        .arg(program)
+        .output()
+        .unwrap();
     assert!(
         output.status.success(),
         "accessor: {accessor}\n{}",
@@ -199,22 +205,28 @@ enum UntaggedPart {
     },
 }
 
-fn python_command() -> Command {
+fn probe_command(candidates: &[&str], directory: &Path) -> Command {
+    let path = std::env::var_os("PATH");
+    let executable = candidates
+        .iter()
+        .find_map(|name| which::which_in(name, path.as_ref(), directory).ok())
+        .unwrap_or_else(|| panic!("runtime probe tool must be available: {candidates:?}"));
+    let mut command = Command::new(executable);
+    command.current_dir(directory);
+    command
+}
+
+fn python_command(directory: &Path) -> Command {
     let candidates = if cfg!(windows) {
         ["python", "python3"]
     } else {
         ["python3", "python"]
     };
-    let executable = candidates
-        .into_iter()
-        .find_map(|name| which::which(name).ok())
-        .expect("Python is required for the generated accessor runtime tests");
-    Command::new(executable)
+    probe_command(&candidates, directory)
 }
 
-fn typescript_command() -> Command {
-    let executable = which::which("tsc").expect("TypeScript is required for the generated accessor runtime tests");
-    Command::new(executable)
+fn typescript_command(directory: &Path) -> Command {
+    probe_command(&["tsc"], directory)
 }
 
 #[test]
@@ -222,7 +234,7 @@ fn typescript_compiler_rejects_a_known_type_error() {
     let directory = tempfile::tempdir().unwrap();
     let source = directory.path().join("invalid.ts");
     std::fs::write(&source, "const value: string = 7;\n").unwrap();
-    let output = typescript_command()
+    let output = typescript_command(directory.path())
         .args(["--strict", "--noEmit", "--skipLibCheck"])
         .arg(source)
         .output()
@@ -235,7 +247,12 @@ fn typescript_compiler_rejects_a_known_type_error() {
 }
 
 fn python_runs(program: String) {
-    let output = python_command().arg("-c").arg(&program).output().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let output = python_command(directory.path())
+        .arg("-c")
+        .arg(&program)
+        .output()
+        .unwrap();
     assert!(
         output.status.success(),
         "{program}\n{}",
@@ -247,7 +264,7 @@ fn typescript_runs(program: String) {
     let directory = tempfile::tempdir().unwrap();
     let source = directory.path().join("check.ts");
     std::fs::write(&source, &program).unwrap();
-    let compiled = typescript_command()
+    let compiled = typescript_command(directory.path())
         .args([
             "--strict",
             "--target",
@@ -272,7 +289,10 @@ fn typescript_runs(program: String) {
         javascript.is_file(),
         "the compiler must emit the actual JavaScript fixture"
     );
-    let executed = Command::new("node").arg(javascript).output().unwrap();
+    let executed = probe_command(&["node"], directory.path())
+        .arg(javascript)
+        .output()
+        .unwrap();
     assert!(
         executed.status.success(),
         "{program}\n{}",
@@ -414,4 +434,54 @@ fn rust_variant_lookup_uses_canonical_acronym_casing() {
         let rendered = resolver.accessor(&format!("body.{variant}[0].text"), "rust", "result");
         assert!(rendered.contains("sample::Payload::HTTPParts(v)"), "{rendered}");
     }
+}
+
+/// The lost-CWD scenario runs in its own single-test process so it cannot race the parent suite. ~keep
+#[cfg(unix)]
+#[test]
+fn runtime_probes_use_live_owned_working_directories() {
+    const CHILD_FLAG: &str = "ALEF_UNION_PAYLOAD_LOST_CWD_CHILD";
+    if std::env::var_os(CHILD_FLAG).is_some() {
+        run_probes_after_parent_directory_is_removed();
+        return;
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "e2e::field_access::union_payload_tests::runtime_probes_use_live_owned_working_directories",
+            "--exact",
+            "--test-threads=1",
+        ])
+        .env(CHILD_FLAG, "1")
+        .current_dir(directory.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "{stdout}\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("1 passed") && stdout.contains("0 failed"), "{stdout}");
+}
+
+#[cfg(unix)]
+fn run_probes_after_parent_directory_is_removed() {
+    let directory = tempfile::tempdir().unwrap();
+    let node = probe_command(&["node"], directory.path()).get_program().to_os_string();
+    std::env::set_current_dir(directory.path()).unwrap();
+    drop(directory);
+    assert!(std::env::current_dir().is_err());
+    let inherited = Command::new(node).args(["-e", "process.cwd()"]).output().unwrap();
+    assert!(!inherited.status.success());
+    assert!(String::from_utf8_lossy(&inherited.stderr).contains("uv_cwd"));
+    python_runs("import os; assert os.path.isdir(os.getcwd())".into());
+    typescript_compiler_rejects_a_known_type_error();
+    typescript_runs(
+        "declare const process: { cwd(): string };\n\
+         declare function require(name: string): { existsSync(path: string): boolean };\n\
+         if (!require('fs').existsSync(process.cwd())) throw new Error('missing working directory');"
+            .into(),
+    );
+    assert!(compile_and_run("assert!(true);").status.success());
 }
