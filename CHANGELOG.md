@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Update CI action pins and available Temurin builds while retaining the prior Windows JDK until its replacement archive is published (#672).
+
 - Map WASM adapter results through configured wrapper names and type overrides, including nested optional and collection returns, while retaining typed errors (#671).
 
 - Keep PHP streaming instance methods, facade delegates and lazy handles on the same Zval return type, preserving delivered chunks and deferred errors (#670).

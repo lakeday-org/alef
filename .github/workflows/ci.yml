@@ -120,7 +120,8 @@ jobs:
           # Matches `template_versions::toolchain::JAVA_JVM_TARGET`: alef's generated Java
           # service bindings use the `java.lang.foreign` FFM API, stable only from JDK 22. This
           # JDK is also `javac`, the oracle `ALEF_REQUIRE_JAVAC` below requires.
-          java-version: "25.0.5+8.0.LTS"
+          # Temurin 25.0.5+8 has no Windows binaries yet; retain 25.0.4.1+1 there. ~keep
+          java-version: ${{ runner.os == 'Windows' && '25.0.4+101.0.LTS' || '25.0.5+8.0.LTS' }}
       - uses: xberg-io/actions/setup-maven@v1
       # Go is NOT preinstalled on every GitHub-hosted image. The arm64 macOS images carry none,
       # which is why `Test (macos-latest)` failed nine generated-Go fixtures on every run from
