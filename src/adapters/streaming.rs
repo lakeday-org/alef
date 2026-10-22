@@ -259,7 +259,7 @@ fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
                                 let item = match chunk {{
                                     Ok(c) => {item_type}::from(c),
                                     Err(e) => {{
-                                        let _ = tx.send(Err(napi::Error::new(napi::Status::GenericFailure, e.to_string()))).await;
+                                        let _ = tx.send(Err(alef_napi_err(e))).await;
                                         break;
                                     }}
                                 }};
@@ -273,20 +273,18 @@ fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
         item_type = item_type,
     );
 
+    // The stream is opened before the forwarding task starts, so a failed open (401, 429)
+    // rejects the call itself, as the Rust and Go bindings do. Only errors after the first
+    // chunk travel through the channel and arrive on read.
     let method_body = format!(
         "let inner = self.inner.clone();\n    \
          {bindings_block}\
+         use futures_util::StreamExt;\n    \
+         let mut stream = inner.{core_path}({call_str}).await\n        \
+             .map_err(alef_napi_err)?;\n    \
          let (tx, rx) = tokio::sync::mpsc::channel(32);\n    \
          tokio::spawn(async move {{\n        \
-             use futures_util::StreamExt;\n        \
-             match inner.{core_path}({call_str}).await {{\n            \
-                 Err(e) => {{\n                \
-                     let _ = tx.send(Err(napi::Error::new(napi::Status::GenericFailure, e.to_string()))).await;\n            \
-                 }}\n            \
-                 Ok(mut stream) => {{\n                \
-                     {stream_forward_loop}\n            \
-                 }}\n        \
-             }}\n    \
+             {stream_forward_loop}\n    \
          }});\n    \
          let iter = {iter_name} {{\n        \
              receiver: Arc::new(tokio::sync::Mutex::new(rx)),\n    \
