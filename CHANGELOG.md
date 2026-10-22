@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.113.0] - 2026-10-22
+
 ### Added
 
 - Generated Go streaming methods and module functions have a `WithErr` variant, such as `ChatStreamWithErr`. It returns the stream object and takes no context. Range over `stream.Chan()`, then read `stream.Err()` to see a stream error. The plain call keeps its channel return and still drops stream errors, as its doc comment now says (#623).
