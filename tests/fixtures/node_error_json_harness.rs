@@ -4,6 +4,30 @@ mod sample_core {
     }
 
     impl SampleError {
+        pub fn status_code(&self) -> u16 {
+            429
+        }
+
+        pub fn is_transient(&self) -> bool {
+            true
+        }
+
+        pub fn retry_after(&self) -> Option<std::time::Duration> {
+            match self.error_type() {
+                "plain" => None,
+                "control\u{1f}value" => Some(std::time::Duration::MAX),
+                _ => Some(std::time::Duration::from_secs(5)),
+            }
+        }
+
+        pub fn timeout(&self) -> std::time::Duration {
+            if self.error_type() == "control\u{1f}value" {
+                std::time::Duration::MAX
+            } else {
+                std::time::Duration::from_millis(1250)
+            }
+        }
+
         pub fn error_type(&self) -> &str {
             match self {
                 Self::Failure(value) => value,
@@ -42,9 +66,8 @@ mod napi {
 /* CONVERTER */
 
 fn main() {
-    use std::io::Write;
     for value in ["plain", "nul\0value", "control\u{1f}value", "line\nquote\"slash\\"] {
         let error = sample_error_to_napi_err(sample_core::SampleError::Failure(value.to_string()));
-        writeln!(std::io::stdout(), "{}", error.cause.unwrap().reason).unwrap();
+        println!("{}", error.cause.unwrap().reason);
     }
 }

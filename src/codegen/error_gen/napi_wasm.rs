@@ -33,8 +33,7 @@ pub const NAPI_ERROR_INFO_MARKER: &str = "alef:error-info:";
 pub struct NapiErrorProperty {
     pub js_name: String,
     pub ts_type: String,
-    /// Rust expression of type `String`: the JSON fragment for the property value. It reads the
-    /// converter locals `e`, `kind` and `error_code`.
+    /// Display expression for a JSON fragment, reading converter locals `e`, `kind` and `error_code`. ~keep
     pub json_expr: String,
 }
 
@@ -55,12 +54,12 @@ pub fn napi_error_properties(error: &ErrorDef) -> Vec<NapiErrorProperty> {
         NapiErrorProperty {
             js_name: "kind".to_string(),
             ts_type: kind_ts,
-            json_expr: "serde_json::Value::String(kind.to_string()).to_string()".to_string(),
+            json_expr: "serde_json::Value::String(kind.to_string())".to_string(),
         },
         NapiErrorProperty {
             js_name: "errorCode".to_string(),
             ts_type: "number".to_string(),
-            json_expr: "error_code.to_string()".to_string(),
+            json_expr: "error_code".to_string(),
         },
     ];
     props.extend(
@@ -74,12 +73,12 @@ pub fn napi_error_properties(error: &ErrorDef) -> Vec<NapiErrorProperty> {
 
 fn napi_method_error_property(error: &ErrorDef, method: &crate::core::ir::MethodDef) -> Option<NapiErrorProperty> {
     let (js_name, ts_type, json_expr) = match method.name.as_str() {
-        "status_code" => ("statusCode", "number", "e.status_code().to_string()"),
-        "is_transient" => ("isTransient", "boolean", "e.is_transient().to_string()"),
+        "status_code" => ("statusCode", "number", "e.status_code()"),
+        "is_transient" => ("isTransient", "boolean", "e.is_transient()"),
         "error_type" => (
             "errorType",
             "string",
-            "serde_json::Value::String(e.error_type().to_string()).to_string()",
+            "serde_json::Value::String(e.error_type().to_string())",
         ),
         _ => return napi_duration_error_property(error, method),
     };
@@ -96,12 +95,9 @@ fn napi_duration_error_property(error: &ErrorDef, method: &crate::core::ir::Meth
         .find(|(item, _)| item.name == method.name)?;
     let call = millis_expr(&format!("e.{}()", method.name), optional, "i64");
     let (ts_type, json_expr) = if optional {
-        (
-            "number | null",
-            format!("match {call} {{ Some(v) => v.to_string(), None => \"null\".to_string() }}"),
-        )
+        ("number | null", format!("serde_json::json!({call})"))
     } else {
-        ("number", format!("({call}).to_string()"))
+        ("number", call)
     };
     Some(NapiErrorProperty {
         js_name: crate::codegen::naming::public_host_identifier(

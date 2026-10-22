@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Emit Node error metadata without redundant Display conversions so generated converters pass strict clippy while preserving JSON values (#669).
+
 ## [0.113.1] - 2026-10-22
 
 ### Fixed
