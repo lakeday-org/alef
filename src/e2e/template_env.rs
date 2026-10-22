@@ -2,6 +2,14 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "go/optional_wildcard_runtime.go.jinja",
+        include_str!("templates/go/optional_wildcard_runtime.go.jinja"),
+    ),
+    (
+        "swift/optional_wildcard_runtime.swift.jinja",
+        include_str!("templates/swift/optional_wildcard_runtime.swift.jinja"),
+    ),
+    (
         "swift/wildcard_assertion.swift.jinja",
         include_str!("templates/swift/wildcard_assertion.swift.jinja"),
     ),

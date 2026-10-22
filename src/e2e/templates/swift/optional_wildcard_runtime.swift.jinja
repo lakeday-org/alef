@@ -1,0 +1,21 @@
+import Foundation
+
+struct Entry { let name: String? }
+struct Report { let records: [Entry] }
+var recordedFailure = false
+
+func XCTAssertTrue(_ value: Bool, _ message: String) { if !value { recordedFailure = true } }
+func XCTAssertFalse(_ value: Bool, _ message: String) { if value { recordedFailure = true } }
+
+{% for case in cases %}
+func case{{ case.index }}() -> Bool {
+    recordedFailure = false
+    let result = Report(records: [Entry(name: {{ case.name_literal or "nil" }})])
+{{ case.assertion | indent(4, true) }}
+    return !recordedFailure
+}
+
+{% endfor %}
+{% for case in cases %}
+precondition(case{{ case.index }}() == {{ "true" if case.passes else "false" }}, "case {{ case.index }}")
+{% endfor %}

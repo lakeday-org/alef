@@ -1,0 +1,35 @@
+package main
+
+import (
+    "fmt"
+    "strings"
+)
+
+type Entry struct { Name *string }
+type Report struct { Records []Entry }
+type Recorder struct { failed bool }
+
+func (t *Recorder) Errorf(_ string, _ ...any) { t.failed = true }
+
+{% for case in cases %}
+func case{{ case.index }}() bool {
+    result := Report{
+        Records: []Entry{
+{% if case.name_literal is not none %}
+            {Name: func() *string { value := {{ case.name_literal }}; return &value }()},
+{% else %}
+            {Name: nil},
+{% endif %}
+        },
+    }
+    t := &Recorder{}
+{{ case.assertion | indent(4, true) }}
+    return !t.failed
+}
+
+{% endfor %}
+func main() {
+{% for case in cases %}
+    if case{{ case.index }}() != {{ "true" if case.passes else "false" }} { panic("case {{ case.index }}") }
+{% endfor %}
+}

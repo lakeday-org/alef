@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Render Go and Swift optional-field compiler regression programs through registered templates and verify every runtime case is emitted.
+
 ## [0.113.0] - 2026-10-22
 
 ### Added

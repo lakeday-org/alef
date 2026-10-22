@@ -114,18 +114,24 @@ fn optional_wildcard_generated_go_compiles_and_runs() {
     use crate::e2e::codegen::wildcard_element_fixture::{
         compile_and_run_wildcard_program, optional_name_resolver, wildcard_runtime_cases,
     };
-    let mut source = String::from(
-        "package main\nimport (\"fmt\";\"strings\")\ntype Entry struct { Name *string }\ntype Report struct { Records []Entry }\ntype Recorder struct { failed bool }\nfunc(t *Recorder) Errorf(_ string, _ ...any) { t.failed = true }\n",
+    let cases: Vec<_> = wildcard_runtime_cases("go")
+        .iter()
+        .enumerate()
+        .map(|(index, (assertion, name, passes))| {
+            crate::alef_context! {
+                index => index,
+                name_literal => name.map(|name| format!("{name:?}")),
+                passes => passes,
+                assertion => render_assertion_with(&optional_name_resolver("go"), assertion),
+            }
+        })
+        .collect();
+    assert_eq!(cases.len(), 60);
+    let source = crate::e2e::template_env::render(
+        "go/optional_wildcard_runtime.go.jinja",
+        crate::alef_context! { cases => cases },
     );
-    let mut checks = String::new();
-    for (index, (assertion, name, passes)) in wildcard_runtime_cases("go").iter().enumerate() {
-        let name = name.map_or("nil".to_string(), |name| {
-            format!("func() *string {{ v := {name:?}; return &v }}()")
-        });
-        let rendered = render_assertion_with(&optional_name_resolver("go"), assertion);
-        source.push_str(&format!("func case{index}() bool {{ result := Report{{Records: []Entry{{{{Name: {name}}}}}}}; t := &Recorder{{}};\n{rendered}\nreturn !t.failed\n}}\n"));
-        checks.push_str(&format!("if case{index}() != {passes} {{ panic(\"case {index}\") }}\n"));
-    }
-    source.push_str(&format!("func main() {{\n{checks}}}\n"));
+    assert_eq!(source.matches("func case").count(), 60);
+    assert_eq!(source.matches("panic(\"case ").count(), 60);
     compile_and_run_wildcard_program("go", &source);
 }
