@@ -50,6 +50,12 @@ use super::renderers::quoted_key_literal;
 use super::types::{PathSegment, PythonMapValueEdges, PythonTypedDictMap};
 use std::collections::HashSet;
 
+struct PythonAccessOwner<'a> {
+    owner_type: Option<String>,
+    json_crossings: &'a HashSet<String>,
+    start_in_json: bool,
+}
+
 /// Render a Python accessor expression, wrapping every point where the chain crosses an
 /// `Optional` field (per `optional_fields`) in a narrowing conditional expression.
 ///
@@ -72,9 +78,11 @@ pub(super) fn render_python_with_optionals(
         optional_fields,
         typeddict_map,
         map_value_edges,
-        typeddict_map.root_type.clone(),
-        json_crossings,
-        false,
+        PythonAccessOwner {
+            owner_type: typeddict_map.root_type.clone(),
+            json_crossings,
+            start_in_json: false,
+        },
     )
 }
 
@@ -98,9 +106,11 @@ pub(super) fn render_python_element_with_optionals(
         optional_fields,
         typeddict_map,
         map_value_edges,
-        owner_type,
-        &HashSet::new(),
-        start_in_json,
+        PythonAccessOwner {
+            owner_type,
+            json_crossings: &HashSet::new(),
+            start_in_json,
+        },
     )
 }
 
@@ -110,10 +120,13 @@ fn render_python_with_optionals_from_owner(
     optional_fields: &HashSet<String>,
     typeddict_map: &PythonTypedDictMap,
     map_value_edges: &PythonMapValueEdges,
-    owner_type: Option<String>,
-    json_crossings: &HashSet<String>,
-    start_in_json: bool,
+    owner: PythonAccessOwner<'_>,
 ) -> String {
+    let PythonAccessOwner {
+        owner_type,
+        json_crossings,
+        start_in_json,
+    } = owner;
     let last_index = segments.len().saturating_sub(1);
     let mut crossings: Vec<usize> = Vec::new();
     let mut path_so_far = String::new();

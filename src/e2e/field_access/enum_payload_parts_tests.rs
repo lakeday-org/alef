@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "The measurement test emits accessor expressions for inspection."
+)]
+
 //! A fixture path that steps through a data-carrying enum field and then into a list of
 //! tagged parts: `choices[0].message.content.parts` and `choices[0].message.content.parts[0].text`.
 //!
@@ -125,9 +130,9 @@ fn node_and_wasm_should_read_the_bare_payload_of_an_untagged_newtype_variant() {
             "{language}: the untagged `Body` is the bare list, so `parts` is not a property; got: {list}"
         );
         let text = resolver().accessor("choices[0].message.content.parts[0].text", language, "result");
-        assert!(
-            !text.contains("parts") && text.ends_with("[0].text"),
-            "{language}: the part is the element of the bare list; got: {text}"
+        assert_eq!(
+            text, "result.choices[0].message.content?.[0]?.text",
+            "{language}: the part is the element of the bare list"
         );
     }
 }

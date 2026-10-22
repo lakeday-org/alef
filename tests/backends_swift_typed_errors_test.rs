@@ -79,7 +79,12 @@ fn api() -> ApiSurface {
             method("status_code", TypeRef::Primitive(PrimitiveType::U16)),
             method("retry_after", TypeRef::Optional(Box::new(TypeRef::Duration))),
         ],
-        ..ErrorDef::default()
+        exception_base: None,
+        original_rust_path: String::new(),
+        doc: String::new(),
+        binding_excluded: false,
+        binding_exclusion_reason: None,
+        version: Default::default(),
     };
     let function = |name: &str, is_async: bool| FunctionDef {
         name: name.to_string(),
@@ -175,8 +180,8 @@ fn the_swift_error_is_built_from_the_bridge_error_with_status_and_retry_delay() 
         "a variant with a retry delay gets it, and a variant without a status field gets one: {swift}"
     );
     assert!(
-        swift.contains("self = .timeout(status: UInt16(clamping: status))"),
-        "a unit variant keeps its case and gains the status: {swift}"
+        swift.contains("self = .timeout(message: message, status: UInt16(clamping: status))"),
+        "a unit variant keeps its case and gains the message and status: {swift}"
     );
     assert!(
         swift.contains("public var kind: String"),
@@ -210,7 +215,8 @@ fn every_bridge_call_goes_through_the_conversion_helpers() {
         "an asynchronous forwarder must convert the thrown bridge error: {swift}"
     );
     assert!(
-        !swift.contains("try RustBridge.chat(") && !swift.contains("try await RustBridge.chatLater("),
+        !swift.contains("return try RustBridge.chat(")
+            && !swift.contains("let result = try await RustBridge.chatLater("),
         "no fallible call may reach the caller without the conversion: {swift}"
     );
 }

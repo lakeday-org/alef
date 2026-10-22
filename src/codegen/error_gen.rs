@@ -6,8 +6,8 @@ mod napi_wasm;
 mod native;
 mod php;
 mod pyo3;
-mod rustler;
 mod ruby;
+mod rustler;
 pub use php::{gen_php_error_dispatch, gen_php_error_stubs, gen_php_error_types, php_error_class_names};
 pub use ruby::{gen_magnus_error_class_registrations, gen_magnus_error_converter, gen_magnus_error_dispatch};
 mod shared;
@@ -28,8 +28,7 @@ pub use napi_wasm::{
 };
 pub use native::{
     gen_ffi_error_codes, gen_ffi_error_methods, gen_magnus_error_methods_struct, gen_php_error_converter,
-    gen_php_error_methods_impl, magnus_converter_fn_name,
-    magnus_error_methods_registrations, php_converter_fn_name,
+    gen_php_error_methods_impl, magnus_converter_fn_name, magnus_error_methods_registrations, php_converter_fn_name,
 };
 pub use pyo3::{
     converter_fn_name, gen_pyo3_error_converter, gen_pyo3_error_methods_impl, gen_pyo3_error_registration,
