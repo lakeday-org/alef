@@ -121,19 +121,39 @@ fn emit_wildcard_scan(out: &mut String, array_accessor: &str, local: &str, cond:
     let _ = writeln!(out, "\t}}");
 }
 
+struct WildcardLeaf<'a> {
+    accessor: &'a str,
+    pointer: bool,
+}
+
+impl WildcardLeaf<'_> {
+    fn string_expression(&self) -> String {
+        let dereference = if self.pointer { "*" } else { "" };
+        format!("fmt.Sprintf(\"%v\", {dereference}{})", self.accessor)
+    }
+
+    fn present_predicate(&self, predicate: String) -> String {
+        if self.pointer {
+            format!("{} != nil && {predicate}", self.accessor)
+        } else {
+            predicate
+        }
+    }
+}
+
 /// `contains`/`not_contains` against a single scalar `assertion.value`.
 fn render_wildcard_single_value(
     out: &mut String,
     assertion: &Assertion,
     field: &str,
     array_accessor: &str,
-    elem_accessor: &str,
+    leaf: &WildcardLeaf<'_>,
     suffix: &str,
 ) {
     let expected = assertion.value.as_ref().expect("guarded by the caller's match arm");
     let go_val = json_to_go(expected);
     let local = format!("found{suffix}");
-    let cond = format!("strings.Contains(fmt.Sprintf(\"%v\", {elem_accessor}), {go_val})");
+    let cond = leaf.present_predicate(format!("strings.Contains({}, {go_val})", leaf.string_expression()));
     emit_wildcard_scan(out, array_accessor, &local, &cond);
     if assertion.assertion_type == "contains" {
         let _ = writeln!(out, "\tif !{local} {{");
@@ -157,7 +177,7 @@ fn render_wildcard_multi_value(
     assertion: &Assertion,
     field: &str,
     array_accessor: &str,
-    elem_accessor: &str,
+    leaf: &WildcardLeaf<'_>,
     suffix: &str,
 ) {
     let Some(values) = &assertion.values else {
@@ -168,7 +188,7 @@ fn render_wildcard_multi_value(
     for (i, val) in values.iter().enumerate() {
         let go_val = json_to_go(val);
         let local = format!("found{suffix}v{i}");
-        let cond = format!("strings.Contains(fmt.Sprintf(\"%v\", {elem_accessor}), {go_val})");
+        let cond = leaf.present_predicate(format!("strings.Contains({}, {go_val})", leaf.string_expression()));
         emit_wildcard_scan(out, array_accessor, &local, &cond);
         if negated {
             let _ = writeln!(out, "\tif {local} {{");
@@ -188,9 +208,15 @@ fn render_wildcard_multi_value(
 }
 
 /// `not_empty`: at least one element's rendered value is non-blank.
-fn render_wildcard_non_empty(out: &mut String, field: &str, array_accessor: &str, elem_accessor: &str, suffix: &str) {
+fn render_wildcard_non_empty(
+    out: &mut String,
+    field: &str,
+    array_accessor: &str,
+    leaf: &WildcardLeaf<'_>,
+    suffix: &str,
+) {
     let local = format!("found{suffix}");
-    let cond = format!("fmt.Sprintf(\"%v\", {elem_accessor}) != \"\"");
+    let cond = leaf.present_predicate(format!("{} != \"\"", leaf.string_expression()));
     emit_wildcard_scan(out, array_accessor, &local, &cond);
     let _ = writeln!(out, "\tif !{local} {{");
     let _ = writeln!(
@@ -224,17 +250,21 @@ pub(super) fn render_wildcard_assertion(
     // `element_accessor`, not `accessor`: the path is already element-relative, so the
     // result-anchoring `accessor` applies would re-prefix it with the container. ~keep
     let elem_accessor = field_resolver.element_accessor(elem_part, "go", "e");
+    let leaf = WildcardLeaf {
+        accessor: &elem_accessor,
+        pointer: field_resolver.target_field_is_pointer(field) == Some(true),
+    };
     let suffix = wildcard_local_suffix(assertion);
 
     match assertion.assertion_type.as_str() {
         "contains" | "not_contains" if assertion.value.is_some() => {
-            render_wildcard_single_value(out, assertion, field, &array_accessor, &elem_accessor, &suffix);
+            render_wildcard_single_value(out, assertion, field, &array_accessor, &leaf, &suffix);
         }
         "contains" | "contains_all" | "not_contains" => {
-            render_wildcard_multi_value(out, assertion, field, &array_accessor, &elem_accessor, &suffix);
+            render_wildcard_multi_value(out, assertion, field, &array_accessor, &leaf, &suffix);
         }
         "not_empty" => {
-            render_wildcard_non_empty(out, field, &array_accessor, &elem_accessor, &suffix);
+            render_wildcard_non_empty(out, field, &array_accessor, &leaf, &suffix);
         }
         other => {
             let _ = writeln!(

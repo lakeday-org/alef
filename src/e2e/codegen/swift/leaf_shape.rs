@@ -291,6 +291,24 @@ pub(super) fn swift_scalar_leaf_string_expr(
     }
 }
 
+/// ~keep Optional chaining preserves absence even when a contains needle is empty.
+pub(super) fn swift_wildcard_leaf_string_expr(
+    accessor: &str,
+    is_enum: bool,
+    is_data_carrying_enum: bool,
+    is_optional: bool,
+) -> String {
+    let expression = swift_scalar_leaf_string_expr(accessor, is_enum, is_data_carrying_enum, false);
+    if is_optional {
+        let suffix = expression
+            .strip_prefix(accessor)
+            .expect("scalar expression starts with its accessor");
+        format!("{accessor}?{suffix}")
+    } else {
+        expression
+    }
+}
+
 /// Whether the leaf's own getter returns `Option<..>`, so a caller chaining onto the rendered
 /// accessor must write `?.` rather than `.`.
 ///

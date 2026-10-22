@@ -319,16 +319,14 @@ pub(super) fn swift_traversal_contains_assert(context: SwiftTraversalContains<'_
         .field_resolver
         .ir_enum_is_data_carrying(context.full_field)
         .unwrap_or(false);
-    let elem_is_optional = context.field_resolver.is_optional(resolved_elem_part)
-        || context
-            .field_resolver
-            .is_optional(context.field_resolver.resolve(resolved_elem_part));
+    let elem_is_optional = context.field_resolver.is_optional(context.full_field)
+        || super::leaf_shape::leaf_getter_is_optional(context.field_resolver, Some(context.full_field));
     // `swift_scalar_leaf_string_expr` picks `.toString()` (method-call/opaque leaf, or a
     // first-class payload-carrying enum) vs `.rawValue` (a first-class all-unit enum) vs bare
     // access (a first-class plain `String` leaf, which has neither) from the accessor
     // expression's own shape — see that function's doc for why a single call answers correctly
     // for every combination. ~keep
-    let elem_str = super::leaf_shape::swift_scalar_leaf_string_expr(
+    let elem_str = super::leaf_shape::swift_wildcard_leaf_string_expr(
         &elem_accessor,
         elem_is_enum,
         elem_is_data_carrying_enum,
@@ -339,10 +337,11 @@ pub(super) fn swift_traversal_contains_assert(context: SwiftTraversalContains<'_
     } else {
         "XCTAssertTrue"
     };
-    format!(
-        "        {assert_fn}({array_accessor}.contains(where: {{ {elem_str}.contains({}) }}), \"{}\")",
-        context.value_expression, context.message
-    )
+    let optional_comparison = if elem_is_optional { " == true" } else { "" };
+    let predicate = format!("{elem_str}.contains({}){optional_comparison}", context.value_expression);
+    crate::e2e::template_env::render("swift/wildcard_assertion.swift.jinja", crate::alef_context! {
+        assert_fn => assert_fn, array_accessor => array_accessor, predicate => predicate, message => context.message,
+    }).trim_end().to_string()
 }
 
 /// Returns `(map_expr, is_optional)` where `map_expr` is the `.map { … }` chain

@@ -24,7 +24,7 @@ use crate::e2e::field_access::FieldResolver;
 
 const CONTAINER_ACCESSOR: &str = ".Records";
 
-fn render(resolver: &FieldResolver) -> String {
+fn render_assertion_with(resolver: &FieldResolver, assertion: &crate::e2e::fixture::Assertion) -> String {
     let mut out = String::new();
     let context = AssertionRenderContext {
         effective_result_var: "result",
@@ -38,7 +38,7 @@ fn render(resolver: &FieldResolver) -> String {
         is_streaming: false,
         streaming_item_type: None,
     };
-    render_assertion(&mut out, &context, &contains_assertion(WILDCARD_FIELD));
+    render_assertion(&mut out, &context, assertion);
     out
 }
 
@@ -74,4 +74,58 @@ fn wildcard_container_keeps_its_envelope_projection() {
         "container half must keep the result-anchored envelope projection, got: {rendered}"
     );
     assert_container_accessor_appears_once(&rendered, CONTAINER_ACCESSOR);
+}
+
+fn render(resolver: &FieldResolver) -> String {
+    render_assertion_with(resolver, &contains_assertion(WILDCARD_FIELD))
+}
+
+#[test]
+fn optional_wildcard_strings_dereference_only_present_leaves() {
+    use crate::e2e::codegen::wildcard_element_fixture::{WILDCARD_NAME_FIELD, optional_name_resolver};
+    let mut failures = Vec::new();
+    let mut checked = 0;
+    for kind in ["contains", "not_contains", "contains_all", "not_empty"] {
+        for multiple in [false, true] {
+            if kind == "contains_all" && !multiple {
+                continue;
+            }
+            let assertion = crate::e2e::fixture::Assertion {
+                assertion_type: kind.into(),
+                field: Some(WILDCARD_NAME_FIELD.into()),
+                value: (!multiple).then(|| serde_json::json!("")),
+                values: multiple.then(|| vec![serde_json::json!(""), serde_json::json!("t")]),
+                ..Default::default()
+            };
+            let rendered = render_assertion_with(&optional_name_resolver("go"), &assertion);
+            checked += 1;
+            if !rendered.contains("e.Name != nil &&") || !rendered.contains("*e.Name") {
+                failures.push(format!("{kind}/{multiple}: {rendered}"));
+            }
+        }
+    }
+    assert_eq!(checked, 7);
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+#[ignore = "requires the Go toolchain"]
+fn optional_wildcard_generated_go_compiles_and_runs() {
+    use crate::e2e::codegen::wildcard_element_fixture::{
+        compile_and_run_wildcard_program, optional_name_resolver, wildcard_runtime_cases,
+    };
+    let mut source = String::from(
+        "package main\nimport (\"fmt\";\"strings\")\ntype Entry struct { Name *string }\ntype Report struct { Records []Entry }\ntype Recorder struct { failed bool }\nfunc(t *Recorder) Errorf(_ string, _ ...any) { t.failed = true }\n",
+    );
+    let mut checks = String::new();
+    for (index, (assertion, name, passes)) in wildcard_runtime_cases("go").iter().enumerate() {
+        let name = name.map_or("nil".to_string(), |name| {
+            format!("func() *string {{ v := {name:?}; return &v }}()")
+        });
+        let rendered = render_assertion_with(&optional_name_resolver("go"), assertion);
+        source.push_str(&format!("func case{index}() bool {{ result := Report{{Records: []Entry{{{{Name: {name}}}}}}}; t := &Recorder{{}};\n{rendered}\nreturn !t.failed\n}}\n"));
+        checks.push_str(&format!("if case{index}() != {passes} {{ panic(\"case {index}\") }}\n"));
+    }
+    source.push_str(&format!("func main() {{\n{checks}}}\n"));
+    compile_and_run_wildcard_program("go", &source);
 }

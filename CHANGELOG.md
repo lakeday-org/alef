@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Generate nil-safe Go and Swift e2e assertions for optional collection fields, comparing present string values and excluding absent values even when the expected substring is empty.
+
 ## [0.113.0] - 2026-10-22
 
 ### Added

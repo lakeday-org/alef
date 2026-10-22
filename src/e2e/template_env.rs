@@ -2,6 +2,10 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "swift/wildcard_assertion.swift.jinja",
+        include_str!("templates/swift/wildcard_assertion.swift.jinja"),
+    ),
+    (
         "typescript/json_member.ts.jinja",
         include_str!("templates/typescript/json_member.ts.jinja"),
     ),

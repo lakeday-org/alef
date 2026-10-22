@@ -182,3 +182,104 @@ pub(crate) fn assert_element_relative(rendered: &str, element_body: &str, contai
         "closure body must address the element binding's own field (`{element_body}`), got: {rendered}"
     );
 }
+
+/// ~keep A required root name prevents the global bare-name optional index hiding lost path context.
+pub(crate) fn optional_name_resolver(language: &str) -> FieldResolver {
+    let mut types = report_entry_type_defs();
+    types[0].fields.push(FieldDef {
+        name: "name".into(),
+        ty: TypeRef::String,
+        ..FieldDef::default()
+    });
+    types[1].fields[1].optional = true;
+    let (reachable, excluded, optional) = FieldResolver::ir_field_sets(&types);
+    let resolver = FieldResolver::new(
+        &HashMap::new(),
+        &HashSet::new(),
+        &HashSet::new(),
+        &HashSet::new(),
+        &HashSet::new(),
+    )
+    .with_ir_result_fields(
+        FieldResolver::ir_result_field_facts(&types, language),
+        Some(ROOT_TYPE.into()),
+    )
+    .with_ir_collection_map(FieldResolver::ir_collection_fields(&types), Some(ROOT_TYPE.into()))
+    .with_ir_fields(reachable, excluded, optional);
+    assert!(!resolver.is_optional("name"));
+    assert!(resolver.is_optional(WILDCARD_NAME_FIELD));
+    if language == "swift" {
+        resolver.with_swift_first_class_map(crate::e2e::field_access::SwiftFirstClassMap {
+            first_class_types: HashSet::from([ROOT_TYPE.into(), "Entry".into()]),
+            field_types: HashMap::from([(ROOT_TYPE.into(), HashMap::from([("records".into(), "Entry".into())]))]),
+            root_type: Some(ROOT_TYPE.into()),
+            ..Default::default()
+        })
+    } else {
+        resolver
+    }
+}
+
+pub(crate) fn compile_and_run_wildcard_program(language: &str, source: &str) {
+    let directory = tempfile::tempdir().expect("create compiler test directory");
+    let path = directory.path().join(format!("wildcard.{language}"));
+    std::fs::write(&path, source).expect("write generated assertion harness");
+    let mut command = std::process::Command::new(language);
+    if language == "go" {
+        command.arg("run");
+    }
+    let output = command.arg(&path).output().expect("start language toolchain");
+    assert!(
+        output.status.success(),
+        "{}\n{}\n{source}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+pub(crate) fn wildcard_runtime_cases(language: &str) -> Vec<(Assertion, Option<&'static str>, bool)> {
+    let mut cases = Vec::new();
+    for name in [None, Some("t"), Some("other"), Some("")] {
+        for needle in ["", "t", "missing"] {
+            for kind in [
+                "contains",
+                "not_contains",
+                "not_contains_multi",
+                "contains_all",
+                "not_empty",
+            ] {
+                // ~keep Swift String.contains rejects empty needles; preserve each backend's existing string semantics.
+                let matches =
+                    name.is_some_and(|name| name.contains(needle) && (language == "go" || !needle.is_empty()));
+                let passes = match kind {
+                    "not_contains" => !matches,
+                    "not_contains_multi" => !matches && !name.is_some_and(|name| name.contains("t")),
+                    "contains_all" => matches && name.is_some_and(|name| name.contains("t")),
+                    "not_empty" => name.is_some_and(|name| !name.is_empty()),
+                    _ => matches,
+                };
+                cases.push((
+                    Assertion {
+                        assertion_type: if kind == "not_contains_multi" {
+                            "not_contains"
+                        } else {
+                            kind
+                        }
+                        .into(),
+                        field: Some(WILDCARD_NAME_FIELD.into()),
+                        value: (!["contains_all", "not_contains_multi"].contains(&kind))
+                            .then(|| serde_json::json!(needle)),
+                        values: ["contains_all", "not_contains_multi"]
+                            .contains(&kind)
+                            .then(|| vec![serde_json::json!(needle), serde_json::json!("t")]),
+                        ..Default::default()
+                    },
+                    name,
+                    passes,
+                ));
+            }
+        }
+    }
+    assert_eq!(cases.len(), 60);
+    cases
+}

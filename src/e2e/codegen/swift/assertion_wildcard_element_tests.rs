@@ -88,3 +88,46 @@ fn wildcard_container_keeps_its_envelope_projection() {
     );
     assert_container_accessor_appears_once(&rendered, CONTAINER_ACCESSOR);
 }
+
+#[test]
+fn optional_wildcard_strings_never_match_absent_leaves() {
+    use crate::e2e::codegen::wildcard_element_fixture::optional_name_resolver;
+    let mut failures = Vec::new();
+    let mut checked = 0;
+    for kind in ["contains", "not_contains", "contains_all", "not_empty"] {
+        let assertion = Assertion {
+            assertion_type: kind.into(),
+            field: Some(WILDCARD_NAME_FIELD.into()),
+            value: Some(serde_json::json!("")),
+            values: Some(vec![serde_json::json!(""), serde_json::json!("t")]),
+            ..Default::default()
+        };
+        let rendered = render(&optional_name_resolver("swift"), &assertion);
+        checked += 1;
+        if !rendered.contains("$0.name?") || !(rendered.contains("== true") || rendered.contains("== false")) {
+            failures.push(format!("{kind}: {rendered}"));
+        }
+    }
+    assert_eq!(checked, 4);
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+#[ignore = "requires the Swift toolchain"]
+fn optional_wildcard_generated_swift_compiles_and_runs() {
+    use crate::e2e::codegen::wildcard_element_fixture::{
+        compile_and_run_wildcard_program, optional_name_resolver, wildcard_runtime_cases,
+    };
+    let mut source = String::from(
+        "import Foundation\nstruct Entry { let name: String? }\nstruct Report { let records: [Entry] }\nvar recordedFailure = false\nfunc XCTAssertTrue(_ value: Bool, _ message: String) { if !value { recordedFailure = true } }\nfunc XCTAssertFalse(_ value: Bool, _ message: String) { if value { recordedFailure = true } }\n",
+    );
+    let mut checks = String::new();
+    for (index, (assertion, name, passes)) in wildcard_runtime_cases("swift").iter().enumerate() {
+        let name = name.map_or("nil".to_string(), |name| format!("{name:?}"));
+        let rendered = render(&optional_name_resolver("swift"), assertion);
+        source.push_str(&format!("func case{index}() -> Bool {{ recordedFailure = false; let result = Report(records: [Entry(name: {name})]);\n{rendered}\nreturn !recordedFailure\n}}\n"));
+        checks.push_str(&format!("precondition(case{index}() == {passes}, \"case {index}\")\n"));
+    }
+    source.push_str(&checks);
+    compile_and_run_wildcard_program("swift", &source);
+}

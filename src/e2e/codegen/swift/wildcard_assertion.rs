@@ -111,18 +111,22 @@ pub(super) fn render_wildcard_assertion(
             // `gen_bindings::enums::emit_swift_wire_tag_accessor`) but no `.rawValue` —
             // `swift_scalar_leaf_string_expr` needs this to pick the right one. ~keep
             let elem_is_data_carrying_enum = field_resolver.ir_enum_is_data_carrying(field).unwrap_or(false);
-            let elem_is_optional = field_resolver.is_optional(resolved_elem_part)
-                || field_resolver.is_optional(field_resolver.resolve(resolved_elem_part));
-            let elem_str = super::leaf_shape::swift_scalar_leaf_string_expr(
+            let elem_is_optional = field_resolver.is_optional(field)
+                || super::leaf_shape::leaf_getter_is_optional(field_resolver, Some(field));
+            let elem_str = super::leaf_shape::swift_wildcard_leaf_string_expr(
                 &elem_accessor,
                 elem_is_enum,
                 elem_is_data_carrying_enum,
                 elem_is_optional,
             );
-            let _ = writeln!(
-                out,
-                "        XCTAssertTrue({array_accessor}.contains(where: {{ !{elem_str}.isEmpty }}), \"expected non-empty value\")"
-            );
+            let predicate = if elem_is_optional {
+                format!("{elem_str}.isEmpty == false")
+            } else {
+                format!("!{elem_str}.isEmpty")
+            };
+            out.push_str(&crate::e2e::template_env::render("swift/wildcard_assertion.swift.jinja", crate::alef_context! {
+                assert_fn => "XCTAssertTrue", array_accessor => array_accessor, predicate => predicate, message => "expected non-empty value",
+            }));
         }
         other => {
             let _ = writeln!(
