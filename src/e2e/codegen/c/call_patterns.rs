@@ -279,7 +279,7 @@ pub(super) fn render_engine_factory_test_function(
                         prefix,
                         resolved,
                         local_var: &local_var,
-                        result_var,
+                        root_expression: result_var,
                         fields_c_types,
                         fields_enum,
                         intermediate_handles: &mut intermediate_handles,

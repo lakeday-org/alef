@@ -4,7 +4,7 @@ pub(in crate::e2e::codegen::c) struct NativeAccessorArgs<'a> {
     pub prefix: &'a str,
     pub resolved: &'a str,
     pub local_var: &'a str,
-    pub result_var: &'a str,
+    pub root_expression: &'a str,
     pub fields_c_types: &'a HashMap<String, String>,
     pub fields_enum: &'a HashSet<String>,
     pub intermediate_handles: &'a mut Vec<(String, String)>,
@@ -22,7 +22,7 @@ pub(super) fn emit(
     let segments: Vec<&str> = args.resolved.split('.').collect();
     let mut walk = SegmentWalk {
         current_snake_type: args.result_type_name.to_snake_case(),
-        current_handle: args.result_var.to_string(),
+        current_handle: args.root_expression.to_string(),
         current_type_from_ir: args
             .type_defs
             .iter()

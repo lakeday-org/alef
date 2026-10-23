@@ -79,19 +79,10 @@ fn collect_rust_files(directory: &std::path::Path, found: &mut Vec<std::path::Pa
     }
 }
 
-#[test]
-fn no_new_code_emits_an_identifier_from_the_raw_result_var() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+fn find_raw_result_var_reads(root: &std::path::Path) -> (usize, std::collections::BTreeSet<String>) {
     let mut files = Vec::new();
     collect_rust_files(&root.join("src"), &mut files);
-    assert!(
-        files.len() > 100,
-        "the source scan found only {} files — the walk is broken, and a guard that examines \
-         nothing passes for a healthy tree",
-        files.len()
-    );
-
-    let mut found: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut found = std::collections::BTreeSet::new();
     for path in &files {
         let relative = path
             .strip_prefix(root)
@@ -108,14 +99,12 @@ fn no_new_code_emits_an_identifier_from_the_raw_result_var() {
             }
         }
     }
+    (files.len(), found)
+}
 
-    let known: std::collections::BTreeSet<String> = KNOWN_RAW_RESULT_VAR_READS
-        .iter()
-        .map(|entry| (*entry).to_string())
-        .collect();
-    let added: Vec<&String> = found.difference(&known).collect();
-    let removed: Vec<&String> = known.difference(&found).collect();
-
+fn assert_known_raw_reads(found: &std::collections::BTreeSet<String>, known: &std::collections::BTreeSet<String>) {
+    let added: Vec<&String> = found.difference(known).collect();
+    let removed: Vec<&String> = known.difference(found).collect();
     assert!(
         added.is_empty(),
         "new direct read(s) of the raw `result_var`. It is blank whenever the call was not built \
@@ -127,6 +116,50 @@ fn no_new_code_emits_an_identifier_from_the_raw_result_var() {
         "KNOWN_RAW_RESULT_VAR_READS lists entries that no longer exist — delete them so the list \
          keeps shrinking:\n{removed:#?}"
     );
+}
+
+#[test]
+fn no_new_code_emits_an_identifier_from_the_raw_result_var() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let (file_count, found) = find_raw_result_var_reads(root);
+    assert!(
+        file_count > 100,
+        "the source scan found only {file_count} files — the walk is broken, and a guard that examines \
+         nothing passes for a healthy tree"
+    );
+    let known = KNOWN_RAW_RESULT_VAR_READS
+        .iter()
+        .map(|entry| (*entry).to_string())
+        .collect();
+    assert_known_raw_reads(&found, &known);
+}
+
+#[test]
+fn the_source_scan_rejects_a_new_raw_identifier_emitter() {
+    let root = tempfile::tempdir().expect("temporary source root");
+    let source_dir = root.path().join("src");
+    std::fs::create_dir(&source_dir).expect("source directory");
+    std::fs::write(
+        source_dir.join("emitter.rs"),
+        "fn emit(call: &CallConfig, out: &mut String) {\n    out.push_str(&call.result_var);\n}\n",
+    )
+    .expect("raw identifier emitter");
+    let (file_count, found) = find_raw_result_var_reads(root.path());
+    assert_eq!(file_count, 1, "the planted emitter must be scanned");
+    assert_eq!(
+        found,
+        std::collections::BTreeSet::from(["src/emitter.rs\tout.push_str(&call.result_var);".to_string()])
+    );
+    let rejected = std::panic::catch_unwind(|| assert_known_raw_reads(&found, &std::collections::BTreeSet::new()));
+    let message = rejected
+        .expect_err("the guard must reject an actual new raw identifier emitter")
+        .downcast::<String>()
+        .expect("formatted guard diagnostic");
+    assert!(
+        message.contains("new direct read(s) of the raw `result_var`"),
+        "{message}"
+    );
+    assert!(message.contains("src/emitter.rs"), "{message}");
 }
 
 #[test]

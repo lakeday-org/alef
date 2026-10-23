@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep resolved C accessor expressions distinct from raw call identifiers and verify every loaded e2e template registry with omission and empty-scan controls.
+
 ## [0.113.3] - 2026-10-23
 
 ### Fixed

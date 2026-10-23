@@ -206,56 +206,135 @@ mod not_empty_tests {
 
 #[cfg(test)]
 mod template_registration_tests {
-    use super::TEMPLATES;
+    use super::make_env;
+    use minijinja::Environment;
     use std::collections::HashSet;
     use std::path::Path;
 
-    /// `go/harness_main.go.jinja` is read by its own private `minijinja::Environment` in
-    /// `render_harness_main` (`src/e2e/codegen/go.rs`), via a local `include_str!` rather than
-    /// through this shared `TEMPLATES` registry. That function is currently dead code — its own
-    /// doc comment says the server-pattern harness is now emitted by a consumer `Extension` and
-    /// alef no longer calls it, kept only pending a dead-code sweep — so the file is genuinely
-    /// unreachable through `render()`, but deleting it would break `render_harness_main`'s
-    /// `include_str!`, and that's an emitter-side change out of scope here. ~keep
+    /// Go's standalone harness uses its own private environment outside the shared registry. ~keep
     const ALLOWLISTED_UNREGISTERED: &[&str] = &["go/harness_main.go.jinja"];
+    const MIN_EXPECTED_TEMPLATES: usize = 100;
 
-    /// `render()` resolves names against `TEMPLATES`, not the filesystem, so a
-    /// `.jinja` file added to `templates/` but never wired into this array compiles fine
-    /// (`include_str!` only runs for entries that are listed) and panics only once an
-    /// emitter reaches it at generation time. Compare by content rather than by
-    /// registered key: some backends register a file under a shortened or aliased name,
-    /// which is fine, but every file's bytes must appear in `TEMPLATES` somewhere. ~keep
-    #[test]
-    fn every_template_file_is_registered() {
-        let templates_dir = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src/e2e/templates"));
-        let registered_contents: HashSet<&str> = TEMPLATES.iter().map(|(_, content)| *content).collect();
+    struct TemplateCensus {
+        scanned_files: usize,
+        registrations: usize,
+        unregistered: Vec<String>,
+    }
 
+    fn templates_dir() -> &'static Path {
+        Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src/e2e/templates"))
+    }
+
+    /// Compare content because runtime aliases may differ from file paths. Inspect the loaded
+    /// environment so extracted registry modules and the renderer share one authority. ~keep
+    fn census(environment: &Environment<'_>, root: &Path) -> TemplateCensus {
+        let registrations = environment.templates().count();
+        let registered_contents = environment
+            .templates()
+            .map(|(_, template)| template.source().to_owned())
+            .collect();
         let mut unregistered = Vec::new();
-        collect_unregistered(templates_dir, templates_dir, &registered_contents, &mut unregistered);
+        let scanned_files = collect_unregistered(root, root, &registered_contents, &mut unregistered);
         unregistered.retain(|path| !ALLOWLISTED_UNREGISTERED.contains(&path.as_str()));
         unregistered.sort();
+        TemplateCensus {
+            scanned_files,
+            registrations,
+            unregistered,
+        }
+    }
+
+    fn assert_registered(census: &TemplateCensus) {
         assert!(
-            unregistered.is_empty(),
-            "found .jinja file(s) in templates/ whose content is not registered in TEMPLATES: {unregistered:?}"
+            census.scanned_files >= MIN_EXPECTED_TEMPLATES,
+            "expected at least {MIN_EXPECTED_TEMPLATES} template files, observed {}",
+            census.scanned_files
         );
+        assert!(
+            census.registrations >= MIN_EXPECTED_TEMPLATES,
+            "expected at least {MIN_EXPECTED_TEMPLATES} runtime registrations, observed {}",
+            census.registrations
+        );
+        assert!(
+            census.unregistered.is_empty(),
+            "scanned {} template files against {} runtime registrations; unregistered: {:?}",
+            census.scanned_files,
+            census.registrations,
+            census.unregistered
+        );
+    }
+
+    #[test]
+    fn every_template_file_is_registered() {
+        assert_registered(&census(&make_env(), templates_dir()));
+    }
+
+    #[test]
+    fn the_census_rejects_an_omitted_runtime_registration() {
+        let mut environment = make_env();
+        let expected_registrations = environment.templates().count();
+        let missing = "ruby/enum_collection_accessor.jinja";
+        assert!(environment.get_template(missing).is_ok());
+        environment.remove_template(missing);
+        let observed = census(&environment, templates_dir());
+        assert_eq!(observed.registrations, expected_registrations - 1);
+        assert_eq!(observed.unregistered, [missing]);
+        let rejected = std::panic::catch_unwind(|| assert_registered(&observed));
+        let message = rejected
+            .expect_err("an omitted runtime registration must fail the actual census gate")
+            .downcast::<String>()
+            .expect("formatted census diagnostic");
+        assert!(message.contains("unregistered:"), "{message}");
+        assert!(message.contains(missing), "{message}");
+    }
+
+    #[test]
+    fn the_census_accepts_runtime_aliases_for_registered_content() {
+        let mut environment = make_env();
+        let expected_registrations = environment.templates().count();
+        environment.remove_template("ruby/enum_collection_accessor.jinja");
+        environment
+            .add_template(
+                "renamed/enum_accessor.jinja",
+                include_str!("../templates/ruby/enum_collection_accessor.jinja"),
+            )
+            .expect("valid aliased runtime template");
+        let observed = census(&environment, templates_dir());
+        assert_eq!(observed.registrations, expected_registrations);
+        assert_registered(&observed);
+    }
+
+    #[test]
+    fn an_empty_template_walk_is_not_a_green_census() {
+        let root = tempfile::tempdir().expect("empty template root");
+        let observed = census(&make_env(), root.path());
+        assert_eq!(observed.scanned_files, 0);
+        let rejected = std::panic::catch_unwind(|| assert_registered(&observed));
+        let message = rejected
+            .expect_err("a zero-file census must fail")
+            .downcast::<String>()
+            .expect("formatted empty census diagnostic");
+        assert!(message.contains("template files, observed 0"), "{message}");
     }
 
     fn collect_unregistered(
         root: &Path,
         dir: &Path,
-        registered_contents: &HashSet<&str>,
+        registered_contents: &HashSet<String>,
         unregistered: &mut Vec<String>,
-    ) {
+    ) -> usize {
+        let mut scanned_files = 0;
         for entry in std::fs::read_dir(dir).expect("read templates directory") {
             let entry = entry.expect("read templates directory entry");
             let path = entry.path();
             if path.is_dir() {
-                collect_unregistered(root, &path, registered_contents, unregistered);
+                scanned_files += collect_unregistered(root, &path, registered_contents, unregistered);
                 continue;
             }
             if path.extension().and_then(|ext| ext.to_str()) != Some("jinja") {
                 continue;
             }
+            scanned_files += 1;
             let content = std::fs::read_to_string(&path).expect("read template file");
             if !registered_contents.contains(content.as_str()) {
                 let relative = path
@@ -267,6 +346,7 @@ mod template_registration_tests {
                 unregistered.push(relative);
             }
         }
+        scanned_files
     }
 }
 

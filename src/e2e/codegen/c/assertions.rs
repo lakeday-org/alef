@@ -62,7 +62,7 @@ pub(super) fn emit_nested_accessor(
             prefix,
             resolved,
             local_var,
-            result_var,
+            root_expression: result_var,
             fields_c_types,
             fields_enum,
             intermediate_handles,
