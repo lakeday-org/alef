@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Render the Swift error compatibility probe through the backend template registry and anchor compiler and runtime probes to their owned temporary directory.
+
 ## [0.113.3] - 2026-10-23
 
 ### Fixed

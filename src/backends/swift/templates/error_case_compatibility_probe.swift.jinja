@@ -1,0 +1,8 @@
+{{ declaration }}
+let failure = SampleError.notFound(message: "missing", source: nil)
+switch failure {
+case .notFound(let message, let source):
+    precondition(message == "missing" && source == nil)
+default:
+    preconditionFailure("wrong error case")
+}

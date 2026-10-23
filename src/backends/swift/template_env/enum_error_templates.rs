@@ -1,4 +1,8 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
+    (
+        "error_case_compatibility_probe.swift.jinja",
+        include_str!("../templates/error_case_compatibility_probe.swift.jinja"),
+    ),
     ("enum_header.jinja", include_str!("../templates/enum_header.jinja")),
     (
         "error_enum_header.jinja",
