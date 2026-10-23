@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve generated Node runtime helpers and historical wrapper aliases in ESM named exports by reading the actual NAPI binding declarations.
+
 ## [0.113.3] - 2026-10-23
 
 ### Fixed

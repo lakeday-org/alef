@@ -1,7 +1,8 @@
 mod esm;
+mod native_exports;
 
 use crate::backends::napi::gen_bindings::errors;
-use crate::core::backend::GeneratedFile;
+use crate::core::backend::{Backend, GeneratedFile};
 use crate::core::config::{
     AdapterPattern, Language, NodeCapsuleTypeConfig, OutputLayout, ResolvedCrateConfig, resolve_output_dir,
 };
@@ -73,7 +74,13 @@ pub(super) fn generate(api: &ApiSurface, config: &ResolvedCrateConfig) -> anyhow
     } else {
         "./index-wrapper.cjs"
     };
-    let esm_wrapper = gen_esm_wrapper(&runtime_export_names(&content), entrypoint);
+    let mut names = runtime_export_names(&content);
+    for binding in super::NapiBackend.generate_bindings(api, config)? {
+        names.extend(native_exports::runtime_export_names(&binding.content)?);
+    }
+    names.sort();
+    names.dedup();
+    let esm_wrapper = gen_esm_wrapper(&names, entrypoint);
 
     Ok(vec![
         GeneratedFile {

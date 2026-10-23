@@ -33,7 +33,7 @@ pub(super) fn runtime_export_names(dts: &str) -> Vec<String> {
 }
 
 /// An export name the ESM wrapper can declare with `export const`.
-fn is_esm_export_name(name: &str) -> bool {
+pub(super) fn is_esm_export_name(name: &str) -> bool {
     const RESERVED: &[&str] = &[
         "default",
         "class",
@@ -87,6 +87,7 @@ fn is_esm_export_name(name: &str) -> bool {
     chars
         .next()
         .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '$')
+        && chars.all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '$')
         && !RESERVED.contains(&name)
 }
 
