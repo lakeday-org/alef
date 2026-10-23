@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve indexed list-variant paths and canonical payload field metadata when lowering generated assertions (#682).
+
 
 ## [0.113.3] - 2026-10-23
 

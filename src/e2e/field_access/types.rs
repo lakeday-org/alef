@@ -327,6 +327,7 @@ pub(crate) enum WasmEnumRepresentation<'a> {
 ///   `fields_enum` entry already has).
 #[derive(Debug, Clone, Default)]
 pub struct IrEnumMap {
+    pub enum_definitions: HashMap<String, crate::core::ir::EnumDef>,
     pub field_types: HashMap<String, HashMap<String, String>>,
     pub enum_fields: HashMap<String, HashSet<String>>,
     /// `enum_field_types[type_name][field_name]` — the IR enum's own name for an entry also

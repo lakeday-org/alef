@@ -4,6 +4,7 @@
 //! actual API struct paths (e.g., "metadata.document.title") and generates
 //! language-specific accessor expressions.
 
+mod enum_payload_access;
 mod internally_tagged_variants;
 mod ir_collection;
 mod ir_enum;
@@ -21,6 +22,7 @@ mod resolver;
 mod types;
 mod variant_crossings;
 
+pub use enum_payload_access::{EnumFieldMetadata, WireAccessStep};
 pub(crate) use internally_tagged_variants::push_owner_segment;
 pub use leaf_anchor::LeafAnchor;
 pub(crate) use types::WasmEnumRepresentation;

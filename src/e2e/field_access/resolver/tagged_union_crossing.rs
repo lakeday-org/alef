@@ -39,9 +39,9 @@ impl FieldResolver {
     ) -> Option<(String, String, String, String)> {
         let parts: Vec<&str> = fixture_field.split('.').collect();
         if let Some(first) = parts.first() {
-            let variant = first.to_upper_camel_case();
+            let (variant, suffix) = indexed_variant_suffix(first, &parts[1..]);
             if self.union_variant_payload(root, &variant).is_some() {
-                return Some((String::new(), root.to_string(), variant, parts[1..].join(".")));
+                return Some((String::new(), root.to_string(), variant, suffix));
             }
         }
         for index in 0..parts.len().saturating_sub(1) {
@@ -49,8 +49,7 @@ impl FieldResolver {
             let Some(union_type) = enum_type_at_path_from(&self.ir_enum_map, root, &prefix) else {
                 continue;
             };
-            let variant = parts[index + 1].to_upper_camel_case();
-            let suffix = parts[index + 2..].join(".");
+            let (variant, suffix) = indexed_variant_suffix(parts[index + 1], &parts[index + 2..]);
             return Some((prefix, union_type, variant, suffix));
         }
         None
@@ -200,6 +199,25 @@ impl FieldResolver {
             .join(".")
     }
 }
+
+fn indexed_variant_suffix(segment: &str, tail: &[&str]) -> (String, String) {
+    let split = segment.find('[').unwrap_or(segment.len());
+    let (name, indices) = segment.split_at(split);
+    let (name, indices) = if super::super::enum_payload_access::numeric_indices(indices).is_some() {
+        (name, indices)
+    } else {
+        (segment, "")
+    };
+    let suffix = match (indices.is_empty(), tail.is_empty()) {
+        (_, true) => indices.to_string(),
+        (true, false) => tail.join("."),
+        (false, false) => format!("{indices}.{}", tail.join(".")),
+    };
+    (crate::codegen::naming::to_class_name(name), suffix)
+}
+
+#[cfg(test)]
+mod indexed_variant_tests;
 
 #[cfg(test)]
 mod collection_tests {

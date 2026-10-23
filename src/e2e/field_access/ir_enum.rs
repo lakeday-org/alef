@@ -71,6 +71,10 @@ pub(super) fn build_ir_enum_map(type_defs: &[TypeDef], enums: &[EnumDef]) -> IrE
         build_variant_payload_types(enums, type_defs);
 
     IrEnumMap {
+        enum_definitions: enums
+            .iter()
+            .map(|definition| (definition.name.clone(), definition.clone()))
+            .collect(),
         field_types,
         enum_fields,
         enum_field_types,
