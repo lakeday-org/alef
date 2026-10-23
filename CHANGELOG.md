@@ -7,31 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.113.3] - 2026-10-23
+
 ### Fixed
 
 - Lower nested enum-list assertions through the actual Go raw JSON and C/Zig JSON payloads, preserving indices, wire names, and collection shape checks (#684).
 - Preserve declared Ruby enum-field wire names and legacy input aliases, including inherited casing and escaped names (#682).
 - Execute PHP and Ruby nested enum-list count and text assertions against decoded payloads, rejecting incorrect collection shapes (#682).
 - Preserve configured Swift text projections through required and optional bridge getters, public wrappers, and generated assertions without JSON-decoding plain text (#686).
-
 - Keep generated Java streaming methods within Checkstyle method-length limits by moving iterator state into private helpers, with an always-on generated-output length guard (#685).
-
 - Preserve exact list-variant counts and indexed text assertions in generated C#, Dart, Kotlin, and Kotlin Android tests, including enum elements and explicit wire field names.
 - Lower Elixir tagged tuple list payload assertions correctly and respect WASM text projections when checking structural parts (#684).
-
 - Preserve absent optional Swift error durations as nil while retaining explicit zero and positive delays (#683).
-
 - Preserve indexed list-variant paths and canonical payload field metadata when lowering generated assertions (#682).
-
-
-## [0.113.3] - 2026-10-23
-
-### Fixed
-
 - Preserve explicit wire field names in PHP DTO mirrors while retaining host field names, raw-key compatibility and camel-case JSON aliases (#681).
 - Borrow string error-type metadata directly in WASM JavaScript errors without redundant allocation, preserving Display conversion for other metadata types (#679).
 - Match generated Ruby error specs against canonical typed exception classes and retain native RuntimeError fallback checks (#680).
-
 - Keep typed Dart stream envelopes bounded for large items and errors without changing their public Dart payload types.
 - Preserve generated Node runtime helpers and historical wrapper aliases in ESM named exports.
 - Preserve borrowed static-string payload attributes in generated Python and PHP exceptions.
