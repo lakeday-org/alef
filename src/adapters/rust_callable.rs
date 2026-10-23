@@ -9,12 +9,15 @@ pub(crate) fn receiver_call(
     let path: syn::ExprPath =
         syn::parse_str(core_path).with_context(|| format!("parsing adapter Rust callable `{core_path}`"))?;
     let qualified = path.qself.is_some() || path.path.leading_colon.is_some() || path.path.segments.len() > 1;
-    Ok(if qualified {
+    let call = if qualified {
         let separator = if args.is_empty() { "" } else { ", " };
         format!("{core_path}({borrowed_receiver}{separator}{args})")
     } else {
         format!("{receiver}.{core_path}({args})")
-    })
+    };
+    syn::parse_str::<syn::Expr>(&call)
+        .with_context(|| format!("constructing adapter Rust receiver call for `{core_path}`"))?;
+    Ok(call)
 }
 
 #[cfg(test)]
@@ -55,6 +58,28 @@ mod tests {
     }
 
     #[test]
+    fn receiver_call_rejects_bare_path_keywords_and_accepts_qualified_paths() {
+        let invalid = ["self", "Self", "super", "crate"];
+        assert_eq!(invalid.len(), 4);
+        for path in invalid {
+            syn::parse_str::<syn::ExprPath>(path).expect("the input is a path, but not a method name");
+            let error = receiver_call(path, "inner", "&inner", "").unwrap_err();
+            assert!(error.to_string().contains("constructing adapter Rust receiver call"));
+            assert!(error.root_cause().is::<syn::Error>());
+        }
+        for path in [
+            "Self::events",
+            "super::events",
+            "crate::events",
+            "r#type",
+            "events::<Vec<u8>>",
+        ] {
+            let call = receiver_call(path, "inner", "&inner", "").unwrap();
+            syn::parse_str::<syn::Expr>(&call).expect("qualified paths and legal method names remain valid");
+        }
+    }
+
+    #[test]
     fn receiver_call_native_dispatch_preserves_trait_helpers_and_generics() {
         let calls = [
             ("events", "inner", "&inner", "", 1),
@@ -82,7 +107,8 @@ mod tests {
 
     fn check_dispatch_controls(source: &str) {
         let directory = tempfile::tempdir().unwrap();
-        std::fs::write(directory.path().join("Taskfile.yml"), "version: '3'\ntasks:\n  proof:\n    cmds:\n      - rustc --edition=2024 probe.rs -o probe\n      - ./probe\n").unwrap();
+        let executable = format!("probe{}", std::env::consts::EXE_SUFFIX);
+        std::fs::write(directory.path().join("Taskfile.yml"), format!("version: '3'\ntasks:\n  proof:\n    cmds:\n      - rustc --edition=2024 probe.rs -o {executable}\n      - ./{executable}\n")).unwrap();
         for valid in [false, true] {
             let candidate = if valid {
                 source.to_string()
