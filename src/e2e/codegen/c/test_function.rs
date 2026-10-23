@@ -14,11 +14,11 @@ use super::assertions::TargetParams;
 use super::docs_input::render_c_docs_json;
 use super::ffi_constructors::is_std_type_without_ffi_constructor;
 use super::{
-    FieldConfigSources, LeafFieldCheck, build_args_string_c, classify_nested_leaf, emit_nested_accessor,
-    ensure_leaf_field_exists, infer_opaque_handle_type, ir_declares_a_json_string_param, is_primitive_c_type,
-    is_skipped_c_field, json_to_c, render_assertion, render_bytes_test_function, render_c_diagnostic_skip,
-    render_engine_factory_test_function, render_streaming_test_function, resolve_c_client_owner_type,
-    resolve_c_streaming_adapter, resolve_optional_sentinel, try_emit_enum_accessor, validate_c_snippet_metadata,
+    FieldConfigSources, LeafFieldCheck, build_args_string_c, classify_nested_leaf, ensure_leaf_field_exists,
+    infer_opaque_handle_type, ir_declares_a_json_string_param, is_primitive_c_type, is_skipped_c_field, json_to_c,
+    render_assertion, render_bytes_test_function, render_c_diagnostic_skip, render_engine_factory_test_function,
+    render_streaming_test_function, resolve_c_client_owner_type, resolve_c_streaming_adapter,
+    resolve_optional_sentinel, try_emit_enum_accessor, validate_c_snippet_metadata,
 };
 
 /// Emit the C error-path epilogue every `expects_error` return site shares: the declared `error`
@@ -928,14 +928,11 @@ pub(super) fn render_test_function_impl(
 
         let mut intermediate_handles: Vec<(String, String)> = Vec::new();
         let mut accessed_fields: Vec<(String, String, bool)> = Vec::new();
-        // Locals declared as primitive C scalars (uint64_t, double, bool, ...).
-        // Locals not present here default to char* (heap-allocated accessor result).
+        // ~keep Unclassified locals own heap-allocated char* accessor results.
         let mut primitive_locals: HashMap<String, String> = HashMap::new();
-        // Locals declared as opaque struct handles (e.g. SAMPLELLMUsage*).
-        // Keyed by local_var, value is the snake_case type name used for free().
+        // ~keep Opaque local values record the type owning their free function.
         let mut opaque_handle_locals: HashMap<String, String> = HashMap::new();
-        // `field[].key` wildcard leaves: local_var -> (array json var, key to extract per
-        // element). See `collection_wildcard.rs`.
+        // ~keep Wildcard leaves retain the array and key for quantifier assertions.
         let mut wildcard_locals: HashMap<String, (String, String)> = HashMap::new();
 
         for assertion in &fixture.assertions {
@@ -948,26 +945,28 @@ pub(super) fn render_test_function_impl(
                 && !is_mock_virtual_field(f)
                 && !accessed_fields.iter().any(|(k, _, _)| k == f)
             {
-                // Strips virtual namespace prefixes (e.g. "interaction.action_results[0].x"
-                // → "action_results[0].x") before building the accessor chain.
+                // ~keep Accessor extraction starts at the call's result, after virtual namespace removal.
                 let resolved = field_resolver.result_relative_path(f);
                 let resolved = resolved.as_ref();
                 let local_var = f.replace(['.', '['], "_").replace(']', "");
                 let has_map_access = resolved.contains('[');
                 if resolved.contains('.') {
-                    let leaf_result = emit_nested_accessor(
+                    let leaf_result = super::assertions::emit_ir_nested_accessor(
                         out,
-                        prefix,
-                        resolved,
-                        &local_var,
-                        result_var,
-                        fields_c_types,
-                        fields_enum,
-                        &mut intermediate_handles,
-                        result_type_name,
-                        f,
-                        type_defs,
-                        config_sources,
+                        field_resolver,
+                        super::assertions::NativeAccessorArgs {
+                            prefix,
+                            resolved,
+                            local_var: &local_var,
+                            result_var,
+                            fields_c_types,
+                            fields_enum,
+                            intermediate_handles: &mut intermediate_handles,
+                            result_type_name,
+                            raw_field: f,
+                            type_defs,
+                            config_sources,
+                        },
                     )?;
                     if let Some(outcome) = leaf_result {
                         classify_nested_leaf(
@@ -1476,8 +1475,7 @@ pub(super) fn render_test_function_impl(
     let mut primitive_locals: HashMap<String, String> = HashMap::new();
     // Locals declared as opaque struct handles (e.g. SAMPLELLMUsage*).
     let mut opaque_handle_locals: HashMap<String, String> = HashMap::new();
-    // `field[].key` wildcard leaves: local_var -> (array json var, key to extract per
-    // element). See `collection_wildcard.rs`.
+    // ~keep Wildcard leaves retain the array and key for quantifier assertions.
     let mut wildcard_locals: HashMap<String, (String, String)> = HashMap::new();
 
     for assertion in &fixture.assertions {
@@ -1488,27 +1486,29 @@ pub(super) fn render_test_function_impl(
             && !is_mock_virtual_field(f)
             && !accessed_fields.iter().any(|(k, _, _)| k == f)
         {
-            // Strips virtual namespace prefixes (e.g. "interaction.action_results[0].x"
-            // → "action_results[0].x") before building the accessor chain.
+            // ~keep Accessor extraction starts at the call's result, after virtual namespace removal.
             let resolved = field_resolver.result_relative_path(f);
             let resolved = resolved.as_ref();
             let local_var = f.replace(['.', '['], "_").replace(']', "");
             let has_map_access = resolved.contains('[');
 
             if resolved.contains('.') {
-                let leaf_result = emit_nested_accessor(
+                let leaf_result = super::assertions::emit_ir_nested_accessor(
                     out,
-                    prefix,
-                    resolved,
-                    &local_var,
-                    result_var,
-                    fields_c_types,
-                    fields_enum,
-                    &mut intermediate_handles,
-                    result_type_name,
-                    f,
-                    type_defs,
-                    config_sources,
+                    field_resolver,
+                    super::assertions::NativeAccessorArgs {
+                        prefix,
+                        resolved,
+                        local_var: &local_var,
+                        result_var,
+                        fields_c_types,
+                        fields_enum,
+                        intermediate_handles: &mut intermediate_handles,
+                        result_type_name,
+                        raw_field: f,
+                        type_defs,
+                        config_sources,
+                    },
                 )?;
                 if let Some(outcome) = leaf_result {
                     classify_nested_leaf(

@@ -10,9 +10,8 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as FmtWrite;
 
 use super::{
-    FieldConfigSources, LeafFieldCheck, c_optional_sentinel, classify_nested_leaf, emit_nested_accessor,
-    ensure_leaf_field_exists, infer_opaque_handle_type, is_primitive_c_type, is_skipped_c_field, render_assertion,
-    try_emit_enum_accessor,
+    FieldConfigSources, LeafFieldCheck, c_optional_sentinel, classify_nested_leaf, ensure_leaf_field_exists,
+    infer_opaque_handle_type, is_primitive_c_type, is_skipped_c_field, render_assertion, try_emit_enum_accessor,
 };
 
 /// Emit a test function using the engine-factory pattern:
@@ -267,26 +266,28 @@ pub(super) fn render_engine_factory_test_function(
             && field_resolver.is_valid_for_result(f)
             && !accessed_fields.iter().any(|(k, _, _)| k == f)
         {
-            // Strips virtual namespace prefixes (e.g. "interaction.action_results[0].x"
-            // → "action_results[0].x") before building the accessor chain.
+            // ~keep Accessor extraction starts at the call's result, after virtual namespace removal.
             let resolved = field_resolver.result_relative_path(f);
             let resolved = resolved.as_ref();
             let local_var = f.replace(['.', '['], "_").replace(']', "");
             let has_map_access = resolved.contains('[');
             if resolved.contains('.') {
-                let leaf_result = emit_nested_accessor(
+                let leaf_result = super::assertions::emit_ir_nested_accessor(
                     out,
-                    prefix,
-                    resolved,
-                    &local_var,
-                    result_var,
-                    fields_c_types,
-                    fields_enum,
-                    &mut intermediate_handles,
-                    result_type_name,
-                    f,
-                    type_defs,
-                    config_sources,
+                    field_resolver,
+                    super::assertions::NativeAccessorArgs {
+                        prefix,
+                        resolved,
+                        local_var: &local_var,
+                        result_var,
+                        fields_c_types,
+                        fields_enum,
+                        intermediate_handles: &mut intermediate_handles,
+                        result_type_name,
+                        raw_field: f,
+                        type_defs,
+                        config_sources,
+                    },
                 )?;
                 if let Some(outcome) = leaf_result {
                     classify_nested_leaf(

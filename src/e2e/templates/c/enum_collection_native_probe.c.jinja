@@ -1,0 +1,41 @@
+#include <stdint.h>
+#include "test_runner.h"
+
+enum alef_test_status alef_current_test_status = ALEF_TEST_PASSED;
+static const char* payload;
+static int checks;
+static char* sample_reply_choices(uint64_t result) {
+    (void)result;
+    return alef_json_get_object(payload, "choices");
+}
+static void sample_free_string(char* value) { free(value); }
+static void run(void) {
+    uint64_t result = 1;
+{{ accessors }}
+{% for assertion in assertions %}
+{{ assertion }}
+    checks++;
+{% endfor %}
+{% for local in locals %}
+    free({{ local }});
+{% endfor %}
+{% for handle in handles %}
+{% if handle.free_string %}
+    sample_free_string({{ handle.name }});
+{% else %}
+    free({{ handle.name }});
+{% endif %}
+{% endfor %}
+}
+int main(int argc, char** argv) {
+    if (argc != 2) return 2;
+    payload = argv[1];
+    run();
+    if (alef_current_test_status != ALEF_TEST_PASSED) {
+        fprintf(stderr, "FAIL_CASE:%d\n", checks);
+        return 1;
+    }
+    if (checks != 3) return 2;
+    puts("PASS:3");
+    return 0;
+}

@@ -10,6 +10,13 @@ use heck::{ToPascalCase, ToSnakeCase};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as FmtWrite;
 
+#[path = "assertions/enum_collection.rs"]
+mod enum_collection;
+#[path = "assertions/nested_access.rs"]
+mod nested_access;
+pub(super) use enum_collection::emit_ir_nested_accessor;
+pub(super) use nested_access::NativeAccessorArgs;
+
 /// The IR type name a C parameter carries as an opaque `AlefHandle` rather than as a literal.
 /// Defined in `c::optional_arg` -- the single seam every C e2e call site checks a parameter's
 /// handle-ness through, so the free-function path here and the client-method path in
@@ -33,6 +40,7 @@ use super::{
 ///
 /// The type chain is looked up from `fields_c_types` which maps
 /// `"{parent_snake_type}.{field}"` -> `"PascalCaseType"`.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_nested_accessor(
     out: &mut String,
@@ -48,63 +56,23 @@ pub(super) fn emit_nested_accessor(
     type_defs: &[crate::core::ir::TypeDef],
     config_sources: &FieldConfigSources,
 ) -> anyhow::Result<Option<NestedLeafOutcome>> {
-    let segments: Vec<&str> = resolved.split('.').collect();
-    // cbindgen's `[export] prefix` is shouty-snake, not uppercase; re-deriving it here as
-    // `to_uppercase` names types the generated header never declares for any prefix carrying an
-    // internal word boundary (`SampleCore` -> `SAMPLECORE` vs the header's `SAMPLE_CORE`). ~keep
-    let prefix_upper = crate::codegen::c_consumer::export_type_prefix(prefix);
-
-    // Walk the path, starting from the root result type.
-    let mut walk = SegmentWalk {
-        current_snake_type: result_type_name.to_snake_case(),
-        current_handle: result_var.to_string(),
-        current_type_from_ir: type_defs.iter().any(|type_def| type_def.name == result_type_name),
-        json_extract_mode: false,
-        is_wildcard: false,
-    };
-
-    for (i, segment) in segments.iter().enumerate() {
-        let is_leaf = i + 1 == segments.len();
-
-        // JSON-extract mode and bracket ("field[key]"/"field[]") segments are both handled
-        // entirely by `step_prefixed_segment`; only a plain field segment falls through to
-        // `step_plain_segment` below.
-        let step = match step_prefixed_segment(
-            &mut *out,
+    nested_access::emit(
+        out,
+        NativeAccessorArgs {
             prefix,
-            &mut *intermediate_handles,
-            &mut walk,
-            segment,
-            is_leaf,
+            resolved,
             local_var,
-        ) {
-            Some(step) => step,
-            None => step_plain_segment(PlainSegmentArgs {
-                out: &mut *out,
-                prefix,
-                prefix_upper: &prefix_upper,
-                raw_field,
-                resolved,
-                segment,
-                is_leaf,
-                segments: &segments,
-                i,
-                walk: &mut walk,
-                local_var,
-                fields_c_types,
-                fields_enum,
-                intermediate_handles: &mut *intermediate_handles,
-                result_type_name,
-                type_defs,
-                config_sources,
-            })?,
-        };
-        match step {
-            SegmentStep::Continue => continue,
-            SegmentStep::Done(outcome) => return Ok(outcome),
-        }
-    }
-    Ok(None)
+            result_var,
+            fields_c_types,
+            fields_enum,
+            intermediate_handles,
+            result_type_name,
+            raw_field,
+            type_defs,
+            config_sources,
+        },
+        false,
+    )
 }
 
 /// One step of [`emit_nested_accessor`]'s walk for a segment handled without reaching the

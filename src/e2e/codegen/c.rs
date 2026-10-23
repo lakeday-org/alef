@@ -1078,10 +1078,7 @@ mod void_call_status;
 #[cfg(test)]
 mod wildcard_collection_regression_tests;
 
-use assertions::{
-    FieldConfigSources, LeafFieldCheck, build_args_string_c, emit_nested_accessor, ensure_leaf_field_exists,
-    render_assertion,
-};
+use assertions::{FieldConfigSources, LeafFieldCheck, build_args_string_c, ensure_leaf_field_exists, render_assertion};
 use collection_wildcard::{NestedLeafOutcome, classify_nested_leaf, render_wildcard_assertion};
 // Test-only: the tests here and in `snippet_regressions` (which pulls this scope in via
 // `use super::*`) construct sources explicitly to pin which config key a diagnostic names, while

@@ -946,7 +946,7 @@ mod method_calls;
 mod setup;
 mod snippet;
 mod streaming_snippet_ctx;
-mod test_backend;
+pub(crate) mod test_backend;
 mod test_file;
 mod test_function;
 mod visitors;

@@ -1,0 +1,11 @@
+    assert({{ expression }} != NULL && {{ expression }}[strspn({{ expression }}, " \t\r\n")] == '['
+        && "expected enum collection payload");
+{% for step in steps %}
+{% if step.kind == "index" %}
+    char* {{ step.name }} = alef_json_array_get_index({{ step.expression }}, {{ step.value }});
+{% elif step.kind == "string" %}
+    char* {{ step.name }} = alef_json_get_string({{ step.expression }}, "{{ step.value }}");
+{% else %}
+    char* {{ step.name }} = alef_json_get_object({{ step.expression }}, "{{ step.value }}");
+{% endif %}
+{% endfor %}

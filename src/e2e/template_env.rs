@@ -37,6 +37,22 @@ static TEMPLATES: &[(&str, &str)] = &[
         include_str!("templates/typescript/collection_payload.jinja"),
     ),
     (
+        "go/enum_collection_assertion.jinja",
+        include_str!("templates/go/enum_collection_assertion.jinja"),
+    ),
+    (
+        "go/enum_collection_core.rs.jinja",
+        include_str!("templates/go/enum_collection_core.rs.jinja"),
+    ),
+    (
+        "go/enum_collection_core_probe.rs.jinja",
+        include_str!("templates/go/enum_collection_core_probe.rs.jinja"),
+    ),
+    (
+        "go/enum_collection_native_probe.go.jinja",
+        include_str!("templates/go/enum_collection_native_probe.go.jinja"),
+    ),
+    (
         "go/optional_wildcard_runtime.go.jinja",
         include_str!("templates/go/optional_wildcard_runtime.go.jinja"),
     ),
@@ -83,6 +99,18 @@ static TEMPLATES: &[(&str, &str)] = &[
     (
         "go/stream_error.go.jinja",
         include_str!("templates/go/stream_error.go.jinja"),
+    ),
+    (
+        "c/json_container_leaf.jinja",
+        include_str!("templates/c/json_container_leaf.jinja"),
+    ),
+    (
+        "c/enum_collection_access.jinja",
+        include_str!("templates/c/enum_collection_access.jinja"),
+    ),
+    (
+        "c/enum_collection_native_probe.c.jinja",
+        include_str!("templates/c/enum_collection_native_probe.c.jinja"),
     ),
     (
         "c/stream_error.c.jinja",
@@ -179,6 +207,14 @@ static TEMPLATES: &[(&str, &str)] = &[
     (
         "csharp/mock_request_helper.cs.jinja",
         include_str!("templates/csharp/mock_request_helper.cs.jinja"),
+    ),
+    (
+        "zig/enum_collection_accessor.jinja",
+        include_str!("templates/zig/enum_collection_accessor.jinja"),
+    ),
+    (
+        "zig/enum_collection_native_probe.zig.jinja",
+        include_str!("templates/zig/enum_collection_native_probe.zig.jinja"),
     ),
     (
         "zig/mock_request_helper.zig.jinja",

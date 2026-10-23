@@ -813,3 +813,6 @@ mod capsule_import_name_tests {
         assert_eq!(capsule_import_name("Language"), None);
     }
 }
+
+mod enum_collection;
+mod json_access;

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Lower nested enum-list assertions through the actual Go raw JSON and C/Zig JSON payloads, preserving indices, wire names, and collection shape checks (#684).
 - Preserve declared Ruby enum-field wire names and legacy input aliases, including inherited casing and escaped names (#682).
 - Execute PHP and Ruby nested enum-list count and text assertions against decoded payloads, rejecting incorrect collection shapes (#682).
 - Keep generated Java streaming methods within Checkstyle method-length limits by moving iterator state into private helpers, with an always-on generated-output length guard (#685).

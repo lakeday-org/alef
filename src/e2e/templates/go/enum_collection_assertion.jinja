@@ -1,0 +1,35 @@
+    {
+        enumBytes, enumErr := json.Marshal({{ expression }})
+        if enumErr != nil { t.Fatalf("encoding enum payload: %v", enumErr) }
+        var enumValue any
+        if enumErr = json.Unmarshal(enumBytes, &enumValue); enumErr != nil {
+            t.Fatalf("decoding enum payload: %v", enumErr)
+        }
+        if _, enumOK := enumValue.([]any); !enumOK { t.Fatal("expected enum collection payload") }
+{% for step in steps %}
+        {
+{% if step.kind == "index" %}
+            enumArray, enumOK := enumValue.([]any)
+            if !enumOK || len(enumArray) <= {{ step.index }} { t.Fatal("enum payload index unavailable") }
+            enumValue = enumArray[{{ step.index }}]
+{% else %}
+            enumObject, enumOK := enumValue.(map[string]any)
+            if !enumOK { t.Fatal("expected enum payload object") }
+            enumValue, enumOK = enumObject[{{ step.key }}]
+            if !enumOK { t.Fatal("enum payload field unavailable") }
+{% endif %}
+        }
+{% endfor %}
+{% if assertion_type == "equals" %}
+        enumText, enumOK := enumValue.(string)
+        if !enumOK || enumText != {{ expected }} { t.Fatalf("enum text mismatch at %s", {{ field }}) }
+{% else %}
+        enumArray, enumOK := enumValue.([]any)
+        if !enumOK { t.Fatal("expected enum collection payload") }
+{% if assertion_type == "count_equals" %}
+        if len(enumArray) != {{ expected }} { t.Fatal("enum collection count mismatch") }
+{% else %}
+        if len(enumArray) < {{ expected }} { t.Fatal("enum collection count mismatch") }
+{% endif %}
+{% endif %}
+    }

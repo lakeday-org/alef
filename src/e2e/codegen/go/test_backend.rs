@@ -602,3 +602,7 @@ mod trait_bridge_tests;
 #[cfg(test)]
 #[path = "test_backend/enum_default_tests.rs"]
 mod enum_default_tests;
+
+#[cfg(test)]
+#[path = "test_backend/enum_collection_support.rs"]
+pub(crate) mod enum_collection_support;

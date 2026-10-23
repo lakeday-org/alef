@@ -1,0 +1,14 @@
+{{ core }}
+
+fn reply(content: Option<Body>) -> Reply {
+    Reply { choices: vec![Choice { message: Message { content } }] }
+}
+fn parts(values: &[&str]) -> Body {
+    Body::Parts(values.iter().map(|text| Piece::Text { text: (*text).to_string() }).collect())
+}
+fn main() {
+    let cases = [reply(Some(parts(&["hello", " world"]))), reply(Some(parts(&["hello"]))),
+        reply(Some(parts(&["bad", " world"]))), reply(Some(parts(&["hello", "bad"]))),
+        reply(Some(Body::Text("[1,2]".to_string()))), reply(None)];
+    println!("{}", serde_json::to_string(&cases).unwrap());
+}

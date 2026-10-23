@@ -1,0 +1,14 @@
+(enum_payload: {
+    {% if steps %}var{% else %}const{% endif %} enum_value = {{ expression }};
+    if (enum_value != .array) return error.ExpectedEnumCollection;
+{% for step in steps %}
+{% if step.kind == "index" %}
+    if (enum_value != .array or enum_value.array.items.len <= {{ step.index }}) return error.EnumPayloadIndexUnavailable;
+    enum_value = enum_value.array.items[{{ step.index }}];
+{% else %}
+    if (enum_value != .object) return error.ExpectedEnumPayloadObject;
+    enum_value = enum_value.object.get("{{ step.key }}") orelse return error.EnumPayloadFieldUnavailable;
+{% endif %}
+{% endfor %}
+    break :enum_payload enum_value;
+})

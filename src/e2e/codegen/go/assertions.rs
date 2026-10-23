@@ -5,6 +5,8 @@ use crate::e2e::fixture::Assertion;
 use streaming_fields::render_streaming_field_assertion;
 use synthetic_fields::render_synthetic_field_assertion;
 use target::resolve_assertion_target;
+
+mod enum_collection;
 use wildcard_assertions::{emit_non_empty_precondition, render_wildcard_or_unavailable_field};
 
 /// Call-invariant state shared by every assertion rendered for one fixture's test
@@ -54,6 +56,9 @@ pub(super) fn render_assertion(out: &mut String, context: &AssertionRenderContex
     // intercept before ordinary field resolution for the same reason streaming virtual
     // fields do.
     if super::assertion_mock_capture::try_render_mock_capture_assertion(out, assertion) {
+        return;
+    }
+    if enum_collection::try_render(out, context, assertion) {
         return;
     }
     if render_wildcard_or_unavailable_field(out, assertion, context) {

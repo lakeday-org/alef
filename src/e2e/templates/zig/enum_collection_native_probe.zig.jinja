@@ -1,0 +1,14 @@
+const std = @import("std");
+const testing = std.testing;
+extern "c" fn getenv(name: [*:0]const u8) ?[*:0]const u8;
+
+pub fn main() !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    const payload = std.mem.span(getenv("ALEF_PROBE_INPUT") orelse return error.MissingProbePayload);
+    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, payload, .{});
+    const result = parsed.value;
+{{ assertions }}
+    std.debug.print("PASS:3\n", .{});
+}

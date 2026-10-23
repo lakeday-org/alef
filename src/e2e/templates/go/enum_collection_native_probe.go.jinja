@@ -1,0 +1,15 @@
+package sample
+
+import (
+    "encoding/json"
+    "os"
+    "testing"
+)
+
+{{ declarations }}
+
+func TestEnumPayload(t *testing.T) {
+    var result Reply
+    if err := json.Unmarshal([]byte(os.Getenv("ALEF_PROBE_INPUT")), &result); err != nil { t.Fatal(err) }
+{{ assertions }}
+}
