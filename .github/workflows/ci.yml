@@ -47,7 +47,7 @@ jobs:
         run: cargo sort --check --workspace
 
   poly-validate:
-    uses: xberg-io/actions/.github/workflows/reusable-validate.yml@c2525cd5fabf1619f76253284e46cc5c7aaff81e
+    uses: xberg-io/actions/.github/workflows/reusable-validate.yml@a8b47bd3c3e1a04183885b2c4183f169158bd494
     with:
       setup-rust: true
       rust-use-sccache: false

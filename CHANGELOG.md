@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Pin shared validation to its merged commit so GitHub can resolve the reusable workflow.
+
 ## [0.113.3] - 2026-10-23
 
 ### Fixed
