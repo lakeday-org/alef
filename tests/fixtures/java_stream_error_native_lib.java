@@ -30,9 +30,9 @@ final class NativeLib {
         return new TestLibRsException(code, message);
     }
 
-    static final Invoker TL_CHAT_COMPLETION_REQUEST_FROM_JSON = args -> MemorySegment.ofAddress(7);
-    static final Invoker TL_CHAT_COMPLETION_REQUEST_FREE = args -> null;
-    static final Invoker TL_DEFAULT_CLIENT_CHAT_STREAM_START = args -> {
+    static final Invoker TL_STREAM_REQUEST_FROM_JSON = args -> MemorySegment.ofAddress(7);
+    static final Invoker TL_STREAM_REQUEST_FREE = args -> null;
+    static final Invoker TL_SAMPLE_CLIENT_WATCH_START = args -> {
         if (events.length > 0 && events[0].startsWith("START_ERR:")) {
             lastCode = Integer.parseInt(events[0].split(":", 3)[1]);
             lastMessage = events[0].split(":", 3)[2];
@@ -40,11 +40,11 @@ final class NativeLib {
         }
         return MemorySegment.ofAddress(5);
     };
-    static final Invoker TL_DEFAULT_CLIENT_CHAT_STREAM_FREE = args -> {
+    static final Invoker TL_SAMPLE_CLIENT_WATCH_FREE = args -> {
         streamFreeCalls++;
         return null;
     };
-    static final Invoker TL_DEFAULT_CLIENT_CHAT_STREAM_NEXT = args -> {
+    static final Invoker TL_SAMPLE_CLIENT_WATCH_NEXT = args -> {
         lastCode = 0;
         lastMessage = null;
         String event = events[position++];
@@ -56,11 +56,11 @@ final class NativeLib {
         if (event.equals("END")) return MemorySegment.NULL;
         return MemorySegment.ofAddress(1000 + position);
     };
-    static final Invoker TL_CHAT_COMPLETION_CHUNK_TO_JSON = args -> {
+    static final Invoker TL_STREAM_ITEM_TO_JSON = args -> {
         long address = ((MemorySegment) args[0]).address();
         return Arena.global().allocateFrom(events[(int) (address - 1000) - 1]);
     };
-    static final Invoker TL_CHAT_COMPLETION_CHUNK_FREE = args -> null;
+    static final Invoker TL_STREAM_ITEM_FREE = args -> null;
     static final Invoker TL_FREE_STRING = args -> null;
     static final Invoker TL_LAST_ERROR_CODE = args -> (long) lastCode;
     static final Invoker TL_LAST_ERROR_CONTEXT = args ->

@@ -31,125 +31,7 @@
             if (e instanceof {{ exception_class }} ex) { throw ex; }
             throw new {{ exception_class }}("{{ method_name }}: failed to start stream", e);
         }
-        final MemorySegment finalStreamHandle = streamHandle;
-        final class StreamingIterator implements java.util.Iterator<{{ item_type }}>, AutoCloseable {
-            private boolean closed = false;
-            private Throwable deferred = null;
-            private {{ item_type }} pending = pull();
-
-            /** Throws a typed error from an iterator method that cannot declare it. */
-            @SuppressWarnings("unchecked")
-            private static <T extends Throwable> RuntimeException rethrow(final Throwable error) throws T {
-                throw (T) error;
-            }
-
-            private {{ exception_class }} failure(String message, Throwable cause) {
-                return new {{ exception_class }}("{{ method_name }}: " + message, cause);
-            }
-
-            private void cleanup(Throwable primary, MemorySegment jsonPtr, MemorySegment chunkPtr) {
-                Throwable cleanupError = null;
-                if (jsonPtr != null && !jsonPtr.equals(MemorySegment.NULL)) {
-                    try { NativeLib.{{ prefix_upper }}_FREE_STRING.invoke(jsonPtr); }
-                    catch (Throwable error) { cleanupError = error; }
-                }
-                if (chunkPtr != null && !chunkPtr.equals(MemorySegment.NULL)) {
-                    try { NativeLib.{{ item_free }}.invoke(chunkPtr); }
-                    catch (Throwable error) {
-                        if (cleanupError == null) { cleanupError = error; }
-                        else { cleanupError.addSuppressed(error); }
-                    }
-                }
-                if (cleanupError == null) { return; }
-                if (primary != null) { primary.addSuppressed(cleanupError); }
-                else {
-                    {{ exception_class }} cleanupPrimary = failure("failed to clean stream item", cleanupError);
-                    close(cleanupPrimary);
-                    throw rethrow(cleanupPrimary);
-                }
-            }
-
-            private {{ item_type }} pull() {
-                if (closed) { return null; }
-                MemorySegment chunkPtr;
-                try {
-                    chunkPtr = (MemorySegment) NativeLib.{{ next_handle }}.invoke(finalStreamHandle);
-                } catch (Throwable error) {
-                    {{ exception_class }} primary = failure("stream advance failed", error);
-                    close(primary);
-                    throw rethrow(primary);
-                }
-                if (chunkPtr.equals(MemorySegment.NULL)) {
-                    Throwable primary = null;
-                    try {
-                        int code = (int)(long) NativeLib.{{ prefix_upper }}_LAST_ERROR_CODE.invoke();
-                        if (code != 0) {
-                            MemorySegment ctxPtr = (MemorySegment) NativeLib.{{ prefix_upper }}_LAST_ERROR_CONTEXT.invoke();
-                            String msg = ctxPtr.equals(MemorySegment.NULL)
-                                ? "Native call failed with error code " + code
-                                : ctxPtr.reinterpret(Long.MAX_VALUE).getString(0);
-                            primary = NativeLib.lastErrorException(code, msg);
-                        }
-                    } catch (Throwable error) {
-                        primary = failure("failed to read stream status", error);
-                    }
-                    close(primary);
-                    if (primary != null) { throw rethrow(primary); }
-                    return null;
-                }
-                MemorySegment jsonPtr = MemorySegment.NULL;
-                Throwable primary = null;
-                try {
-                    jsonPtr = (MemorySegment) NativeLib.{{ item_to_json }}.invoke(chunkPtr);
-                    if (jsonPtr.equals(MemorySegment.NULL)) {
-                        throw failure("failed to serialize chunk", null);
-                    }
-                    String json = jsonPtr.reinterpret(Long.MAX_VALUE).getString(0);
-                    return STREAM_MAPPER.readValue(json, {{ item_type }}.class);
-                } catch (Throwable error) {
-                    primary = error instanceof {{ exception_class }} || error instanceof RuntimeException
-                        ? error
-                        : failure("failed to deserialize chunk", error);
-                    close(primary);
-                    throw rethrow(primary);
-                } finally {
-                    cleanup(primary, jsonPtr, chunkPtr);
-                }
-            }
-
-            private void close(Throwable primary) {
-                if (closed) { return; }
-                closed = true;
-                try { NativeLib.{{ free_handle }}.invoke(finalStreamHandle); }
-                catch (Throwable cleanupError) {
-                    if (primary != null) { primary.addSuppressed(cleanupError); }
-                    else { throw rethrow(failure("failed to free stream", cleanupError)); }
-                }
-            }
-
-            @Override
-            public void close() { close(null); }
-
-            @Override
-            public boolean hasNext() { return pending != null || deferred != null; }
-
-            @Override
-            public {{ item_type }} next() {
-                if (pending == null) {
-                    Throwable failed = deferred;
-                    if (failed == null) { throw new java.util.NoSuchElementException(); }
-                    deferred = null;
-                    throw rethrow(failed);
-                }
-                {{ item_type }} current = pending;
-                // The held chunk is already complete: return it now and report a failed read
-                // on the following call.
-                try { pending = pull(); }
-                catch (Exception error) { pending = null; deferred = error; }
-                return current;
-            }
-        }
-        StreamingIterator iterator = new StreamingIterator();
+        {{ iterator_class }} iterator = new {{ iterator_class }}(streamHandle);
         return java.util.stream.StreamSupport.stream(
             java.util.Spliterators.spliteratorUnknownSize(
                 iterator,
@@ -158,3 +40,5 @@
             false
         ).onClose(iterator::close);
     }
+
+{% include "streaming_iterator_class.jinja" %}

@@ -374,6 +374,10 @@ static TEMPLATES: &[(&str, &str)] = &[
         include_str!("templates/stream_method_unsupported_return.jinja"),
     ),
     (
+        "streaming_iterator_class.jinja",
+        include_str!("templates/streaming_iterator_class.jinja"),
+    ),
+    (
         "streaming_iterator_method.jinja",
         include_str!("templates/streaming_iterator_method.jinja"),
     ),

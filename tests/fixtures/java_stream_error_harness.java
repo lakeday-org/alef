@@ -3,13 +3,13 @@ package com.test;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 
-/** Holds the generated `chatStream` method with the members it needs from its generated class. */
+/** Holds the generated `watch` method with the members it needs from its generated class. */
 final class StreamHarness {
     static final class Mapper {
         String writeValueAsString(Object value) { return "{}"; }
 
         <T> T readValue(String json, Class<T> type) throws Exception {
-            return type.cast(new ChatCompletionChunk(json));
+            return type.cast(new StreamItem(json));
         }
     }
 

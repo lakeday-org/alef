@@ -29,10 +29,10 @@ class ServerErrorException extends TestLibRsException {
     int getStatusCode() { return statusCode; }
 }
 
-class ChatCompletionRequest {}
+class StreamRequest {}
 
-class ChatCompletionChunk {
+class StreamItem {
     final String text;
 
-    ChatCompletionChunk(String text) { this.text = text; }
+    StreamItem(String text) { this.text = text; }
 }

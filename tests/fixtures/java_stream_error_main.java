@@ -16,19 +16,20 @@ public final class StreamErrorMain {
             case "error_on_first_read" -> errorOnFirstRead();
             case "stream_rejected_on_open" -> streamRejectedOnOpen();
             case "clean_end" -> cleanEnd();
+            case "explicit_close" -> explicitClose();
             default -> throw new IllegalArgumentException("unknown scenario: " + args[0]);
         }
         System.out.println("OK " + args[0]);
     }
 
-    private static Iterator<ChatCompletionChunk> open() throws Exception {
-        return new StreamHarness().chatStream(new ChatCompletionRequest()).iterator();
+    private static Iterator<StreamItem> open() throws Exception {
+        return new StreamHarness().watch(new StreamRequest()).iterator();
     }
 
     /** The server sends a, b, then an error: the caller gets a, b, then the typed error. */
     private static void errorAfterTwoChunks() throws Exception {
         NativeLib.script("a", "b", "ERR:3:server error: overloaded");
-        Iterator<ChatCompletionChunk> iterator = open();
+        Iterator<StreamItem> iterator = open();
         List<String> seen = new ArrayList<>();
         Throwable failure = null;
         try {
@@ -52,7 +53,7 @@ public final class StreamErrorMain {
         NativeLib.script("a", "b", "ERR:3:server error: overloaded");
         List<String> seen = new ArrayList<>();
         Throwable failure = null;
-        try (var stream = new StreamHarness().chatStream(new ChatCompletionRequest())) {
+        try (var stream = new StreamHarness().watch(new StreamRequest())) {
             stream.forEach(chunk -> seen.add(chunk.text));
         } catch (Throwable error) {
             failure = error;
@@ -86,11 +87,22 @@ public final class StreamErrorMain {
 
     private static void cleanEnd() throws Exception {
         NativeLib.script("a", "b", "END");
-        Iterator<ChatCompletionChunk> iterator = open();
+        Iterator<StreamItem> iterator = open();
         List<String> seen = new ArrayList<>();
         while (iterator.hasNext()) seen.add(iterator.next().text);
         check(seen.equals(List.of("a", "b")), "chunks: " + seen);
         check(NativeLib.streamFreeCalls == 1, "stream handle freed once, got " + NativeLib.streamFreeCalls);
+    }
+
+    private static void explicitClose() throws Exception {
+        NativeLib.script("a", "b", "END");
+        var stream = new StreamHarness().watch(new StreamRequest());
+        check(NativeLib.position == 1, "the first item must be pulled eagerly");
+        check(NativeLib.streamFreeCalls == 0, "the live stream handle must remain owned");
+        stream.close();
+        stream.close();
+        check(NativeLib.position == 1, "closing must not advance the stream");
+        check(NativeLib.streamFreeCalls == 1, "explicit close must free the handle exactly once");
     }
 
     private static void checkTyped(Throwable failure) {

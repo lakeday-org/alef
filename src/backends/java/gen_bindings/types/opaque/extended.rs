@@ -445,6 +445,7 @@ pub(super) fn gen_streaming_method(
     out.push_str(&crate::backends::java::template_env::render(
         "streaming_iterator_method.jinja",
         crate::alef_context! {
+            iterator_class => format!("{}StreamingIterator", crate::codegen::naming::to_class_name(&adapter.name)),
             item_type => symbols.item_type,
             method_name => symbols.method_name,
             request_type => symbols.request_type,
@@ -490,6 +491,7 @@ mod stream_error_regressions {
         let generated = crate::backends::java::template_env::render(
             "streaming_iterator_method.jinja",
             crate::alef_context! {
+                iterator_class => "WatchStreamingIterator",
                 item_type => "Chunk", method_name => "watch", request_type => "Request",
                 request_param => "request", exception_class => "SampleException",
                 req_from_json => "REQUEST_FROM_JSON", start_handle => "STREAM_START",
@@ -515,6 +517,7 @@ mod stream_error_regressions {
         crate::backends::java::template_env::render(
             "streaming_iterator_method.jinja",
             crate::alef_context! {
+                iterator_class => "WatchStreamingIterator",
                 item_type => "Chunk", method_name => "watch", request_type => "Request",
                 request_param => "request", exception_class => "SampleException",
                 req_from_json => "REQUEST_FROM_JSON", start_handle => "STREAM_START",
@@ -530,7 +533,9 @@ mod stream_error_regressions {
     fn a_failed_read_ahead_keeps_the_held_chunk_and_reports_the_error_next() {
         let generated = render_iterator();
         assert!(
-            generated.contains("try { pending = pull(); }\n                catch (Exception error) { pending = null; deferred = error; }"),
+            generated.contains(
+                "try { pending = pull(); }\n            catch (Exception error) { pending = null; deferred = error; }"
+            ),
             "next() must catch the failed read and keep it: {generated}"
         );
         assert!(
