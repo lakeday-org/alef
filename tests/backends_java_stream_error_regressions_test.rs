@@ -247,3 +247,37 @@ fn fixture_task(root: &std::path::Path, target: &str) -> alef::snippets::validat
 fn explicitly_closing_a_stream_frees_its_handle_once() {
     run_scenario("explicit_close");
 }
+
+#[test]
+fn generated_stream_method_length_stays_within_the_checkstyle_limit() {
+    const MAX_LINES: usize = 150;
+    let baseline = extract_java_method(
+        include_str!("fixtures/java_stream_method_length/baseline.java"),
+        METHOD_SIGNATURE,
+    );
+    assert!(
+        baseline.lines().count() > MAX_LINES,
+        "the baseline must exercise the length limit"
+    );
+    let client = generated_client();
+    let method = extract_java_method(&client, METHOD_SIGNATURE);
+    assert!(
+        method.lines().count() <= MAX_LINES,
+        "generated method has {} lines",
+        method.lines().count()
+    );
+    assert!(!method.contains("class WatchStreamingIterator"));
+    let method_end = client.find(METHOD_SIGNATURE).unwrap() + method.len();
+    let helper_start = client
+        .find("private static final class WatchStreamingIterator")
+        .expect("private helper");
+    assert!(
+        helper_start > method_end,
+        "iterator class must be outside the public method"
+    );
+    println!(
+        "java_stream_method_lines={} baseline_lines={} limit={MAX_LINES}",
+        method.lines().count(),
+        baseline.lines().count()
+    );
+}
