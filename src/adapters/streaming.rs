@@ -155,39 +155,14 @@ fn gen_python_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> any
     // (nothing produced, safe to drop) or `Ready` (the item is already claimed by that poll, so
     // `select!` never discards a produced item). Dropping `stream` on the way out stops any
     // further upstream work at once rather than waiting for it to finish on its own.
-    let stream_forward_loop = "loop {
-                    tokio::select! {
-                        _ = tx.closed() => break,
-                        chunk = futures::StreamExt::next(&mut stream) => match chunk {
-                            Some(chunk) => {
-                                if tx.send(chunk).await.is_err() {
-                                    break;
-                                }
-                            }
-                            None => break,
-                        },
-                    }
-                }
-                drop(stream);";
 
-    let method_body = format!(
-        "let inner = self.inner.clone();\n    \
-         {bindings_block}\
-         let (tx, rx) = tokio::sync::mpsc::channel(32);\n    \
-         pyo3_async_runtimes::tokio::get_runtime().spawn(async move {{\n        \
-             match {core_call}.await {{\n            \
-                 Err(e) => {{\n                \
-                     let _ = tx.send(Err(e)).await;\n            \
-                 }}\n            \
-                 Ok(mut stream) => {{\n                \
-                     {stream_forward_loop}\n            \
-                 }}\n        \
-             }}\n    \
-         }});\n    \
-         let iter = {iter_name} {{\n        \
-             receiver: Arc::new(tokio::sync::Mutex::new(rx)),\n    \
-         }};\n    \
-         Ok(Bound::new(py, iter)?.into_any())"
+    let method_body = crate::codegen::template_env::render(
+        "adapters/streaming_python_body.rs.jinja",
+        crate::alef_context! {
+            bindings_block => &bindings_block,
+            core_call => &core_call,
+            iter_name => &iter_name,
+        },
     );
 
     Ok((method_body, Some(struct_def)))
@@ -243,49 +218,18 @@ fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyho
 
     // See the pyo3 body above for why `tx.closed()` is raced against `stream.next()` and why
     // that race cannot drop a produced item.
-    let stream_forward_loop = format!(
-        "loop {{
-                        tokio::select! {{
-                            _ = tx.closed() => break,
-                            chunk = stream.next() => {{
-                                let chunk = match chunk {{
-                                    Some(c) => c,
-                                    None => break,
-                                }};
-                                let item = match chunk {{
-                                    Ok(c) => {item_type}::from(c),
-                                    Err(e) => {{
-                                        let _ = tx.send(Err(alef_napi_err(e))).await;
-                                        break;
-                                    }}
-                                }};
-                                if tx.send(Ok(item)).await.is_err() {{
-                                    break;
-                                }}
-                            }}
-                        }}
-                    }}
-                    drop(stream);",
-        item_type = item_type,
-    );
 
     // The stream is opened before the forwarding task starts, so a failed open (401, 429)
     // rejects the call itself, as the Rust and Go bindings do. Only errors after the first
     // chunk travel through the channel and arrive on read.
-    let method_body = format!(
-        "let inner = self.inner.clone();\n    \
-         {bindings_block}\
-         use futures_util::StreamExt;\n    \
-         let mut stream = {core_call}.await\n        \
-             .map_err(alef_napi_err)?;\n    \
-         let (tx, rx) = tokio::sync::mpsc::channel(32);\n    \
-         tokio::spawn(async move {{\n        \
-             {stream_forward_loop}\n    \
-         }});\n    \
-         let iter = {iter_name} {{\n        \
-             receiver: Arc::new(tokio::sync::Mutex::new(rx)),\n    \
-         }};\n    \
-         Ok(iter)"
+    let method_body = crate::codegen::template_env::render(
+        "adapters/streaming_node_body.rs.jinja",
+        crate::alef_context! {
+            bindings_block => &bindings_block,
+            core_call => &core_call,
+            item_type => &item_type,
+            iter_name => &iter_name,
+        },
     );
 
     Ok((method_body, Some(struct_def)))
@@ -306,30 +250,13 @@ fn gen_ruby_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyho
         format!("{}\n    ", let_bindings.join("\n    "))
     };
 
-    let body = format!(
-        "use futures_util::StreamExt;\n    \
-         // 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep\n    \
-         // extraction future (a nested archive member, a multi-stage OCR pipeline), and a\n    \
-         // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.\n    \
-         const STREAMING_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;\n    \
-         let rt = tokio::runtime::Builder::new_multi_thread()\n        \
-             .enable_all()\n        \
-             .thread_stack_size(STREAMING_RUNTIME_STACK_SIZE_BYTES)\n        \
-             .build()\n        \
-             .map_err(alef_magnus_err)?;\n    \
-         {bindings_block}\
-         rt.block_on(async {{\n        \
-             let stream = {core_call}.await\n            \
-                 .map_err(alef_magnus_err)?;\n        \
-             let chunks: Vec<{item_type}> = stream\n            \
-                 .collect::<Vec<_>>().await\n            \
-                 .into_iter()\n            \
-                 .collect::<std::result::Result<Vec<_>, _>>()\n            \
-                 .map(|v| v.into_iter().map({item_type}::from).collect())\n            \
-                 .map_err(alef_magnus_err)?;\n        \
-             serde_json::to_string(&chunks)\n            \
-                 .map_err(alef_magnus_err)\n    \
-         }})"
+    let body = crate::codegen::template_env::render(
+        "adapters/streaming_ruby_body.rs.jinja",
+        crate::alef_context! {
+            bindings_block => &bindings_block,
+            core_call => &core_call,
+            item_type => &item_type,
+        },
     );
 
     Ok((body, None))
@@ -389,77 +316,22 @@ fn gen_elixir_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> any
         "Err::<String, String>(\"streaming method emitted as standalone NIFs ({start_fn}/{next_fn})\".to_string())"
     );
 
-    let struct_def = format!(
-        "/// Streaming handle for `{owner_type}::{core_path}` — owns a Tokio runtime\n\
-         /// plus the live `BoxStream`. Each call to `{next_fn}` blocks the dirty-CPU\n\
-         /// scheduler thread on a single `stream.next()` poll.\n\
-         pub struct {handle_struct} {{\n    \
-             runtime: std::sync::Arc<tokio::runtime::Runtime>,\n    \
-             stream: std::sync::Mutex<Option<futures_util::stream::BoxStream<'static, std::result::Result<{core_import}::{item_type}, {core_import}::{error_type}>>>>,\n\
-         }}\n\
-         \n\
-         #[rustler::resource_impl()]\n\
-         impl rustler::Resource for {handle_struct} {{}}\n\
-         \n\
-         /// Open a streaming `{core_path}` request. Returns an opaque iterator\n\
-         /// resource which the Elixir wrapper drives via `Stream.unfold/2`.\n\
-         #[rustler::nif(schedule = \"DirtyCpu\")]\n\
-         pub fn {start_fn}(\n    \
-             resource: rustler::ResourceArc<{owner_type}>,\n    \
-             {req_param_name}: {req_param_type},\n\
-         ) -> std::result::Result<rustler::ResourceArc<{handle_struct}>, AlefNifError> {{\n    \
-             {bindings_block}\
-             // 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep\n    \
-             // extraction future (a nested archive member, a multi-stage OCR pipeline), and a\n    \
-             // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.\n    \
-             const STREAM_HANDLE_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;\n    \
-             let runtime = std::sync::Arc::new(\n        \
-                 tokio::runtime::Builder::new_multi_thread()\n            \
-                     .enable_all()\n            \
-                     .thread_stack_size(STREAM_HANDLE_RUNTIME_STACK_SIZE_BYTES)\n            \
-                     .build()\n            \
-                     .map_err(|e| e.to_string())?,\n    \
-             );\n    \
-             let inner = resource.inner.read().unwrap_or_else(|e| e.into_inner()).clone();\n    \
-             let stream = runtime\n        \
-                 .block_on(async move {{ {core_call}.await }})\n        \
-                 .map_err(alef_nif_err)?;\n    \
-             let handle = {handle_struct} {{\n        \
-                 runtime,\n        \
-                 stream: std::sync::Mutex::new(Some(stream)),\n    \
-             }};\n    \
-             Ok(rustler::ResourceArc::new(handle))\n\
-         }}\n\
-         \n\
-         /// Pull the next chunk from a streaming handle. Returns the chunk JSON\n\
-         /// (decoded by the Elixir wrapper via `Jason.decode!/1`) or `nil` to\n\
-         /// signal end-of-stream. After end-of-stream the inner stream is dropped.\n\
-         #[rustler::nif(schedule = \"DirtyCpu\")]\n\
-         pub fn {next_fn}(\n    \
-             handle: rustler::ResourceArc<{handle_struct}>,\n\
-         ) -> std::result::Result<Option<String>, AlefNifError> {{\n    \
-             use futures_util::StreamExt;\n    \
-             let runtime = handle.runtime.clone();\n    \
-             let mut guard = handle.stream.lock().map_err(|e| e.to_string())?;\n    \
-             let stream_ref = match guard.as_mut() {{\n        \
-                 Some(s) => s,\n        \
-                 None => return Ok(None),\n    \
-             }};\n    \
-             match runtime.block_on(stream_ref.next()) {{\n        \
-                 Some(Ok(chunk)) => {{\n            \
-                     let json = serde_json::to_string(&chunk).map_err(|e| e.to_string())?;\n            \
-                     Ok(Some(json))\n        \
-                 }}\n        \
-                 Some(Err(e)) => {{\n            \
-                     *guard = None;\n            \
-                     Err(alef_nif_err(e))\n        \
-                 }}\n        \
-                 None => {{\n            \
-                     *guard = None;\n            \
-                     Ok(None)\n        \
-                 }}\n    \
-             }}\n\
-         }}"
+    let struct_def = crate::codegen::template_env::render(
+        "adapters/streaming_elixir_body.rs.jinja",
+        crate::alef_context! {
+            owner_type => &owner_type,
+            core_path => &core_path,
+            next_fn => &next_fn,
+            handle_struct => &handle_struct,
+            core_import => &core_import,
+            item_type => &item_type,
+            error_type => &error_type,
+            start_fn => &start_fn,
+            req_param_name => &req_param_name,
+            req_param_type => &req_param_type,
+            bindings_block => &bindings_block,
+            core_call => &core_call,
+        },
     );
 
     Ok((body, Some(struct_def)))
@@ -511,31 +383,14 @@ fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyho
 
     // The core call is awaited here, in the `async` wasm-bindgen method, so a server that refuses
     // the stream rejects the call itself. Only the forward loop runs in the spawned task.
-    let method_body = format!(
-        "{bindings_block}\
-         let mut stream = {core_call}.await.map_err(alef_wasm_err)?;\n    \
-         let (tx, rx) = futures::channel::mpsc::channel(32);\n    \
-         wasm_bindgen_futures::spawn_local(async move {{\n        \
-             use futures_util::StreamExt;\n        \
-             use futures::sink::SinkExt;\n        \
-             let mut tx = tx;\n        \
-             while let Some(chunk) = stream.next().await {{\n            \
-                 let item = match chunk {{\n                \
-                     Ok(c) => {item_type}::from(c),\n                \
-                     Err(e) => {{\n                    \
-                         let _ = tx.send(Err(alef_wasm_err(e))).await;\n                    \
-                         break;\n                \
-                     }}\n            \
-                 }};\n            \
-                 if tx.send(Ok(item)).await.is_err() {{\n                \
-                     break;\n            \
-                 }}\n        \
-             }}\n    \
-         }});\n    \
-         let iter = {iter_name} {{\n        \
-             receiver: std::cell::RefCell::new(rx),\n    \
-         }};\n    \
-         Ok(iter)"
+    let method_body = crate::codegen::template_env::render(
+        "adapters/streaming_wasm_body.rs.jinja",
+        crate::alef_context! {
+            bindings_block => &bindings_block,
+            core_call => &core_call,
+            item_type => &item_type,
+            iter_name => &iter_name,
+        },
     );
 
     Ok((method_body, Some(struct_def)))
@@ -552,73 +407,14 @@ fn gen_ffi_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow
         )
     })?;
 
-    let body = format!(
-        "clear_last_error();\n\n    \
-         if client.is_null() {{\n        \
-             set_last_error(99, \"{prefix}_{name}: client must not be NULL\");\n        \
-             return -1;\n    \
-         }}\n    \
-         if request_json.is_null() {{\n        \
-             set_last_error(99, \"{prefix}_{name}: request_json must not be NULL\");\n        \
-             return -1;\n    \
-         }}\n\n    \
-         // SAFETY: caller guarantees `client` and `request_json` are non-null and valid.\n    \
-         let client_ref = unsafe {{ &(*client) }};\n\n    \
-         let json_str = match unsafe {{ std::ffi::CStr::from_ptr(request_json) }}.to_str() {{\n        \
-             Ok(s) => s,\n        \
-             Err(e) => {{\n            \
-                 set_last_error(99, &format!(\"{prefix}_{name}: request_json is not valid UTF-8: {{e}}\"));\n            \
-                 return -1;\n        \
-             }}\n    \
-         }};\n\n    \
-         let request: {request_type} = match serde_json::from_str(json_str) {{\n        \
-             Ok(r) => r,\n        \
-             Err(e) => {{\n            \
-                 set_last_error(99, &format!(\"{prefix}_{name}: failed to parse request JSON: {{e}}\"));\n            \
-                 return -1;\n        \
-             }}\n    \
-         }};\n\n    \
-         let rt = get_ffi_runtime();\n\n    \
-         let result = rt.block_on(async {{\n        \
-             use futures_util::StreamExt;\n\n        \
-             let mut stream = match {core_call}.await {{\n            \
-                 Ok(s) => s,\n            \
-                 Err(e) => return Err(format!(\"{prefix}_{name}: failed to open stream: {{e}}\")),\n        \
-             }};\n\n        \
-             loop {{\n            \
-                 match stream.next().await {{\n                \
-                     None => break,\n                \
-                     Some(Err(e)) => return Err(format!(\"{prefix}_{name}: stream error: {{e}}\")),\n                \
-                     Some(Ok(chunk)) => {{\n                    \
-                         let chunk_json = match serde_json::to_string(&chunk) {{\n                        \
-                             Ok(s) => s,\n                        \
-                             Err(e) => return Err(format!(\"{prefix}_{name}: failed to serialise chunk: {{e}}\")),\n                    \
-                         }};\n                    \
-                         match std::ffi::CString::new(chunk_json) {{\n                        \
-                             Ok(c_str) => {{\n                            \
-                                 // SAFETY: `callback` is a valid function pointer supplied by the caller.\n                            \
-                                 // `c_str.as_ptr()` is valid for this block scope.\n                            \
-                                 // `user_data` is forwarded as-is; ownership stays with the caller.\n                            \
-                                 unsafe {{ callback(c_str.as_ptr(), user_data) }};\n                        \
-                             }}\n                        \
-                             Err(e) => return Err(format!(\"{prefix}_{name}: chunk JSON contained NUL byte: {{e}}\")),\n                    \
-                         }}\n                \
-                     }}\n            \
-                 }}\n        \
-             }}\n        \
-             Ok(())\n    \
-         }});\n\n    \
-         match result {{\n        \
-             Ok(()) => 0,\n        \
-             Err(e) => {{\n            \
-                 set_last_error(99, &e);\n            \
-                 -1\n        \
-             }}\n    \
-         }}",
-        name = adapter.name,
-        prefix = prefix,
-        core_call = core_call,
-        request_type = request_type,
+    let body = crate::codegen::template_env::render(
+        "adapters/streaming_ffi_body.rs.jinja",
+        crate::alef_context! {
+            prefix => &prefix,
+            name => &adapter.name,
+            request_type => &request_type,
+            core_call => &core_call,
+        },
     );
 
     Ok((body, None))
@@ -654,30 +450,13 @@ fn gen_r_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::
         format!("{}\n    ", let_bindings.join("\n    "))
     };
 
-    let body = format!(
-        "use futures_util::StreamExt;\n    \
-         // 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep\n    \
-         // extraction future (a nested archive member, a multi-stage OCR pipeline), and a\n    \
-         // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.\n    \
-         const STREAMING_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;\n    \
-         let rt = tokio::runtime::Builder::new_multi_thread()\n        \
-             .enable_all()\n        \
-             .thread_stack_size(STREAMING_RUNTIME_STACK_SIZE_BYTES)\n        \
-             .build()\n        \
-             .map_err(|e| extendr_api::Error::Other(e.to_string()))?;\n    \
-         {bindings_block}\
-         rt.block_on(async {{\n        \
-             let stream = {core_call}.await\n            \
-                 .map_err(|e| extendr_api::Error::Other(e.to_string()))?;\n        \
-             let chunks: Vec<{item_type}> = stream\n            \
-                 .collect::<Vec<_>>().await\n            \
-                 .into_iter()\n            \
-                 .collect::<std::result::Result<Vec<_>, _>>()\n            \
-                 .map(|v| v.into_iter().map({item_type}::from).collect())\n            \
-                 .map_err(|e| extendr_api::Error::Other(e.to_string()))?;\n        \
-             serde_json::to_string(&chunks)\n            \
-                 .map_err(|e| extendr_api::Error::Other(e.to_string()))\n    \
-         }})"
+    let body = crate::codegen::template_env::render(
+        "adapters/streaming_r_body.rs.jinja",
+        crate::alef_context! {
+            bindings_block => &bindings_block,
+            core_call => &core_call,
+            item_type => &item_type,
+        },
     );
 
     Ok((body, None))

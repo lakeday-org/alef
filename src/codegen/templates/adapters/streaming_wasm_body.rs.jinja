@@ -1,0 +1,23 @@
+{{ bindings_block }}let mut stream = {{ core_call }}.await.map_err(alef_wasm_err)?;
+    let (tx, rx) = futures::channel::mpsc::channel(32);
+    wasm_bindgen_futures::spawn_local(async move {
+        use futures_util::StreamExt;
+        use futures::sink::SinkExt;
+        let mut tx = tx;
+        while let Some(chunk) = stream.next().await {
+            let item = match chunk {
+                Ok(c) => {{ item_type }}::from(c),
+                Err(e) => {
+                    let _ = tx.send(Err(alef_wasm_err(e))).await;
+                    break;
+                }
+            };
+            if tx.send(Ok(item)).await.is_err() {
+                break;
+            }
+        }
+    });
+    let iter = {{ iter_name }} {
+        receiver: std::cell::RefCell::new(rx),
+    };
+    Ok(iter)

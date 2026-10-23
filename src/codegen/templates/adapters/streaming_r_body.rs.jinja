@@ -1,0 +1,22 @@
+use futures_util::StreamExt;
+    // 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep
+    // extraction future (a nested archive member, a multi-stage OCR pipeline), and a
+    // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.
+    const STREAMING_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(STREAMING_RUNTIME_STACK_SIZE_BYTES)
+        .build()
+        .map_err(|e| extendr_api::Error::Other(e.to_string()))?;
+    {{ bindings_block }}rt.block_on(async {
+        let stream = {{ core_call }}.await
+            .map_err(|e| extendr_api::Error::Other(e.to_string()))?;
+        let chunks: Vec<{{ item_type }}> = stream
+            .collect::<Vec<_>>().await
+            .into_iter()
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map(|v| v.into_iter().map({{ item_type }}::from).collect())
+            .map_err(|e| extendr_api::Error::Other(e.to_string()))?;
+        serde_json::to_string(&chunks)
+            .map_err(|e| extendr_api::Error::Other(e.to_string()))
+    })

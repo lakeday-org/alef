@@ -1,0 +1,71 @@
+clear_last_error();
+
+    if client.is_null() {
+        set_last_error(99, "{{ prefix }}_{{ name }}: client must not be NULL");
+        return -1;
+    }
+    if request_json.is_null() {
+        set_last_error(99, "{{ prefix }}_{{ name }}: request_json must not be NULL");
+        return -1;
+    }
+
+    // SAFETY: caller guarantees `client` and `request_json` are non-null and valid.
+    let client_ref = unsafe { &(*client) };
+
+    let json_str = match unsafe { std::ffi::CStr::from_ptr(request_json) }.to_str() {
+        Ok(s) => s,
+        Err(e) => {
+            set_last_error(99, &format!("{{ prefix }}_{{ name }}: request_json is not valid UTF-8: {e}"));
+            return -1;
+        }
+    };
+
+    let request: {{ request_type }} = match serde_json::from_str(json_str) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(99, &format!("{{ prefix }}_{{ name }}: failed to parse request JSON: {e}"));
+            return -1;
+        }
+    };
+
+    let rt = get_ffi_runtime();
+
+    let result = rt.block_on(async {
+        use futures_util::StreamExt;
+
+        let mut stream = match {{ core_call }}.await {
+            Ok(s) => s,
+            Err(e) => return Err(format!("{{ prefix }}_{{ name }}: failed to open stream: {e}")),
+        };
+
+        loop {
+            match stream.next().await {
+                None => break,
+                Some(Err(e)) => return Err(format!("{{ prefix }}_{{ name }}: stream error: {e}")),
+                Some(Ok(chunk)) => {
+                    let chunk_json = match serde_json::to_string(&chunk) {
+                        Ok(s) => s,
+                        Err(e) => return Err(format!("{{ prefix }}_{{ name }}: failed to serialise chunk: {e}")),
+                    };
+                    match std::ffi::CString::new(chunk_json) {
+                        Ok(c_str) => {
+                            // SAFETY: `callback` is a valid function pointer supplied by the caller.
+                            // `c_str.as_ptr()` is valid for this block scope.
+                            // `user_data` is forwarded as-is; ownership stays with the caller.
+                            unsafe { callback(c_str.as_ptr(), user_data) };
+                        }
+                        Err(e) => return Err(format!("{{ prefix }}_{{ name }}: chunk JSON contained NUL byte: {e}")),
+                    }
+                }
+            }
+        }
+        Ok(())
+    });
+
+    match result {
+        Ok(()) => 0,
+        Err(e) => {
+            set_last_error(99, &e);
+            -1
+        }
+    }

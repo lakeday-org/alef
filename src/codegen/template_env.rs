@@ -638,6 +638,34 @@ static TEMPLATES: &[(&str, &str)] = &[
         "visitor_context/pyo3_dict_set_item.jinja",
         include_str!("templates/visitor_context/pyo3_dict_set_item.jinja"),
     ),
+    (
+        "adapters/streaming_python_body.rs.jinja",
+        include_str!("templates/adapters/streaming_python_body.rs.jinja"),
+    ),
+    (
+        "adapters/streaming_node_body.rs.jinja",
+        include_str!("templates/adapters/streaming_node_body.rs.jinja"),
+    ),
+    (
+        "adapters/streaming_ruby_body.rs.jinja",
+        include_str!("templates/adapters/streaming_ruby_body.rs.jinja"),
+    ),
+    (
+        "adapters/streaming_elixir_body.rs.jinja",
+        include_str!("templates/adapters/streaming_elixir_body.rs.jinja"),
+    ),
+    (
+        "adapters/streaming_wasm_body.rs.jinja",
+        include_str!("templates/adapters/streaming_wasm_body.rs.jinja"),
+    ),
+    (
+        "adapters/streaming_ffi_body.rs.jinja",
+        include_str!("templates/adapters/streaming_ffi_body.rs.jinja"),
+    ),
+    (
+        "adapters/streaming_r_body.rs.jinja",
+        include_str!("templates/adapters/streaming_r_body.rs.jinja"),
+    ),
 ];
 
 pub(crate) fn make_env() -> Environment<'static> {

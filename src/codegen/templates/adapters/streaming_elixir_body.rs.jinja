@@ -1,0 +1,69 @@
+/// Streaming handle for `{{ owner_type }}::{{ core_path }}` — owns a Tokio runtime
+/// plus the live `BoxStream`. Each call to `{{ next_fn }}` blocks the dirty-CPU
+/// scheduler thread on a single `stream.next()` poll.
+pub struct {{ handle_struct }} {
+    runtime: std::sync::Arc<tokio::runtime::Runtime>,
+    stream: std::sync::Mutex<Option<futures_util::stream::BoxStream<'static, std::result::Result<{{ core_import }}::{{ item_type }}, {{ core_import }}::{{ error_type }}>>>>,
+}
+
+#[rustler::resource_impl()]
+impl rustler::Resource for {{ handle_struct }} {}
+
+/// Open a streaming `{{ core_path }}` request. Returns an opaque iterator
+/// resource which the Elixir wrapper drives via `Stream.unfold/2`.
+#[rustler::nif(schedule = "DirtyCpu")]
+pub fn {{ start_fn }}(
+    resource: rustler::ResourceArc<{{ owner_type }}>,
+    {{ req_param_name }}: {{ req_param_type }},
+) -> std::result::Result<rustler::ResourceArc<{{ handle_struct }}>, AlefNifError> {
+    {{ bindings_block }}// 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep
+    // extraction future (a nested archive member, a multi-stage OCR pipeline), and a
+    // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.
+    const STREAM_HANDLE_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;
+    let runtime = std::sync::Arc::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(STREAM_HANDLE_RUNTIME_STACK_SIZE_BYTES)
+            .build()
+            .map_err(|e| e.to_string())?,
+    );
+    let inner = resource.inner.read().unwrap_or_else(|e| e.into_inner()).clone();
+    let stream = runtime
+        .block_on(async move { {{ core_call }}.await })
+        .map_err(alef_nif_err)?;
+    let handle = {{ handle_struct }} {
+        runtime,
+        stream: std::sync::Mutex::new(Some(stream)),
+    };
+    Ok(rustler::ResourceArc::new(handle))
+}
+
+/// Pull the next chunk from a streaming handle. Returns the chunk JSON
+/// (decoded by the Elixir wrapper via `Jason.decode!/1`) or `nil` to
+/// signal end-of-stream. After end-of-stream the inner stream is dropped.
+#[rustler::nif(schedule = "DirtyCpu")]
+pub fn {{ next_fn }}(
+    handle: rustler::ResourceArc<{{ handle_struct }}>,
+) -> std::result::Result<Option<String>, AlefNifError> {
+    use futures_util::StreamExt;
+    let runtime = handle.runtime.clone();
+    let mut guard = handle.stream.lock().map_err(|e| e.to_string())?;
+    let stream_ref = match guard.as_mut() {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+    match runtime.block_on(stream_ref.next()) {
+        Some(Ok(chunk)) => {
+            let json = serde_json::to_string(&chunk).map_err(|e| e.to_string())?;
+            Ok(Some(json))
+        }
+        Some(Err(e)) => {
+            *guard = None;
+            Err(alef_nif_err(e))
+        }
+        None => {
+            *guard = None;
+            Ok(None)
+        }
+    }
+}

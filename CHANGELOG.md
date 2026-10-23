@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve qualified Rust method, trait, and helper calls in streaming adapters, and keep Node public aliases independent of the underlying Rust callable.
 - Preserve configured Rust call paths for async adapters and standalone Ruby, C FFI, and Swift streaming wrappers, including qualified trait calls, generic methods, and public aliases.
 - Reject Rust path keywords used as bare adapter method names before emitting invalid receiver calls, while preserving qualified paths.
+- Render streaming Rust method bodies and Node adapter wrappers through registered templates while preserving generated bindings.
 
 ## [0.113.3] - 2026-10-23
 

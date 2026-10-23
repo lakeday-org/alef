@@ -283,6 +283,10 @@ static TEMPLATES: &[(&str, &str)] = &[
         "enum_default_impl_cascade.jinja",
         include_str!("templates/enum_default_impl_cascade.jinja"),
     ),
+    (
+        "streaming_adapter_wrapper.rs.jinja",
+        include_str!("templates/streaming_adapter_wrapper.rs.jinja"),
+    ),
 ];
 
 pub(crate) fn make_env() -> Environment<'static> {

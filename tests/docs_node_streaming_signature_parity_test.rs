@@ -295,7 +295,7 @@ fn native_probe_directory() -> tempfile::TempDir {
     .unwrap();
     std::fs::write(
         directory.path().join("Taskfile.yml"),
-        "version: '3'\ntasks:\n  proof:\n    cmds:\n      - cargo check --quiet\n",
+        "version: '3'\ntasks:\n  proof:\n    cmds:\n      - cargo check --quiet --offline\n",
     )
     .unwrap();
     directory

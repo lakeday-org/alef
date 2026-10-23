@@ -1,0 +1,29 @@
+let inner = self.inner.clone();
+    {{ bindings_block }}let (tx, rx) = tokio::sync::mpsc::channel(32);
+    pyo3_async_runtimes::tokio::get_runtime().spawn(async move {
+        match {{ core_call }}.await {
+            Err(e) => {
+                let _ = tx.send(Err(e)).await;
+            }
+            Ok(mut stream) => {
+                loop {
+                    tokio::select! {
+                        _ = tx.closed() => break,
+                        chunk = futures::StreamExt::next(&mut stream) => match chunk {
+                            Some(chunk) => {
+                                if tx.send(chunk).await.is_err() {
+                                    break;
+                                }
+                            }
+                            None => break,
+                        },
+                    }
+                }
+                drop(stream);
+            }
+        }
+    });
+    let iter = {{ iter_name }} {
+        receiver: Arc::new(tokio::sync::Mutex::new(rx)),
+    };
+    Ok(Bound::new(py, iter)?.into_any())

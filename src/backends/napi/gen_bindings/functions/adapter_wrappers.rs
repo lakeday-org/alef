@@ -243,59 +243,18 @@ pub(in crate::backends::napi::gen_bindings) fn gen_adapter_wrapper(
             // consumer drops the async iterator, instead of only noticing on the next send. The
             // race cannot drop a produced item — `StreamExt::next` either returns `Pending`
             // (nothing produced, safe to drop) or `Ready` (already claimed by `select!`).
-            let stream_forward_loop = format!(
-                "loop {{\n\
-                                 tokio::select! {{\n\
-                                     _ = tx.closed() => break,\n\
-                                     chunk = stream.next() => {{\n\
-                                         let chunk = match chunk {{\n\
-                                             Some(c) => c,\n\
-                                             None => break,\n\
-                                         }};\n\
-                                         let item = match chunk {{\n\
-                                             Ok(c) => Js{}::from(c),\n\
-                                             Err(e) => {{\n\
-                                                 let _ = tx\n\
-                                                     .send(Err(alef_napi_err(e)))\n\
-                                                     .await;\n\
-                                                 break;\n\
-                                             }}\n\
-                                         }};\n\
-                                         if tx.send(Ok(item)).await.is_err() {{\n\
-                                             break;\n\
-                                         }}\n\
-                                     }}\n\
-                                 }}\n\
-                             }}\n\
-                             drop(stream);",
-                item_type_name
-            );
 
-            format!(
-                "#[allow(clippy::missing_errors_doc)]\n\
-                 #[napi(js_name = \"{}\")]\n\
-                 pub async fn {}({}) -> Result<{}> {{\n\
-                 {}    let inner = engine.inner.clone();\n\
-                     use futures_util::StreamExt;\n\
-                     let mut stream = {}.await\n\
-                         .map_err(alef_napi_err)?;\n\
-                     let (tx, rx) = tokio::sync::mpsc::channel(32);\n\
-                     tokio::spawn(async move {{\n\
-                         {}\n\
-                     }});\n\
-                     let iter = {} {{\n\
-                         receiver: Arc::new(tokio::sync::Mutex::new(rx)),\n\
-                     }};\n\
-                     Ok(iter)\n\
-                 }}\n\n",
-                js_name,
-                adapter_name,
-                param_parts.join(", "),
-                return_iterator_type,
-                conversions_code,
-                method_call_inner,
-                stream_forward_loop,
-                return_iterator_type
+            crate::backends::napi::template_env::render(
+                "streaming_adapter_wrapper.rs.jinja",
+                crate::alef_context! {
+                    js_name => &js_name,
+                    adapter_name => adapter_name,
+                    params_str => param_parts.join(", "),
+                    iterator_type => &return_iterator_type,
+                    conversions_code => &conversions_code,
+                    core_call => &method_call_inner,
+                    item_type_name => item_type_name,
+                },
             )
         }
         _ => String::new(),

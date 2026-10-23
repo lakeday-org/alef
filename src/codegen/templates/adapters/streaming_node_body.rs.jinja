@@ -1,0 +1,33 @@
+let inner = self.inner.clone();
+    {{ bindings_block }}use futures_util::StreamExt;
+    let mut stream = {{ core_call }}.await
+        .map_err(alef_napi_err)?;
+    let (tx, rx) = tokio::sync::mpsc::channel(32);
+    tokio::spawn(async move {
+        loop {
+                        tokio::select! {
+                            _ = tx.closed() => break,
+                            chunk = stream.next() => {
+                                let chunk = match chunk {
+                                    Some(c) => c,
+                                    None => break,
+                                };
+                                let item = match chunk {
+                                    Ok(c) => {{ item_type }}::from(c),
+                                    Err(e) => {
+                                        let _ = tx.send(Err(alef_napi_err(e))).await;
+                                        break;
+                                    }
+                                };
+                                if tx.send(Ok(item)).await.is_err() {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    drop(stream);
+    });
+    let iter = {{ iter_name }} {
+        receiver: Arc::new(tokio::sync::Mutex::new(rx)),
+    };
+    Ok(iter)
