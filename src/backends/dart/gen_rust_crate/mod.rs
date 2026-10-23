@@ -25,6 +25,7 @@ mod enum_conversions;
 mod enum_conversions_runtime_tests;
 mod enum_fields;
 mod error_bridge;
+pub(crate) mod error_fields;
 mod helpers;
 mod mirror;
 mod mirror_conversions;

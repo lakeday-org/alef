@@ -10,6 +10,7 @@
 
 mod constructor_default_rewrite;
 mod constructor_defaults;
+pub(crate) mod error_display;
 mod frb_rewrite;
 pub use constructor_default_rewrite::apply_constructor_defaults;
 mod gen_bindings;

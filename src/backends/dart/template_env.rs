@@ -6,6 +6,14 @@ mod static_error_registry_tests;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "rust_error_display_metadata.jinja",
+        include_str!("templates/rust_error_display_metadata.jinja"),
+    ),
+    (
+        "dart_error_display_method.jinja",
+        include_str!("templates/dart_error_display_method.jinja"),
+    ),
+    (
         "rust_streaming_layout_probe.rs.jinja",
         include_str!("templates/rust_streaming_layout_probe.rs.jinja"),
     ),

@@ -78,6 +78,7 @@ pub(super) fn emit(out: &mut String, errors: &[ErrorDef], source_crate: &str) {
         ));
     }
     encode_arms.push("_ => throw ArgumentError.value({}, 'error', 'Unsupported bridge error')".into());
+    out.push_str(&crate::backends::dart::error_display::metadata_comments(&errors));
     out.push_str(&crate::backends::dart::template_env::render(
         "rust_typed_error_bridge.jinja",
         crate::alef_context! {
@@ -146,7 +147,7 @@ fn variant_pattern(core_path: &str, variant: &ErrorVariant) -> String {
 }
 
 fn variant_fields(error: &ErrorDef, variant: &ErrorVariant, source_crate: &str) -> Vec<minijinja::Value> {
-    let mut fields = variant.fields.iter().enumerate().filter(|(_, field)| !field.binding_excluded)
+    let mut fields = super::error_fields::visible(variant)
         .enumerate().map(|(visible_index, (index, field))| {
             let binding = if variant.is_tuple { format!("field{index}") } else { internal_rust_identifier(&field.name) };
             let mut field = field.clone();

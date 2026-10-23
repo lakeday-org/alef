@@ -509,7 +509,7 @@ pub(crate) fn emit_mirror_error(out: &mut String, error: &ErrorDef, source_crate
                 crate::alef_context! {},
             ));
         } else {
-            let visible_fields: Vec<&FieldDef> = variant.fields.iter().filter(|f| !f.binding_excluded).collect();
+            let visible_fields: Vec<_> = super::error_fields::visible(variant).map(|(_, f)| f).collect();
             if visible_fields.is_empty() {
                 out.push_str(&template_env::render(
                     "rust_mirror_enum_unit_variant.jinja",

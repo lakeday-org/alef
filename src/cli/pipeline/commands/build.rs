@@ -18,6 +18,7 @@ mod frb_build_runner_tests;
 mod frb_cache;
 mod frb_cfg_gates;
 mod frb_constructor_defaults;
+mod frb_error_display;
 mod frb_version_check;
 mod observability;
 mod post_process;

@@ -40,7 +40,10 @@ fn apply(
         PostProcessor::FrbDartSealedVariants => {
             crate::backends::dart::rewrite_frb_sealed_variants(content, &config.dart_pubspec_name())
         }
-        PostProcessor::FrbDartSingleVariantCopyWith => crate::backends::dart::repair_single_variant_copy_with(content),
+        PostProcessor::FrbDartSingleVariantCopyWith => {
+            let rewritten = crate::backends::dart::repair_single_variant_copy_with(content);
+            super::frb_error_display::apply(&rewritten, crate_dir, config)?
+        }
         PostProcessor::FrbDartExcludeFunctions(excluded) => {
             let exclude_set: std::collections::HashSet<&str> = excluded.iter().map(|s| s.as_str()).collect();
             crate::backends::dart::filter_excluded_functions(content, &exclude_set)

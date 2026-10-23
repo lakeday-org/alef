@@ -41,7 +41,7 @@ pub enum PostProcessor {
     /// Rewrite frb-generated Dart sealed-class factory params from positional names (`field0`)
     /// to payload-derived names (e.g. `metadata` for a `PdfMetadata` payload).
     FrbDartSealedVariants,
-    /// Repair Freezed 4 base copyWith constructors for single-variant FRB unions. ~keep
+    /// Repair Freezed union copyWith constructors and supported error display metadata. ~keep
     FrbDartSingleVariantCopyWith,
     /// Filter excluded function definitions from frb-generated Dart lib.dart.
     /// Stores the set of function names to exclude.

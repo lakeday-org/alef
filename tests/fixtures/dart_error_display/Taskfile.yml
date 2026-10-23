@@ -1,0 +1,36 @@
+version: '3'
+tasks:
+  setup:
+    dir: packages/dart
+    cmds:
+      - dart pub get
+  generate:
+    cmds:
+      - flutter_rust_bridge_codegen generate --rust-root packages/dart/rust --rust-input crate --rust-output packages/dart/rust/src/frb_generated.rs --dart-root packages/dart --dart-output packages/dart/lib/src/display_sample_bridge_generated --no-add-mod-to-lib --no-web --no-deps-check --no-auto-upgrade-dependency --stop-on-error
+  build:
+    cmds:
+      - cargo build --manifest-path packages/dart/rust/Cargo.toml --target-dir native-target
+  analyze:
+    dir: packages/dart
+    cmds:
+      - dart analyze check.dart
+  test:
+    dir: packages/dart
+    cmds:
+      - dart run check.dart {{.CLI_ARGS}}
+  prune:
+    cmds:
+      - cmd: poly fmt --fix {{.CLI_ARGS}}
+        ignore_error: true
+      - poly fmt --check {{.CLI_ARGS}}
+      - cmd: poly lint --fix --no-cache --no-workspace {{.CLI_ARGS}}
+        ignore_error: true
+      - poly lint --no-cache --no-workspace {{.CLI_ARGS}}
+  constructor-control:
+    dir: packages/dart
+    cmds:
+      - dart run check.dart constructors-only
+  wrong-expectation:
+    dir: packages/dart
+    cmds:
+      - dart run check.dart {{.CLI_ARGS}} wrong-expected
