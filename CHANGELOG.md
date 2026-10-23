@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Align Swift integration snapshots with typed error descriptions while retaining existing error cases and validation payloads.
+
 ## [0.113.4] - 2026-10-23
 
 ### Fixed

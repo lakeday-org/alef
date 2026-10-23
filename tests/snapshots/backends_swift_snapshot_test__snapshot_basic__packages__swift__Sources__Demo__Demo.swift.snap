@@ -23,6 +23,16 @@ public enum DemoError: Swift.Error {
     /// be mapped to a known Swift case during DTO unmarshaling.
     case validation(message: String, source: String)
 }
+extension DemoError: Swift.CustomStringConvertible {
+    /// Uses the Rust display template when available, otherwise the transported message or variant name.
+    public var description: String {
+        switch self {
+        case .invalidInput: return "invalid input provided"
+        case .processingFailed: return "processing failed"
+        case .validation(message: let message, source: _): return message
+        }
+    }
+}
 
 extension DemoError {
     init?(bridgeError error: RustBridge.AlefBridgeError) {
