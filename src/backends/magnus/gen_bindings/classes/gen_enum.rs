@@ -143,19 +143,7 @@ pub fn gen_enum_with_module(
                 .fields
                 .iter()
                 .enumerate()
-                .map(|(idx, f)| {
-                    let serde_rename = if flatten_newtype {
-                        None
-                    } else {
-                        positional_field_serde_rename(f, idx, &variant.name, variant.fields.len())
-                    };
-                    crate::alef_context! {
-                        name => &f.name,
-                        field_type => field_type_for_serde(f),
-                        flatten_newtype => flatten_newtype,
-                        serde_rename => serde_rename,
-                    }
-                })
+                .map(|(idx, field)| enum_field_context(field, idx, variant, enum_def, flatten_newtype))
                 .collect();
 
             let snake_name = crate::codegen::naming::pascal_to_snake(&variant.name);
@@ -227,6 +215,32 @@ fn accepted_unit_variant_input_spellings(variant_name: &str, snake_name: &str, w
 fn emits_tuple_variant(enum_def: &EnumDef, variant: &crate::core::ir::EnumVariant) -> bool {
     // ~keep Delegates so the enum body emitter and the conversion match arms cannot drift.
     crate::codegen::conversions::helpers::variant_emits_tuple_form(enum_def, variant)
+}
+
+fn enum_field_context(
+    field: &FieldDef,
+    index: usize,
+    variant: &EnumVariant,
+    definition: &EnumDef,
+    flatten: bool,
+) -> minijinja::Value {
+    let old_rename = positional_field_serde_rename(field, index, &variant.name, variant.fields.len());
+    let inherited = (!variant.is_tuple)
+        .then_some(definition.rename_all_fields.as_deref())
+        .flatten();
+    let explicit = (field.serde_rename.is_some() || inherited.is_some())
+        .then(|| crate::codegen::naming::wire_field_name(&field.name, field.serde_rename.as_deref(), inherited));
+    let old_wire = old_rename.as_deref().unwrap_or(&field.name);
+    let alias = explicit
+        .as_deref()
+        .filter(|wire| *wire != old_wire)
+        .map(|_| format!("{old_wire:?}"));
+    let rename = explicit.or(old_rename).map(|wire| format!("{wire:?}"));
+    crate::alef_context! {
+        name => &field.name, field_type => field_type_for_serde(field), flatten_newtype => flatten,
+        serde_rename_literal => if flatten { None } else { rename },
+        serde_alias_literal => if flatten { None } else { alias },
+    }
 }
 
 /// A `#[serde(rename = "...")]` for a variant field whose IR name is a synthesized positional

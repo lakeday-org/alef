@@ -296,6 +296,14 @@ static TEMPLATES: &[(&str, &str)] = &[
         "php/bootstrap.php.jinja",
         include_str!("templates/php/bootstrap.php.jinja"),
     ),
+    (
+        "php/enum_collection_accessor.jinja",
+        include_str!("templates/php/enum_collection_accessor.jinja"),
+    ),
+    (
+        "php/enum_collection_native_probe.php.jinja",
+        include_str!("templates/php/enum_collection_native_probe.php.jinja"),
+    ),
     ("php/assertion.jinja", include_str!("templates/php/assertion.jinja")),
     ("php/test_file.jinja", include_str!("templates/php/test_file.jinja")),
     (

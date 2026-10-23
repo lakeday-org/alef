@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve declared Ruby enum-field wire names and legacy input aliases, including inherited casing and escaped names (#682).
+- Execute PHP and Ruby nested enum-list count and text assertions against decoded payloads, rejecting incorrect collection shapes (#682).
 - Preserve indexed list-variant paths and canonical payload field metadata when lowering generated assertions (#682).
 
 

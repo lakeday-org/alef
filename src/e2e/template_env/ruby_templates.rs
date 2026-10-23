@@ -1,5 +1,17 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
     (
+        "ruby/enum_wire_producer_probe.rs.jinja",
+        include_str!("../templates/ruby/enum_wire_producer_probe.rs.jinja"),
+    ),
+    (
+        "ruby/enum_collection_accessor.jinja",
+        include_str!("../templates/ruby/enum_collection_accessor.jinja"),
+    ),
+    (
+        "ruby/enum_collection_native_probe.rb.jinja",
+        include_str!("../templates/ruby/enum_collection_native_probe.rb.jinja"),
+    ),
+    (
         "ruby/json_field_runtime.rb.jinja",
         include_str!("../templates/ruby/json_field_runtime.rb.jinja"),
     ),

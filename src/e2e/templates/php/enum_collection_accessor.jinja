@@ -1,0 +1,7 @@
+(static function ($enum_json) {
+    $enum_list = json_decode($enum_json, false, 512, JSON_THROW_ON_ERROR);
+    if (!is_array($enum_list)) {
+        throw new \RuntimeException('expected enum collection payload');
+    }
+    return $enum_list{% for step in steps %}{{ step }}{% endfor %};
+})({{ enum_expression }})

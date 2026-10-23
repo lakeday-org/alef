@@ -459,6 +459,7 @@ mod args;
 mod assertion_mock_capture;
 mod assertions;
 mod call_field_resolver;
+mod enum_collection_access;
 mod enum_variant_access;
 mod http;
 mod project;
@@ -486,3 +487,6 @@ mod install_sh_execution_tests;
 mod mock_capture_gate_tests;
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(crate) use enum_collection_access::test_support as enum_collection_test_support;

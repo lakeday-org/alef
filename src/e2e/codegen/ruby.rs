@@ -240,6 +240,7 @@ mod assertion_mock_capture;
 mod assertions;
 #[cfg(test)]
 mod element_accessor_wildcard_tests;
+mod enum_collection_access;
 mod enum_variant_access;
 mod error_matcher;
 mod examples;

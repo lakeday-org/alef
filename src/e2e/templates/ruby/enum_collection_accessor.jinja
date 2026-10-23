@@ -1,0 +1,4 @@
+{{ enum_expression }}.then { |enum_list|
+  raise 'expected enum collection payload' unless enum_list.is_a?(Array)
+  enum_list{% for step in steps %}.fetch({{ step }}){% endfor %}
+}

@@ -1,0 +1,37 @@
+<?php
+final class Message {
+    public function __construct(private string $content) {}
+    public function getContent(): string { return $this->content; }
+}
+final class Choice {
+    public function __construct(private Message $message) {}
+    public function getMessage(): Message { return $this->message; }
+}
+final class Reply {
+    public function __construct(private array $choices) {}
+    public function getChoices(): array { return $this->choices; }
+}
+final class Probe {
+    public int $checks = 0;
+    public function assertCount(int $expected, array $actual): void {
+        ++$this->checks;
+        if (count($actual) !== $expected) { throw new RuntimeException('count assertion failed'); }
+    }
+    public function assertEquals(mixed $expected, mixed $actual): void {
+        ++$this->checks;
+        if ($actual !== $expected) { throw new RuntimeException('text assertion failed'); }
+    }
+    public function run(Reply $result): void {
+{{ assertions }}
+    }
+}
+$result = new Reply([new Choice(new Message($argv[1]))]);
+$probe = new Probe();
+try {
+    $probe->run($result);
+    if ($probe->checks !== 3) { throw new RuntimeException('wrong assertion count'); }
+    echo "PASS:3\n";
+} catch (Throwable $error) {
+    fwrite(STDERR, "ASSERTION_FAILURE:{$probe->checks}:{$error->getMessage()}\n");
+    exit(1);
+}

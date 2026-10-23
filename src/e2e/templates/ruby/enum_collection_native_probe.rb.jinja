@@ -1,0 +1,31 @@
+require 'json'
+require 'rspec/expectations'
+
+Message = Struct.new(:content)
+Choice = Struct.new(:message)
+Reply = Struct.new(:choices)
+class Probe
+  include RSpec::Matchers
+  attr_reader :checks
+  def initialize
+    @checks = 0
+  end
+  def expect(value)
+    @checks += 1
+    super(value)
+  end
+  def run(result)
+{{ assertions }}
+  end
+end
+
+result = Reply.new([Choice.new(Message.new(JSON.parse(ARGV.fetch(0), symbolize_names: true)))])
+probe = Probe.new
+begin
+  probe.run(result)
+  raise 'wrong assertion count' unless probe.checks == 3
+  puts 'PASS:3'
+rescue RSpec::Expectations::ExpectationNotMetError => error
+  warn "ASSERTION_FAILURE:#{probe.checks}:#{error.message}"
+  exit 1
+end

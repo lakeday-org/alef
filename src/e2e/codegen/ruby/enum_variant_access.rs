@@ -97,8 +97,11 @@ pub(super) fn classify(field_resolver: &FieldResolver, field: &str) -> RubyEnumA
 /// `union_variant_payload` read the same IR the magnus backend reads, so the two cannot drift
 /// apart again without the flag itself changing meaning.
 ///
-/// Unsupported/nested/indexed suffixes return `None` and retain the explicit generator-gap skip.
+/// ~keep Collection suffixes use wire metadata; other unsupported suffixes retain the explicit generator-gap skip.
 pub(super) fn variant_field_accessor(field_resolver: &FieldResolver, field: &str, result_var: &str) -> Option<String> {
+    if let Some(accessor) = super::enum_collection_access::accessor(field_resolver, field, result_var) {
+        return Some(accessor);
+    }
     let resolved = field_resolver.resolve(field);
     let segments: Vec<&str> = resolved.split('.').collect();
     for enum_index in 1..segments.len().saturating_sub(1) {

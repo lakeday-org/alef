@@ -1,0 +1,11 @@
+{{ declaration }}
+
+fn main() {
+    let first = Piece::Text { text_value: "hello".to_string() };
+    let second = Piece::Text { text_value: " world".to_string() };
+    let wire = serde_json::to_value(&first).unwrap();
+    assert_eq!(wire.get({{ wire_key }}), Some(&serde_json::json!("hello")), "canonical wire field missing");
+    let restored: Piece = serde_json::from_value(serde_json::json!({ "type": "text", "text_value": "hello" })).unwrap();
+    assert_eq!(serde_json::to_value(restored).unwrap(), wire, "legacy input must retain canonical output");
+    println!("{}", serde_json::to_string(&vec![first, second]).unwrap());
+}

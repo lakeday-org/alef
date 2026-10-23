@@ -212,6 +212,10 @@ impl<'a> PhpVariantAccess<'a> {
         VariantAccess::Available
     }
 
+    pub(super) fn is_json_bridged(&self, enum_name: &str) -> bool {
+        self.lowering.json_bridged.contains(enum_name)
+    }
+
     pub(super) fn is_unavailable(&self, field: &str) -> bool {
         self.classify(field) != VariantAccess::Available
     }
