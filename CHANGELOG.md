@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Align Swift integration snapshots with typed error descriptions while retaining existing error cases and validation payloads.
-
 ## [0.113.4] - 2026-10-23
 
 ### Fixed
@@ -25,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Render streaming Rust method bodies and Node adapter wrappers through registered templates while preserving generated bindings.
 - Preserve WASM errors' original Display text and typed metadata when payload fields share reserved JavaScript property names, retaining complete payload values under `Symbol.for("alef.error.payload")` and the `payload` alias when no existing metadata uses that name.
 - Render supported Rust display templates and transported messages in Swift typed-error descriptions without changing raw payloads or public case arity.
+- Align Swift integration snapshots with typed error descriptions while retaining existing error cases and validation payloads.
 
 ## [0.113.3] - 2026-10-23
 
