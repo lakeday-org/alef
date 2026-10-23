@@ -226,7 +226,14 @@ fn wasm_error_properties(error: &ErrorDef) -> Vec<(String, String)> {
             )),
             "error_type" => props.push((
                 "errorType".to_string(),
-                "wasm_bindgen::JsValue::from_str(&e.error_type().to_string())".to_string(),
+                match &method.return_type {
+                    crate::core::ir::TypeRef::String if method.returns_ref => {
+                        "wasm_bindgen::JsValue::from_str(e.error_type())"
+                    }
+                    crate::core::ir::TypeRef::String => "wasm_bindgen::JsValue::from_str(&e.error_type())",
+                    _ => "wasm_bindgen::JsValue::from_str(&e.error_type().to_string())",
+                }
+                .to_string(),
             )),
             other => {
                 let Some((_, optional)) = duration_methods(error).into_iter().find(|(m, _)| m.name == other) else {
@@ -609,3 +616,7 @@ use crate::core::ir::ErrorDef;
 use super::shared::{
     duration_methods, error_variant_wildcard_pattern, millis_expr, millis_type, to_screaming_snake, to_snake_case,
 };
+
+#[cfg(test)]
+#[path = "tests/wasm_borrowed_error_type.rs"]
+mod wasm_borrowed_error_type;

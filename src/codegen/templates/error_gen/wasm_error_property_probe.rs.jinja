@@ -1,0 +1,21 @@
+mod wasm_bindgen {
+    pub struct JsValue;
+    impl JsValue {
+        pub fn from_str(value: &str) -> String {
+            value.to_owned()
+        }
+    }
+}
+struct SampleError {
+    value: String,
+}
+impl SampleError {
+    fn error_type(&self) -> {{ return_type }} {
+        {{ return_expression }}
+    }
+}
+fn main() {
+    let e = SampleError { value: "failure".to_owned() };
+    assert_eq!(e.value, "failure");
+    assert_eq!({{ expression }}, {{ expected }});
+}
