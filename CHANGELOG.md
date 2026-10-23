@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Validate generated Dart bindings with the Dart 3.13.7 security patch in CI on Linux, macOS and Windows (#675).
+
 ## [0.113.1] - 2026-10-22
 
 ### Fixed
