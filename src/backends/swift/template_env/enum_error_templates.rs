@@ -1,5 +1,9 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
     (
+        "error_duration_probe.swift.jinja",
+        include_str!("../templates/error_duration_probe.swift.jinja"),
+    ),
+    (
         "error_case_compatibility_probe.swift.jinja",
         include_str!("../templates/error_case_compatibility_probe.swift.jinja"),
     ),

@@ -316,6 +316,9 @@ fn bridge_value_expression(value: &AssociatedValue<'_>, error: &ErrorDef) -> Opt
             Some(crate::codegen::error_gen::DurationShape::Optional) => {
                 return Some("retryAfterMs < 0 ? nil : Duration.milliseconds(retryAfterMs)".to_string());
             }
+            Some(crate::codegen::error_gen::DurationShape::Bare) if field.optional => {
+                return Some("retryAfterMs < 0 ? nil : Duration.milliseconds(retryAfterMs)".to_string());
+            }
             Some(crate::codegen::error_gen::DurationShape::Bare) => {
                 return Some("Duration.milliseconds(max(retryAfterMs, 0))".to_string());
             }
@@ -416,3 +419,7 @@ pub(super) fn emit_errors(errors: &[ErrorDef], module_name: &str, out: &mut Stri
 #[cfg(test)]
 #[path = "errors_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "errors_duration_tests.rs"]
+mod duration_tests;

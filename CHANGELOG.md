@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve declared Ruby enum-field wire names and legacy input aliases, including inherited casing and escaped names (#682).
 - Execute PHP and Ruby nested enum-list count and text assertions against decoded payloads, rejecting incorrect collection shapes (#682).
 - Preserve exact list-variant counts and indexed text assertions in generated C#, Dart, Kotlin, and Kotlin Android tests, including enum elements and explicit wire field names.
+- Preserve absent optional Swift error durations as nil while retaining explicit zero and positive delays (#683).
 
 - Preserve indexed list-variant paths and canonical payload field metadata when lowering generated assertions (#682).
 

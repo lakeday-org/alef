@@ -1,0 +1,33 @@
+import Foundation
+
+struct BridgeString {
+    let value: String
+    func toString() -> String { value }
+}
+enum RustBridge {
+    struct AlefBridgeError: Error {
+        let milliseconds: Int64
+        func message() -> BridgeString { BridgeString(value: "delayed") }
+        func kind() -> BridgeString { BridgeString(value: "Delayed") }
+        func status() -> Int64 { -1 }
+        func retryAfterMs() -> Int64 { milliseconds }
+        func payload() -> BridgeString { BridgeString(value: "{}") }
+        func errorType() -> BridgeString { BridgeString(value: "SampleError") }
+    }
+}
+
+{{ declaration }}
+
+let cases: [Int64] = [.min, -1, 0, 37, .max]
+for milliseconds in cases {
+    guard let error = SampleError(bridgeError: RustBridge.AlefBridgeError(milliseconds: milliseconds)),
+          case .delayed(message: _, retryAfter: let duration) = error else {
+        fatalError("generated bridge initializer must preserve the typed case")
+    }
+    if milliseconds < 0 {
+        precondition(duration == nil, "missing duration must remain nil")
+    } else {
+        precondition(duration == Duration.milliseconds(milliseconds), "present duration must retain its value")
+    }
+}
+print("verified \(cases.count) duration cases")
