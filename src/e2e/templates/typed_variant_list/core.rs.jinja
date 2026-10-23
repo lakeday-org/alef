@@ -1,0 +1,25 @@
+use serde::{Deserialize, Serialize};
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Envelope { pub entries: Vec<Entry> }
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Entry { pub body: Body }
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Body { pub payload: Option<Payload> }
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Payload { Segments(Vec<Piece>), Scalar(String) }
+#[derive(Clone, Serialize, Deserialize)]
+{% if enum_elements %}
+#[serde(tag = "kind")]
+pub enum Piece {
+    Text {
+{% if wire_rename %}
+        #[serde(rename = "payload_text")]
+{% endif %}
+        text: String,
+    },
+}
+{% else %}
+pub struct Piece { pub text: String }
+{% endif %}
+pub fn make_sample() -> Envelope { unreachable!("the probe only constructs generated Dart values") }

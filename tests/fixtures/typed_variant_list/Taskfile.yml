@@ -1,0 +1,39 @@
+version: "3"
+tasks:
+  csharp:
+    cmds:
+      - dotnet run --project Probe.csproj
+  kotlin:
+    cmds:
+      - mvn -q dependency:build-classpath -Dmdep.outputFile=classpath.txt
+      - >-
+        kotlinc *.kt -cp "{{.KOTLIN_TEST_JAR}}{{if eq OS "windows"}};{{else}}:{{end}}{{.JACKSON_CLASSPATH}}"
+        -include-runtime -d probe.jar
+      - >-
+        java -cp "probe.jar{{if eq OS "windows"}};{{else}}:{{end}}{{.KOTLIN_TEST_JAR}}{{if eq OS "windows"}};{{else}}:{{end}}{{.JACKSON_CLASSPATH}}"
+        MainKt
+  kotlin-java:
+    cmds:
+      - mvn -q dependency:build-classpath -Dmdep.outputFile=classpath.txt
+      - javac -cp "{{.JACKSON_CLASSPATH}}" -d java-classes {{.JAVA_SOURCES}}
+      - >-
+        kotlinc *.kt -cp "java-classes{{if eq OS "windows"}};{{else}}:{{end}}{{.KOTLIN_TEST_JAR}}{{if eq OS "windows"}};{{else}}:{{end}}{{.JACKSON_CLASSPATH}}"
+        -include-runtime -d probe.jar
+      - >-
+        java -cp "probe.jar{{if eq OS "windows"}};{{else}}:{{end}}java-classes{{if eq OS "windows"}};{{else}}:{{end}}{{.KOTLIN_TEST_JAR}}{{if eq OS "windows"}};{{else}}:{{end}}{{.JACKSON_CLASSPATH}}"
+        MainKt
+  dependencies:
+    cmds:
+      - mvn -q dependency:build-classpath -Dmdep.outputFile=classpath.txt
+  dart-setup:
+    cmds:
+      - dart pub get
+  dart-generate:
+    cmds:
+      - >-
+        flutter_rust_bridge_codegen generate --rust-root rust --rust-input crate
+        --rust-output rust/src/frb_generated.rs --dart-root . --dart-output lib/bridge
+        --no-add-mod-to-lib --no-web --no-deps-check --no-auto-upgrade-dependency --stop-on-error
+  dart:
+    cmds:
+      - dart test probe_test.dart --reporter expanded

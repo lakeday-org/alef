@@ -1,0 +1,5 @@
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, {{ payload }}.ValueKind);
+{% if not count %}
+        Assert.Equal(System.Text.Json.JsonValueKind.String, {{ expression }}.ValueKind);
+{% endif %}
+        Assert.Equal({{ expected }}, {{ expression }}.{% if count %}GetArrayLength(){% else %}GetString(){% endif %});

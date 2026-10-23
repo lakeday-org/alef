@@ -1,0 +1,34 @@
+using Sample;
+using Xunit;
+
+static class Probe
+{
+    static void Check(Envelope result)
+    {
+{{ assertions }}
+    }
+
+    static Envelope Make(int count, string first, string second, bool scalar = false, bool absent = false)
+    {
+        var pieces = new List<Piece> { {% if enum_elements %}new Piece.Text(first), new Piece.Text(second){% else %}new Piece { Text = first }, new Piece { Text = second }{% endif %} };
+        pieces = pieces.Take(count).ToList();
+        Payload? payload = absent ? null : scalar ? Payload.Of("scalar") : Payload.OfObject(pieces);
+        return new Envelope { Entries = new List<Entry> { new Entry { Body = new Body { Payload = payload } } } };
+    }
+
+    static void Rejected(Action action)
+    {
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(action);
+    }
+
+    static void Main()
+    {
+        Check(Make(2, "hello", " world"));
+        Rejected(() => Check(Make(1, "hello", " world")));
+        Rejected(() => Check(Make(2, "wrong", " world")));
+        Rejected(() => Check(Make(2, "hello", "wrong")));
+        Rejected(() => Check(Make(2, "hello", " world", true)));
+        Rejected(() => Check(Make(2, "hello", " world", absent: true)));
+        Console.WriteLine("typed_list_cases=6");
+    }
+}

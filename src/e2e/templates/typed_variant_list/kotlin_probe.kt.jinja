@@ -1,0 +1,28 @@
+import sample.*
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
+
+fun checkResult(result: Envelope) {
+{{ assertions }}
+}
+
+fun makeResult(count: Int, first: String, second: String, scalar: Boolean = false, absent: Boolean = false): Envelope {
+    val pieces = listOf({% if enum_elements %}Piece.Text(first), Piece.Text(second){% else %}Piece(first), Piece(second){% endif %}).take(count)
+{% if android %}
+    val payload: Payload? = if (absent) null else if (scalar) Payload.Scalar("scalar") else Payload.Segments(pieces)
+{% else %}
+    val payload = if (absent) null else if (scalar) Payload.of("scalar") else Payload.ofObject(pieces)
+{% endif %}
+    return Envelope(listOf(Entry(Body(payload))))
+}
+
+fun main() {
+    checkResult(makeResult(2, "hello", " world"))
+    assertFailsWith<AssertionError> { checkResult(makeResult(1, "hello", " world")) }
+    assertFailsWith<AssertionError> { checkResult(makeResult(2, "wrong", " world")) }
+    assertFailsWith<AssertionError> { checkResult(makeResult(2, "hello", "wrong")) }
+    assertFailsWith<AssertionError> { checkResult(makeResult(2, "hello", " world", true)) }
+    assertFailsWith<AssertionError> { checkResult(makeResult(2, "hello", " world", absent = true)) }
+    println("typed_list_cases=6")
+}

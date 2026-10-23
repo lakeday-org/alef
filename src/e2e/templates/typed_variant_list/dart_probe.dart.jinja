@@ -1,0 +1,27 @@
+import 'package:test/test.dart';
+import 'lib/bridge/lib.dart';
+
+void checkResult(Envelope result) {
+{{ assertions }}
+}
+
+Envelope makeResult(int count, String first, String second, {bool scalar = false, bool absent = false}) {
+  final pieces = <Piece>[
+{% if enum_elements %}
+    Piece_Text(text: first), Piece_Text(text: second),
+{% else %}
+    Piece(text: first), Piece(text: second),
+{% endif %}
+  ].take(count).toList();
+  final Payload? payload = absent ? null : scalar ? Payload_Scalar(field0: 'scalar') : Payload_Segments(field0: pieces);
+  return Envelope(entries: [Entry(body: Body(payload: payload))]);
+}
+
+void main() {
+  test('correct count and both exact texts', () => checkResult(makeResult(2, 'hello', ' world')));
+  test('wrong count is rejected', () => expect(() => checkResult(makeResult(1, 'hello', ' world')), throwsA(isA<TestFailure>())));
+  test('wrong first text is rejected', () => expect(() => checkResult(makeResult(2, 'wrong', ' world')), throwsA(isA<TestFailure>())));
+  test('wrong second text is rejected', () => expect(() => checkResult(makeResult(2, 'hello', 'wrong')), throwsA(isA<TestFailure>())));
+  test('null payload is rejected', () => expect(() => checkResult(makeResult(2, 'hello', ' world', absent: true)), throwsA(isA<TestFailure>())));
+  test('wrong variant is rejected', () => expect(() => checkResult(makeResult(2, 'hello', ' world', scalar: true)), throwsA(isA<TestFailure>())));
+}

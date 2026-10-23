@@ -12,6 +12,8 @@
 //! other tagged union, computing the payload property name from the IR itself via
 //! `kotlin_field_name_with_type` instead of assuming `"metadata"`.
 
+mod list_payload;
+
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use std::fmt::Write as FmtWrite;
 
@@ -392,6 +394,10 @@ pub(super) fn try_render_generic_union_assertion(
     kotlin_android_style: bool,
     f: &str,
 ) -> bool {
+    if let Some(rendered) = list_payload::render(assertion, field_resolver, result_var, kotlin_android_style, f) {
+        out.push_str(&rendered);
+        return true;
+    }
     let Some((prefix, union_type, variant_pascal, suffix)) = field_resolver.ir_tagged_union_split(f) else {
         return false;
     };
@@ -732,3 +738,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod list_payload_tests;

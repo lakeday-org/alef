@@ -1,5 +1,7 @@
 //! C# discriminated-union assertion helpers.
 
+mod list_payload;
+
 use crate::e2e::codegen::assertion_type_skip::AssertionTypeSkip;
 use crate::e2e::escape::escape_csharp;
 use crate::e2e::field_access::FieldResolver;
@@ -205,6 +207,10 @@ pub(super) fn try_render_generic_union_assertion(
     field: &str,
     assert_enum_fields: &std::collections::HashMap<String, String>,
 ) -> bool {
+    if let Some(rendered) = list_payload::render(assertion, field_resolver, result_var, field) {
+        out.push_str(&rendered);
+        return true;
+    }
     let Some((prefix, union_type, variant, suffix)) = field_resolver.ir_tagged_union_split(field) else {
         return false;
     };
@@ -607,3 +613,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod list_payload_tests;

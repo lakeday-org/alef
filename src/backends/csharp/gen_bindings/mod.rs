@@ -39,7 +39,7 @@ pub(super) mod enums;
 // e2e field resolver renders `.As<Variant>` into doc snippets and must read the accessor set
 // from the generator that emits it, not re-derive it. See the function's own `~keep` doc.
 pub(crate) use enums::emits_tagged_union;
-pub(crate) use enums::variant_accessor_properties;
+pub(crate) use enums::{variant_accessor_properties, variant_field_name};
 pub(super) mod errors;
 // Re-exported at crate visibility (narrower than the module itself) so
 // `e2e::codegen::declared_error_variant::substantiates_variant_identity` can ask the exact same

@@ -1,0 +1,10 @@
+        {
+            if ({{ container }} is {{ owner }}.{{ variant }} listVariant)
+            {
+                Assert.Equal({{ expected }}, {{ expression }}{% if count %}.Count{% endif %});
+            }
+            else
+            {
+                Assert.Fail("Expected {{ variant }} variant");
+            }
+        }

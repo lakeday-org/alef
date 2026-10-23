@@ -1,3 +1,5 @@
+mod list_payload;
+
 use crate::codegen::naming::dart_tuple_field_identifier;
 use crate::e2e::codegen::assertion_type_skip::AssertionTypeSkip;
 use crate::e2e::codegen::field_skip::FieldSkip;
@@ -142,6 +144,10 @@ pub(super) fn try_render_tagged_union_assertion(
     field_resolver: &FieldResolver,
     field: &str,
 ) -> bool {
+    if let Some(rendered) = list_payload::render(assertion, field_resolver, result_var, field) {
+        out.push_str(&rendered);
+        return true;
+    }
     let Some((prefix, union_type, variant, suffix)) = field_resolver.ir_tagged_union_split(field) else {
         return false;
     };
@@ -170,3 +176,6 @@ pub(super) fn try_render_tagged_union_assertion(
     render_tagged_union_leaf_assertion(out, assertion, &field_expr, is_collection, is_optional);
     true
 }
+
+#[cfg(test)]
+mod list_payload_tests;

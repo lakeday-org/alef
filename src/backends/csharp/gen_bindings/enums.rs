@@ -1,10 +1,11 @@
 //! C# enum and tagged union code generation.
 
+mod field_names;
+pub(crate) use field_names::variant_field_name;
+
 use super::{csharp_file_header, is_tuple_field};
 use crate::backends::csharp::type_map::csharp_type;
-use crate::codegen::naming::{
-    csharp_type_name, csharp_variant_name, to_csharp_name, wire_field_name, wire_variant_value,
-};
+use crate::codegen::naming::{csharp_type_name, csharp_variant_name, wire_field_name, wire_variant_value};
 use crate::codegen::serde_enum_repr::{SerdeEnumRepr, serde_enum_repr};
 use crate::core::ir::{EnumDef, TypeRef};
 
@@ -180,9 +181,6 @@ fn gen_tagged_union(enum_def: &EnumDef, namespace: &str) -> String {
     out.push_str(&render("namespace_decl.jinja", crate::alef_context! { namespace }));
     out.push('\n');
 
-    let variant_names: std::collections::HashSet<String> =
-        enum_def.variants.iter().map(|v| csharp_variant_name(&v.name)).collect();
-
     let _discriminators: Vec<(String, String)> = enum_def
         .variants
         .iter()
@@ -267,23 +265,7 @@ fn gen_tagged_union(enum_def: &EnumDef, namespace: &str) -> String {
                     crate::alef_context! { pascal },
                 ));
                 for (i, field) in variant.fields.iter().enumerate() {
-                    let cs_type = if field.sanitized && field.type_rust_path.is_some() {
-                        "object".to_string()
-                    } else {
-                        csharp_type(&field.ty).to_string()
-                    };
-                    let cs_type = if field.optional && !cs_type.ends_with('?') {
-                        format!("{cs_type}?")
-                    } else {
-                        cs_type
-                    };
-                    let cs_type = if variant_names.iter().any(|vn| cs_type.starts_with(&format!("{vn}<"))) {
-                        cs_type
-                            .replace("List<", "global::System.Collections.Generic.List<")
-                            .replace("Dictionary<", "global::System.Collections.Generic.Dictionary<")
-                    } else {
-                        cs_type
-                    };
+                    let cs_type = field_names::variant_field_type(enum_def, field);
                     let comma = if i < variant.fields.len() - 1 { "," } else { "" };
                     if is_tuple_field(field) {
                         out.push_str(&render(
@@ -295,7 +277,7 @@ fn gen_tagged_union(enum_def: &EnumDef, namespace: &str) -> String {
                         // The public C# property identifier stays derived from the raw Rust
                         // field name, independent of the wire name below — casing and wire
                         // naming are separate surfaces. ~keep
-                        let cs_name = to_csharp_name(raw_field_name);
+                        let cs_name = variant_field_name(enum_def, variant, field);
                         // The wire name follows the full field-naming precedence: this field's
                         // own `serde_rename` wins over the enum's `rename_all_fields` (the
                         // struct-variant field-casing container rule), which wins over the raw
@@ -306,7 +288,7 @@ fn gen_tagged_union(enum_def: &EnumDef, namespace: &str) -> String {
                             field.serde_rename.as_deref(),
                             enum_def.rename_all_fields.as_deref(),
                         );
-                        let clashes = cs_name == pascal || cs_name == cs_type || variant_names.contains(&cs_name);
+                        let clashes = cs_name == "Value";
                         if clashes {
                             out.push_str(&render(
                                 "variant_field_json_value.jinja",

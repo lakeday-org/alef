@@ -1,0 +1,6 @@
+        when (val listVariant = {{ container }}) {
+            is {{ owner }}.{{ variant }} -> {
+                assertEquals({{ expected }}, {{ expression }}{% if count %}.size{% endif %})
+            }
+            else -> kotlin.test.assertTrue(false, "Expected {{ variant }} variant")
+        }

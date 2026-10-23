@@ -1,4 +1,5 @@
 mod ruby_templates;
+mod typed_list_templates;
 
 use minijinja::Environment;
 
@@ -717,7 +718,11 @@ static TEMPLATES: &[(&str, &str)] = &[
 pub(crate) fn make_env() -> Environment<'static> {
     let mut env = Environment::new();
     crate::template::configure_env(&mut env);
-    for (name, src) in TEMPLATES.iter().chain(ruby_templates::TEMPLATES) {
+    for (name, src) in TEMPLATES
+        .iter()
+        .chain(ruby_templates::TEMPLATES)
+        .chain(typed_list_templates::TEMPLATES)
+    {
         env.add_template(name, src).expect("built-in template is valid");
     }
     env

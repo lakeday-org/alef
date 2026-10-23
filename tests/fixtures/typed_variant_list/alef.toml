@@ -1,0 +1,11 @@
+[workspace]
+languages = ["csharp", "dart", "java", "kotlin_android"]
+[[crates]]
+name = "sample"
+sources = ["src/lib.rs"]
+[crates.csharp]
+namespace = "Sample"
+[crates.java]
+package = "sample"
+[crates.kotlin_android]
+package = "sample"
