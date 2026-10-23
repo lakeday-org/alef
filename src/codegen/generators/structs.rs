@@ -1,9 +1,12 @@
+mod field_serde_attrs;
+
 use crate::codegen::builder::StructBuilder;
 use crate::codegen::doc_emission::{DocTarget, sanitize_rust_idioms};
 use crate::codegen::generators::RustBindingConfig;
 use crate::codegen::shared::binding_fields;
 use crate::codegen::type_mapper::TypeMapper;
 use crate::core::ir::{CoreWrapper, TypeDef, TypeRef};
+use field_serde_attrs::mirror_wire_rename;
 
 /// Whether every binding-visible field of `typ` round-trips losslessly through
 /// `From<core::Type> for BindingType` (see `gen_from_core_to_binding_cfg`) -- the precondition
@@ -364,6 +367,9 @@ pub fn gen_struct_with_per_field_attrs(
         {
             attrs.push("serde(skip)".to_string());
         }
+        if !attrs.iter().any(|attribute| attribute == "serde(skip)") {
+            mirror_wire_rename(field, &mut attrs);
+        }
         // Whole-type delegation didn't fire for `typ` (or wasn't requested for it) -- mirror
         // this field's own `#[serde(default)]` directly so it stays absent-tolerant even under
         // the derived, field-by-field `Deserialize`. See `serde_default_field_attr`.
@@ -490,13 +496,8 @@ pub fn gen_struct_with_rename(
         {
             attrs.push("serde(skip)".to_string());
         }
-        // Mirror per-field `#[serde(rename = "...")]` from the core type so the binding
-        if has_serde
-            && !attrs.iter().any(|a| a.starts_with("serde(rename"))
-            && !attrs.iter().any(|a| a == "serde(skip)")
-            && let Some(rename) = &field.serde_rename
-        {
-            attrs.push(format!("serde(rename = \"{rename}\")"));
+        if has_serde && !attrs.iter().any(|attribute| attribute == "serde(skip)") {
+            mirror_wire_rename(field, &mut attrs);
         }
         // Whole-type delegation didn't fire for `typ` (or wasn't requested for it) -- mirror
         // this field's own `#[serde(default)]` directly so it stays absent-tolerant even under
@@ -590,12 +591,7 @@ pub fn gen_struct(typ: &TypeDef, mapper: &dyn TypeMapper, cfg: &RustBindingConfi
             mapper.map_type(&field.ty)
         };
         let mut attrs: Vec<String> = cfg.field_attrs.iter().map(|a| a.to_string()).collect();
-        // Mirror per-field `#[serde(rename = "...")]` from the core type so the binding
-        if let Some(rename) = &field.serde_rename
-            && !attrs.iter().any(|a| a.starts_with("serde(rename"))
-        {
-            attrs.push(format!("serde(rename = \"{rename}\")"));
-        }
+        mirror_wire_rename(field, &mut attrs);
         let emit_name = crate::core::keywords::rust_raw_ident(&field.name);
         if emit_name != field.name && !attrs.iter().any(|a| a.starts_with("serde(rename")) {
             attrs.push(format!("serde(rename = \"{}\")", field.name));

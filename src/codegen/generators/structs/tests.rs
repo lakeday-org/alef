@@ -792,3 +792,6 @@ fn gen_struct_with_rename_keeps_derive_when_no_unreproducible_serde_attrs() {
         "the reproduced attribute must still be emitted: {rendered}"
     );
 }
+
+#[path = "tests/php_wire_rename.rs"]
+mod php_wire_rename;

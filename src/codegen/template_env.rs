@@ -2,6 +2,10 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "struct_field_wire_probe.rs.jinja",
+        include_str!("templates/struct_field_wire_probe.rs.jinja"),
+    ),
+    (
         "error_gen/rustler_error_converter.jinja",
         include_str!("templates/error_gen/rustler_error_converter.jinja"),
     ),

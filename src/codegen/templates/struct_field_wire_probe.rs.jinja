@@ -1,0 +1,24 @@
+{{ declaration }}
+#[derive(serde::Deserialize)]
+enum CoreKind {
+    #[serde(rename = "function")]
+    Function,
+}
+#[derive(serde::Deserialize)]
+struct CoreCall {
+    #[serde(rename = "type")]
+    call_type: CoreKind,
+}
+fn main() {
+    for key in ["type", "callType", "call_type"] {
+        let input = serde_json::json!({key: "function"});
+        let binding: SampleCall = serde_json::from_value(input).unwrap();
+        assert_eq!(binding.call_type, "function", "wire key {key} must populate call_type");
+        let wire = serde_json::to_value(binding).unwrap();
+        assert_eq!(wire["type"], "function");
+        assert!(wire.get("call_type").is_none());
+        assert!(wire.get("callType").is_none());
+        let core: CoreCall = serde_json::from_value(wire).unwrap();
+        assert!(matches!(core.call_type, CoreKind::Function));
+    }
+}

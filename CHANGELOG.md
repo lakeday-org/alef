@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve explicit wire field names in PHP DTO mirrors while retaining host field names, raw-key compatibility and camel-case JSON aliases (#681).
 - Borrow string error-type metadata directly in WASM JavaScript errors without redundant allocation, preserving Display conversion for other metadata types (#679).
 
 ## [0.113.3] - 2026-10-23

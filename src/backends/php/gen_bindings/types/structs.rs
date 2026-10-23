@@ -16,6 +16,7 @@ use super::enums::ty_references_untagged_data_enum;
 
 mod constructor_init;
 mod getters;
+mod wire_aliases;
 use getters::{JSON_TEXT_EXPR, add_php_getter};
 
 mod scalar;
@@ -355,10 +356,7 @@ pub(crate) fn gen_php_struct(
             }
         }
         if cfg.has_serde {
-            let php_name = crate::codegen::naming::to_php_name(&field.name);
-            if php_name != field.name {
-                attrs.push(format!("serde(alias = \"{}\")", php_name));
-            }
+            attrs.extend(wire_aliases::field_alias_attributes(field));
         }
         attrs
     };
