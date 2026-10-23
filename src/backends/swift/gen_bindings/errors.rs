@@ -171,6 +171,7 @@ pub(super) fn emit_error(error: &ErrorDef, module_name: &str, out: &mut String, 
         out.push_str("    case validation(message: String, source: String)\n");
     }
     out.push_str("}\n");
+    description::emit(error, &name, mapper, out);
     if !error.methods.is_empty() {
         out.push('\n');
         let mut properties = String::new();
@@ -423,3 +424,6 @@ mod tests;
 #[cfg(test)]
 #[path = "errors_duration_tests.rs"]
 mod duration_tests;
+
+#[path = "errors_description.rs"]
+mod description;

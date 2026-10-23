@@ -1,0 +1,10 @@
+extension {{ name }}: Swift.CustomStringConvertible {
+    /// Uses the Rust display template when available, otherwise the transported message or variant name. ~keep
+    public var description: String {
+        switch self {
+{% for case in cases %}
+        case .{{ case.name }}{{ case.pattern }}: return {{ case.expression }}
+{% endfor %}
+        }
+    }
+}

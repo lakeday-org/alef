@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reject Rust path keywords used as bare adapter method names before emitting invalid receiver calls, while preserving qualified paths.
 - Render streaming Rust method bodies and Node adapter wrappers through registered templates while preserving generated bindings.
 - Preserve WASM errors' original Display text and typed metadata when payload fields share reserved JavaScript property names, retaining complete payload values under `Symbol.for("alef.error.payload")` and the `payload` alias when no existing metadata uses that name.
+- Render supported Rust display templates and transported messages in Swift typed-error descriptions without changing raw payloads or public case arity.
 
 ## [0.113.3] - 2026-10-23
 

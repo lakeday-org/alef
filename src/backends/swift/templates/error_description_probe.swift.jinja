@@ -1,0 +1,62 @@
+import Foundation
+
+struct CustomStringConvertible {}
+
+struct BridgeString {
+    let value: String
+    func toString() -> String { value }
+}
+enum RustBridge {
+    struct AlefBridgeError: Error {
+        let text: String
+        let variant: String
+        let fields: [String: String]
+        func message() -> BridgeString { BridgeString(value: text) }
+        func kind() -> BridgeString { BridgeString(value: variant) }
+        func status() -> Int64 { -1 }
+        func retryAfterMs() -> Int64 { -1 }
+        func errorType() -> BridgeString { BridgeString(value: "SampleError") }
+        func payload() -> BridgeString {
+            let data = try! JSONSerialization.data(withJSONObject: fields)
+            return BridgeString(value: String(data: data, encoding: .utf8)!)
+        }
+    }
+}
+
+{{ declaration }}
+
+let cases: [(String, String, [String: String])] = [
+    ("NotFound", "not_found: raw payload", ["message": "\"raw payload\""]),
+    ("Blocked", "access_denied: filter/block: raw payload", ["message": "\"raw payload\""]),
+    ("PolicyRejected", "policy_rejected: sample://entry - rejected", ["message": "\"raw payload\"", "url": "\"sample://entry\"", "reason": "\"rejected\""]),
+    ("Escaped", "{prefix}: \"raw payload\"\\tail\n", ["message": "\"raw payload\""]),
+    ("Empty", "empty operation", [:]),
+    ("Synthetic", "custom display retained from bridge", ["detail": "\"detail\""]),
+    ("Unsupported", "raw payload", ["message": "\"raw payload\""]),
+    ("Opaque", "Opaque", [:]),
+]
+for (kind, expected, fields) in cases {
+    let bridgeText = kind == "Opaque" ? "arbitrary unavailable custom Display" : kind == "Unsupported" ? "debug: \"raw payload\"" : expected
+    let bridge = RustBridge.AlefBridgeError(text: bridgeText, variant: kind, fields: fields)
+    do {
+        try alefBridgedCall { () throws -> Void in throw bridge }
+        fatalError("bridge must throw")
+    } catch {
+        guard let typed = error as? SampleError else { fatalError("typed error must survive") }
+        precondition(typed.kind == kind, "typed identity must survive")
+        precondition(String(describing: typed) == expected, "Display text must survive")
+        precondition(typed.description == expected, "description must match")
+        switch typed {
+        case .notFound(message: let message), .blocked(message: let message), .escaped(message: let message), .unsupported(message: let message):
+            precondition(message == "raw payload", "raw message payload must survive")
+        case .policyRejected(message: let message, url: let url, reason: let reason):
+            precondition(message == "raw payload" && url == "sample://entry" && reason == "rejected", "all raw payload fields must survive")
+        case .synthetic(message: let message, detail: let detail):
+            precondition(message == expected && detail == "detail", "synthetic Display must survive")
+        default: break
+        }
+    }
+}
+let ordinary = NSError(domain: "ordinary", code: 1)
+precondition((alefTypedError(ordinary) as NSError) === ordinary, "ordinary errors must pass through")
+print("verified \(cases.count) typed descriptions and ordinary error passthrough")
