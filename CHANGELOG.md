@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.113.4] - 2026-10-23
+
 ### Fixed
 
 - Restore supported Rust error display templates in generated Dart Freezed variants while preserving typed payloads, factory constructors, and unsupported-format fallbacks.
