@@ -1,6 +1,7 @@
 use super::*;
 use crate::backends::napi::NapiBackend;
 use crate::core::backend::Backend;
+use crate::core::config::ResolvedCrateConfig;
 use crate::core::ir::{ApiSurface, EnumVariant, FieldDef};
 
 fn field(name: &str, ty: TypeRef) -> FieldDef {
@@ -23,12 +24,14 @@ fn api() -> ApiSurface {
         types: vec![
             TypeDef {
                 name: "Specific".into(),
+                rust_path: "sample::Specific".into(),
                 has_serde: true,
                 fields: vec![kind, field("postal_code", TypeRef::String)],
                 ..Default::default()
             },
             TypeDef {
                 name: "Tool".into(),
+                rust_path: "sample::Tool".into(),
                 has_serde: true,
                 fields: vec![tool_type, config],
                 ..Default::default()
@@ -37,6 +40,7 @@ fn api() -> ApiSurface {
         enums: vec![
             EnumDef {
                 name: "Mode".into(),
+                rust_path: "sample::Mode".into(),
                 has_serde: true,
                 serde_rename_all: Some("lowercase".into()),
                 variants: vec![EnumVariant {
@@ -47,6 +51,7 @@ fn api() -> ApiSurface {
             },
             EnumDef {
                 name: "Choice".into(),
+                rust_path: "sample::Choice".into(),
                 has_serde: true,
                 serde_untagged: true,
                 variants: ["Mode", "Specific"]
@@ -64,11 +69,27 @@ fn api() -> ApiSurface {
     }
 }
 
+fn native_config() -> ResolvedCrateConfig {
+    ResolvedCrateConfig {
+        name: "sample".into(),
+        ..Default::default()
+    }
+}
+
 fn declarations() -> String {
+    declarations_for(&api())
+}
+
+fn declarations_for(api: &ApiSurface) -> String {
+    let config = native_config();
+    let bindings = NapiBackend.generate_bindings(api, &config).expect("native bindings");
+    assert_eq!(bindings.len(), 1, "one actual native module");
+    syn::parse_file(&bindings[0].content).expect("fixture emits valid native Rust");
     NapiBackend
-        .generate_type_stubs(&api(), &Default::default())
+        .generate_type_stubs(api, &config)
         .expect("NAPI declarations")
         .iter()
+        .filter(|file| file.path.ends_with("index.d.ts"))
         .map(|file| file.content.as_str())
         .collect::<Vec<_>>()
         .join("\n")
@@ -209,16 +230,11 @@ fn recursive_wire_aliases_preserve_null_and_avoid_public_name_collisions() {
         .push(field("maybe_value", TypeRef::Optional(Box::new(TypeRef::String))));
     api.types.push(TypeDef {
         name: "__AlefWireSpecific".into(),
+        rust_path: "sample::__AlefWireSpecific".into(),
         fields: vec![field("sentinel", TypeRef::String)],
         ..Default::default()
     });
-    let dts = NapiBackend
-        .generate_type_stubs(&api, &Default::default())
-        .expect("declarations")
-        .iter()
-        .map(|file| file.content.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
+    let dts = declarations_for(&api);
     assert_eq!(dts.matches("export type __AlefWireSpecific_ =").count(), 1, "{dts}");
     assert!(dts.contains("next_value?: (__AlefWireSpecific_ | null)"), "{dts}");
     assert!(dts.contains("maybe_value?: (string | null)"), "{dts}");
@@ -243,14 +259,29 @@ fn untagged_duration_payloads_match_serde_and_keep_explicit_numeric_codecs() {
         fields: vec![field("_0", TypeRef::Duration)],
         ..Default::default()
     });
-    let dts = NapiBackend
-        .generate_type_stubs(&api, &Default::default())
-        .expect("declarations")
-        .iter()
-        .map(|file| file.content.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
+    let dts = declarations_for(&api);
     assert!(dts.contains("ttl: { secs: number; nanos: number }"), "{dts}");
     assert!(dts.contains("millis: number"), "{dts}");
     assert!(dts.contains("  | { secs: number; nanos: number }"), "{dts}");
+}
+
+#[test]
+fn native_export_metadata_rejects_incomplete_untagged_fixture_paths() {
+    let config = native_config();
+    let positive = NapiBackend
+        .generate_type_stubs(&api(), &config)
+        .expect("complete fixture");
+    assert_eq!(positive.len(), 3, "declarations and both runtime shims");
+    let mut invalid = api();
+    for definition in &mut invalid.enums {
+        definition.rust_path.clear();
+    }
+    let error = NapiBackend
+        .generate_type_stubs(&invalid, &Default::default())
+        .expect_err("the original incomplete fixture must fail the actual Rust parser");
+    assert!(error.root_cause().is::<syn::Error>(), "{error:#}");
+    assert!(
+        error.to_string().contains("parsing generated NAPI bindings"),
+        "{error:#}"
+    );
 }

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Consult runtime fixture origins for file-backed mock responses so HTML redirects and root-relative links use their dedicated listener, retaining shared-server fallback for ordinary bodies.
 - Keep resolved C accessor expressions distinct from raw call identifiers and verify every loaded e2e template registry with omission and empty-scan controls.
+- Supply complete Rust type paths in TypeScript untagged-input fixtures and verify their generated native modules before declaration checks.
 
 ## [0.113.3] - 2026-10-23
 
