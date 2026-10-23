@@ -7,19 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Keep validation, build, and publish jobs running when the optional compiler-cache service is unavailable.
-- Render strict Swift bridge-pattern Rust probes through registered templates and isolate compiler lookup and subprocess working directories.
-- Render the Swift error compatibility probe through the backend template registry and anchor compiler and runtime probes to their owned temporary directory.
-
 ## [0.113.3] - 2026-10-23
 
 ### Fixed
 
 - Preserve borrowed static-string payload attributes in generated Python and PHP exceptions.
-- Retain Swift error cases' released nullable source argument while keeping excluded native error causes out of bridge payloads.
+- Retain Swift error cases' released nullable source argument while excluding native error causes from bridge payloads, and omit unsupported named fields from Rust bridge patterns without redundant wildcards.
 - Preserve Node error shims across semicolonless NAPI loader output, enforce package and runtime version checks, and retain the shim when migrating builds to `--no-js`.
+- Keep Swift compiler and runtime regression probes in registered templates and owned temporary working directories.
+- Update the reviewed Ruby setup action to v1.334.0 and MiniJinja lockfile to v3.0.3.
+- Keep validation, build, and publish jobs running when the optional compiler-cache service is unavailable.
 
 ## [0.113.2] - 2026-10-23
 
