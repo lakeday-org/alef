@@ -10,6 +10,9 @@ mod assertion;
 pub use assertion::Assertion;
 pub mod docs_only;
 mod docs_presentation;
+mod host_root_routes;
+#[cfg(test)]
+mod host_root_routes_tests;
 mod loader;
 mod metadata;
 pub mod origin_tokens;
@@ -595,95 +598,6 @@ impl Fixture {
             .and_then(|m| m.stream_chunks.as_ref())
             .map(|c| !c.is_empty())
             .unwrap_or(false)
-    }
-
-    /// Returns true if this fixture needs a dedicated origin-root listener.
-    ///
-    /// Route-array fixtures are normally mounted under `/fixtures/<id>` in the shared
-    /// mock server. A dedicated listener is required when a route path or fixture body
-    /// makes the client under test resolve follow-up requests from the origin root rather
-    /// than the fixture namespace, or when a response body/header carries one of the
-    /// `{{mock_origin}}` / `{{mock_alt_origin}}` / `{{mock_sub_origin}}` /
-    /// `{{mock_foreign_origin}}` origin-substitution tokens (see [`origin_tokens`]). Mirrors
-    /// the `is_host_root_path` predicate in the standalone mock-server binary
-    /// (`codegen/rust/mock_server/route_loading.rs`).
-    ///
-    /// Origin-root fixtures get a dedicated per-fixture listener and their base URL is
-    /// published in the `MOCK_SERVERS={"fixture_id":"http://..."}` JSON line.
-    pub fn has_host_root_route(&self) -> bool {
-        if let Some(arr) = self.input.get("mock_responses").and_then(|v| v.as_array()) {
-            if arr.iter().any(|entry| {
-                entry
-                    .get("path")
-                    .and_then(|v| v.as_str())
-                    .map(is_host_root_path)
-                    .unwrap_or(false)
-            }) {
-                return true;
-            }
-            // A response can trigger a follow-up request to an origin-root path. In that
-            // case, the fixture must be served on a dedicated listener so the next request
-            // resolves against the same route table. Three trigger shapes are detected:
-            //   - 3xx with Location: /...
-            //   - any status with Refresh: <s>;url=/...
-            //   - 200 HTML with <meta http-equiv="refresh" content="...url=/...">
-            return arr.iter().any(|entry| {
-                let status = entry.get("status_code").and_then(|v| v.as_u64()).unwrap_or(0);
-                let headers = entry.get("headers").and_then(|v| v.as_object());
-                let location_redirect = (300..400).contains(&status)
-                    && headers
-                        .map(|hdrs| {
-                            hdrs.iter().any(|(name, value)| {
-                                name.eq_ignore_ascii_case("location")
-                                    && value.as_str().is_some_and(|s| s.starts_with('/'))
-                            })
-                        })
-                        .unwrap_or(false);
-                let refresh_redirect = headers
-                    .map(|hdrs| {
-                        hdrs.iter().any(|(name, value)| {
-                            if !name.eq_ignore_ascii_case("refresh") {
-                                return false;
-                            }
-                            value
-                                .as_str()
-                                .and_then(|s| s.to_ascii_lowercase().find("url=").map(|i| (s.to_owned(), i)))
-                                .map(|(s, idx)| s[idx + 4..].trim_start().starts_with('/'))
-                                .unwrap_or(false)
-                        })
-                    })
-                    .unwrap_or(false);
-                let meta_refresh = entry
-                    .get("body_inline")
-                    .and_then(|v| v.as_str())
-                    .map(|body| {
-                        let lower = body.to_ascii_lowercase();
-                        lower
-                            .split("http-equiv=\"refresh\"")
-                            .nth(1)
-                            .and_then(|s| s.split("content=").nth(1))
-                            .map(|s| s.trim_start_matches(['"', '\'']).contains("url=/"))
-                            .unwrap_or(false)
-                    })
-                    .unwrap_or(false);
-                // Inline HTML anchor with host-absolute target (`<a href="/page1">`) uses
-                // the same trigger as the runtime mock-server `has_inline_host_link`
-                // detection. Generated tests for multi-page fixtures use the shared
-                // `/fixtures/<id>/` URL while clients resolve linked `/page` paths against
-                // the host root.
-                let inline_host_link = entry
-                    .get("body_inline")
-                    .and_then(|v| v.as_str())
-                    .map(|body| body.contains("href=\"/") || body.contains("href='/"))
-                    .unwrap_or(false);
-                location_redirect
-                    || refresh_redirect
-                    || meta_refresh
-                    || inline_host_link
-                    || origin_tokens::entry_has_origin_token(entry)
-            });
-        }
-        false
     }
 
     /// Get the resolved category (explicit or from source directory).
