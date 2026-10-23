@@ -1,0 +1,32 @@
+#[cfg(test)]
+mod text_projection_probe {
+    #[test]
+    fn actual_getters_preserve_their_declared_transport() {
+        for expected in ["", "ordinary text", "\"quoted\"", "{\"key\":1}", " leading whitespace"] {
+            let packet = super::Packet(sample::Packet {
+                required: sample::BodyValue::PlainValue(expected.into()),
+                nullable: Some(sample::BodyValue::PlainValue(expected.into())),
+                legacy: Some(sample::BodyValue::PlainValue(expected.into())),
+            });
+{% if projected %}
+            assert_eq!(packet.required(), expected);
+            assert_eq!(packet.nullable().as_deref(), Some(expected));
+            assert_eq!(packet.legacy().as_deref(), Some(expected));
+{% else %}
+            let json = serde_json::to_string(expected).unwrap();
+            assert_eq!(packet.required(), json);
+            assert_eq!(packet.nullable(), json);
+            assert_eq!(packet.legacy().as_deref(), Some(json.as_str()));
+{% endif %}
+        }
+        let packet = super::Packet(sample::Packet {
+            required: sample::BodyValue::PlainValue(String::new()), nullable: None, legacy: None,
+        });
+{% if projected %}
+        assert_eq!(packet.nullable(), None);
+{% else %}
+        assert_eq!(packet.nullable(), "null");
+{% endif %}
+        assert_eq!(packet.legacy(), None);
+    }
+}

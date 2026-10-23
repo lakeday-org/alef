@@ -4,7 +4,7 @@
 //! `is_bridge_leaf`, and `rust_primitive_str` — pure functions with no
 //! side effects used across all other submodules.
 
-use crate::core::ir::{ApiSurface, ParamDef, PrimitiveType, TypeRef};
+use crate::core::ir::{ApiSurface, FieldDef, ParamDef, PrimitiveType, TypeRef};
 use heck::ToSnakeCase;
 use std::collections::HashSet;
 
@@ -361,3 +361,30 @@ pub(crate) fn forces_fallible_enum_bridge(
         _ => false,
     })
 }
+
+pub(crate) fn text_projected_getter_type(field: &FieldDef, text_types: &HashSet<&str>) -> Option<&'static str> {
+    if field
+        .newtype_wrapper
+        .as_deref()
+        .is_some_and(crate::codegen::conversions::helpers::is_explicit_newtype)
+    {
+        return None;
+    }
+    let named = match &field.ty {
+        TypeRef::Optional(inner) => inner.as_ref(),
+        other => other,
+    };
+    let TypeRef::Named(name) = named else { return None };
+    if !text_types.contains(name.as_str()) {
+        return None;
+    }
+    Some(if field.optional || matches!(field.ty, TypeRef::Optional(_)) {
+        "Option<String>"
+    } else {
+        "String"
+    })
+}
+
+#[cfg(test)]
+#[path = "text_projection_tests.rs"]
+mod text_projection_tests;

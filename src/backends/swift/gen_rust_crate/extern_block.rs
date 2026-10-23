@@ -99,6 +99,7 @@ pub(crate) fn has_lossless_constructor_extern(
             .all(|field| enum_kinds.supports_constructor_field(&field.ty))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn emit_extern_block_for_type(
     ty: &TypeDef,
     exclude_fields: &HashSet<String>,
@@ -106,6 +107,7 @@ pub(crate) fn emit_extern_block_for_type(
     no_serde_names: &HashSet<&str>,
     first_class_names: &HashSet<&str>,
     enum_kinds: EnumKinds<'_, '_>,
+    text_types: &HashSet<&str>,
     configured_features: &std::collections::HashSet<&str>,
 ) -> String {
     let parent_first_class = first_class_names.contains(ty.name.as_str());
@@ -183,7 +185,9 @@ pub(crate) fn emit_extern_block_for_type(
         let enum_set = enum_kinds.all();
         let bridge_ty =
             bridge_type_enum_and_serde_struct_aware(&field.ty, enum_set, no_serde_names, parent_first_class);
-        let bridge_ty = if super::type_bridge::field_needs_json_bridge(&field.ty, field.optional) {
+        let bridge_ty = if let Some(projected) = super::type_bridge::text_projected_getter_type(field, text_types) {
+            projected.to_string()
+        } else if super::type_bridge::field_needs_json_bridge(&field.ty, field.optional) {
             "String".to_string()
         } else if field.optional {
             if is_vec_of_enum(&field.ty, enum_set)

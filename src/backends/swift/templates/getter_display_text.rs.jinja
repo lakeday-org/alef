@@ -1,0 +1,4 @@
+    pub fn {{ getter_name }}(&self) -> {{ return_type }} {
+{% if optional %}        self.0.{{ name }}.as_ref().map(|v| v.to_string())
+{% else %}        self.0.{{ name }}.to_string()
+{% endif %}    }

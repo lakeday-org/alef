@@ -1,5 +1,9 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
     (
+        "getter_display_text.rs.jinja",
+        include_str!("../templates/getter_display_text.rs.jinja"),
+    ),
+    (
         "struct_newtype.jinja",
         include_str!("../templates/struct_newtype.jinja"),
     ),

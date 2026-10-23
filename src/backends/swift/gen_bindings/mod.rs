@@ -332,24 +332,8 @@ impl Backend for SwiftBackend {
             client::emit_doc_comment(&ty.doc, "", &mut body);
             if dto::can_emit_first_class_struct(ty, &mapper, &exclude_fields, &known_dto_names) {
                 zero_arg_default::validate_constructor_enum_defaults(api, ty, &configured_enum_features)?;
-                let dto_error_name = api
-                    .errors
-                    .first()
-                    .map(|e| {
-                        if e.name == "Error" {
-                            format!("{module_name}Error")
-                        } else {
-                            e.name.clone()
-                        }
-                    })
-                    .unwrap_or_else(|| {
-                        let raw = config.error_type_name();
-                        if raw == "Error" {
-                            format!("{module_name}Error")
-                        } else {
-                            raw
-                        }
-                    });
+                let dto_error_name = dto::ffi_initializer::error_type_name(api, config, &module_name);
+                let text_variants = dto::ffi_initializer::text_variants(api, &config.untagged_union_text_types)?;
                 first_class_struct_names.push(ty.name.clone());
                 dto::emit_first_class_struct(
                     ty,
@@ -362,6 +346,7 @@ impl Backend for SwiftBackend {
                     &serde_struct_names,
                     &dto_error_name,
                     &configured_features,
+                    &text_variants,
                     &mut body,
                 )?;
             } else {

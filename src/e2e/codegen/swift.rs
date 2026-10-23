@@ -47,6 +47,8 @@ impl E2eCodegen for SwiftE2eCodegen {
         functions: &[crate::core::ir::FunctionDef],
         errors: &[crate::core::ir::ErrorDef],
     ) -> Result<Vec<GeneratedFile>> {
+        let normalized_types = text_projection::normalized_fields(type_defs);
+        let type_defs = normalized_types.as_slice();
         let lang = self.language_name();
         // Emit under `<output>/swift_e2e/` so the consumer's SwiftPM identity
         // (derived from path basename) does not collide with the dep at
@@ -160,6 +162,8 @@ impl E2eCodegen for SwiftE2eCodegen {
         let swift_first_class_map = values::build_swift_first_class_map(type_defs, enums, e2e_config, call);
 
         let swift_first_class_map_ref = swift_first_class_map;
+        let swift_first_class_map_ref =
+            text_projection::apply(swift_first_class_map_ref, type_defs, &config.untagged_union_text_types);
 
         // Resolve client_factory override for swift (enables client-instance dispatch).
         let client_factory: Option<&str> = overrides.and_then(|o| o.client_factory.as_deref());
@@ -276,6 +280,7 @@ mod snippet;
 mod stubs;
 mod test_file;
 mod test_method;
+mod text_projection;
 mod values;
 mod wildcard_assertion;
 

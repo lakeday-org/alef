@@ -1,0 +1,1 @@
+try rb.{{ accessor }}().map { (s: RustStringRef) -> {{ name }} in let d = s.as_str().toString().data(using: .utf8) ?? Data(); return try JSONDecoder().decode({{ name }}.self, from: d) }

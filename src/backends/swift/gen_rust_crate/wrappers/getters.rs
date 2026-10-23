@@ -9,6 +9,7 @@
 
 use crate::backends::swift::gen_rust_crate::type_bridge::{
     bridge_type_enum_aware_ref, field_needs_json_bridge, is_enum_named, is_vec_of_enum, needs_json_bridge,
+    text_projected_getter_type,
 };
 use crate::codegen::conversions::helpers::{apply_explicit_field_newtype_from_core, is_explicit_newtype};
 use crate::core::ir::{CoreWrapper, FieldDef, TypeDef, TypeRef};
@@ -99,7 +100,9 @@ pub(super) fn emit_getters(
     let parent_first_class = first_class_names.contains(ty.name.as_str());
     for field in &ty.fields {
         let bridge_ty = bridge_type_enum_aware_ref(&field.ty, enum_names);
-        let bridge_ty_owned = if field_needs_json_bridge(&field.ty, field.optional) {
+        let bridge_ty_owned = if let Some(projected) = text_projected_getter_type(field, text_types) {
+            projected.to_string()
+        } else if field_needs_json_bridge(&field.ty, field.optional) {
             "String".to_string()
         } else if field.optional {
             if is_vec_of_enum(&field.ty, enum_names) {
@@ -136,7 +139,9 @@ pub(super) fn emit_getters(
             getter_name,
             bridge_ty_owned,
         };
-        if field.newtype_wrapper.as_deref().is_some_and(is_explicit_newtype) {
+        if text_projected_getter_type(field, text_types).is_some() {
+            emit_text_type_getter(field, &ctx, out);
+        } else if field.newtype_wrapper.as_deref().is_some_and(is_explicit_newtype) {
             let core_expr = format!("self.0.{}.clone()", ctx.name);
             let converted = apply_explicit_field_newtype_from_core(&core_expr, field)
                 .expect("explicit newtype metadata checked above");
@@ -161,8 +166,6 @@ pub(super) fn emit_getters(
                     name => &ctx.name,
                 },
             ));
-        } else if is_text_type_field(field, text_types) {
-            emit_text_type_getter(field, &ctx, out);
         } else if is_enum_named(&field.ty, enum_names) {
             emit_enum_string_getter(field, &ctx, enum_names, unit_enum_names, out);
         } else if is_vec_of_enum(&field.ty, enum_names) {
@@ -225,33 +228,16 @@ fn emit_remaining_getter(ty: &TypeDef, field: &crate::core::ir::FieldDef, ctx: &
     ));
 }
 
-/// Returns true when `field` holds an enum named in `untagged_union_text_types`.
-///
-/// Those enums stand for "the text of the value" (a plain string or a list of typed parts), so
-/// a getter returns the text itself, not the enum serialized as JSON.
-fn is_text_type_field(field: &FieldDef, text_types: &HashSet<&str>) -> bool {
-    let named = match &field.ty {
-        TypeRef::Optional(inner) => inner.as_ref(),
-        other => other,
-    };
-    matches!(named, TypeRef::Named(n) if text_types.contains(n.as_str()))
-}
-
 /// Emit the getter for a field whose enum is listed in `untagged_union_text_types`.
 ///
 /// The value converts through the core type's `Display` impl, the same conversion the WASM
 /// backend uses for these fields. A `Text` value gives its string without JSON quotes, and a
 /// list of parts gives the joined text of its text parts.
 fn emit_text_type_getter(field: &FieldDef, ctx: &GetterCtx, out: &mut String) {
-    let optional = field.optional || matches!(field.ty, TypeRef::Optional(_));
-    let body = if optional {
-        format!("self.0.{}.as_ref().map(|v| v.to_string())", ctx.name)
-    } else {
-        format!("self.0.{}.to_string()", ctx.name)
-    };
-    out.push_str(&format!(
-        "    pub fn {}(&self) -> {} {{\n        {}\n    }}\n",
-        ctx.getter_name, ctx.bridge_ty_owned, body
+    out.push_str(&crate::backends::swift::template_env::render(
+        "getter_display_text.rs.jinja",
+        crate::alef_context! { getter_name => &ctx.getter_name, return_type => &ctx.bridge_ty_owned,
+        name => &ctx.name, optional => field.optional || matches!(field.ty, TypeRef::Optional(_)) },
     ));
 }
 

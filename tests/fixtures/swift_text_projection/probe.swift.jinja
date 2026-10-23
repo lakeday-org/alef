@@ -1,0 +1,116 @@
+import Foundation
+import XCTest
+
+struct NativeString {
+    let value: String
+    func toString() -> String { value }
+}
+
+enum RustBridge {
+    struct PacketRef {
+        let value: String
+        let absent: Bool
+        func required() -> NativeString { NativeString(value: value) }
+        func nullable() -> NativeString? { absent ? nil : NativeString(value: value) }
+        func legacy() -> NativeString? { absent ? nil : NativeString(value: value) }
+    }
+    struct StructuralPacketRef {
+        let value: String
+        let absent: Bool
+        func required() -> NativeString { NativeString(value: value) }
+        func nullable() -> NativeString { NativeString(value: absent ? "null" : value) }
+        func legacy() -> NativeString? { absent ? nil : NativeString(value: value) }
+    }
+}
+
+{{ enum_declaration }}
+{{ text_extension }}
+{{ packet_declaration }}
+extension Packet {
+{{ packet_initializer }}
+}
+{{ structural_declaration }}
+extension StructuralPacket {
+{{ structural_initializer }}
+}
+
+final class ProjectionTests: XCTestCase {
+#if canImport(ObjectiveC)
+    @objc
+#endif
+    func testConfiguredTextProjection() throws {
+{% for row in rows %}
+        do {
+            let expected = {{ row.literal }}
+            let native = RustBridge.PacketRef(value: {% if loop.first %}CommandLine.arguments.contains("wrong-text") ? "changed" : {% endif %}expected, absent: false)
+            let packet = try Packet(native)
+            XCTAssertEqual(packet.required.text(), expected)
+            XCTAssertEqual(packet.nullable?.text(), expected)
+            XCTAssertEqual(packet.legacy?.text(), expected)
+            do {
+                let result = native
+{{ row.opaque }}
+            }
+            do {
+                let result = packet
+{{ row.property }}
+            }
+            let json = String(data: try JSONEncoder().encode(BodyValue.plainValue(field0: expected)), encoding: .utf8)!
+            let structuralNative = RustBridge.StructuralPacketRef(value: json, absent: false)
+            let structural = try StructuralPacket(structuralNative)
+            do {
+                let result = structuralNative
+{{ row.structural }}
+            }
+            XCTAssertEqual(structural.required.text(), expected)
+            XCTAssertEqual(structural.nullable?.text(), expected)
+            XCTAssertEqual(structural.legacy?.text(), expected)
+        }
+{% endfor %}
+        do {
+            let native = RustBridge.PacketRef(value: "", absent: true)
+            let packet = try Packet(native)
+            XCTAssertNil(packet.nullable)
+            XCTAssertNil(packet.legacy)
+            do {
+                let result = native
+{{ nil_opaque }}
+            }
+            do {
+                let result = packet
+{{ nil_property }}
+            }
+            let structural = try StructuralPacket(RustBridge.StructuralPacketRef(value: "\"\"", absent: true))
+            XCTAssertNil(structural.nullable)
+            XCTAssertNil(structural.legacy)
+            do {
+                let result = RustBridge.StructuralPacketRef(value: "\"\"", absent: true)
+{{ nil_structural }}
+            }
+        }
+        do {
+            let structural = try StructuralPacket(RustBridge.StructuralPacketRef(value: "7", absent: false))
+            XCTAssertEqual(structural.required, .count(field0: 7))
+            XCTAssertEqual(structural.nullable, .count(field0: 7))
+            XCTAssertEqual(structural.legacy, .count(field0: 7))
+        }
+        do {
+            let rb = RustBridge.PacketRef(value: "ordinary text", absent: false)
+            XCTAssertThrowsError(try JSONDecoder().decode(BodyValue.self, from: ((rb.required().toString()).data(using: .utf8) ?? Data("null".utf8)))) { error in
+                XCTAssertTrue(error is DecodingError)
+            }
+        }
+    }
+}
+
+print("swift_text_projection_checks=90")
+#if canImport(ObjectiveC)
+let suite = ProjectionTests.defaultTestSuite
+suite.run()
+guard let result = suite.testRun, result.executionCount == 1 else {
+    fatalError("Expected exactly one executed native test")
+}
+exit(result.hasSucceeded ? 0 : 1)
+#else
+XCTMain([testCase([("testConfiguredTextProjection", ProjectionTests.testConfiguredTextProjection)])], arguments: [CommandLine.arguments[0]])
+#endif

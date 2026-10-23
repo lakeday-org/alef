@@ -467,6 +467,7 @@ fn emit_lib_rs(
             &no_serde_names,
             &first_class_names,
             enum_kinds,
+            &config.untagged_union_text_types.iter().map(String::as_str).collect(),
             configured_features,
         );
         extern_blocks.push(format!("{cfg_open}{raw_block}"));

@@ -1,3 +1,5 @@
+pub(super) mod ffi_initializer;
+
 use crate::backends::swift::gen_bindings::zero_arg_default::zero_arg_named_default;
 use crate::backends::swift::gen_rust_crate::default_construction::EnumKinds;
 use crate::backends::swift::naming::{swift_rust_shim_ident as swift_ident, swift_source_ident as swift_case_ident};
@@ -218,6 +220,7 @@ pub(super) fn emit_first_class_struct(
     serde_struct_names: &HashSet<String>,
     error_type_name: &str,
     configured_features: &std::collections::HashSet<&str>,
+    text_variants: &ffi_initializer::TextVariants,
     out: &mut String,
 ) -> anyhow::Result<()> {
     let type_name = &ty.name;
@@ -298,113 +301,17 @@ pub(super) fn emit_first_class_struct(
         );
     }
 
-    let mut ffi_init_assignments = String::new();
-    for field in &visible_fields {
-        let swift_field = swift_case_ident(&field.name.to_lower_camel_case());
-        let rust_accessor = swift_ident(&field.name.to_lower_camel_case());
-        let is_optional = field.optional || matches!(&field.ty, TypeRef::Optional(_));
-
-        let expr = if is_field_unbridgeable_for_init(ty, field, exclude_fields, known_dto_names) {
-            if is_optional {
-                "nil".to_string()
-            } else {
-                let swift_ty = mapper.map_type(&field.ty);
-                format!("try JSONDecoder().decode({swift_ty}.self, from: Data(\"null\".utf8))")
-            }
-        } else if field.optional && matches!(field.ty, TypeRef::Vec(_)) {
-            let swift_ty = mapper.map_type(&field.ty);
-            let accessor_with_chain = format!("rb.{rust_accessor}().toString()");
-            format!(
-                "try JSONDecoder().decode({swift_ty}?.self, from: \
-                 (({accessor_with_chain}).data(using: .utf8) ?? Data(\"null\".utf8)))"
-            )
-        } else if is_vec_of_serde_struct(&field.ty, serde_struct_names) {
-            let swift_ty = mapper.map_type(&field.ty);
-            let swift_ty_with_opt = if is_optional && !matches!(&field.ty, TypeRef::Optional(_)) {
-                format!("{swift_ty}?")
-            } else {
-                swift_ty
-            };
-
-            let field_is_optional = is_optional || matches!(&field.ty, TypeRef::Optional(_));
-            let inner_vec_named: Option<&str> = match &field.ty {
-                TypeRef::Vec(inner) => match inner.as_ref() {
-                    TypeRef::Named(name) => Some(name.as_str()),
-                    _ => None,
-                },
-                TypeRef::Optional(opt_inner) => match opt_inner.as_ref() {
-                    TypeRef::Vec(inner) => match inner.as_ref() {
-                        TypeRef::Named(name) => Some(name.as_str()),
-                        _ => None,
-                    },
-                    _ => None,
-                },
-                _ => None,
-            };
-
-            if field_is_optional {
-                let accessor_with_chain = format!("rb.{rust_accessor}().toString()");
-                format!(
-                    "try JSONDecoder().decode({swift_ty_with_opt}.self, from: \
-                     (({accessor_with_chain}).data(using: .utf8) ?? Data(\"null\".utf8)))"
-                )
-            } else if let Some(inner_struct_name) = inner_vec_named {
-                format!(
-                    "try rb.{rust_accessor}().map {{ (s: RustStringRef) -> {inner_struct_name} in \
-                     let d = s.as_str().toString().data(using: .utf8) ?? Data(); \
-                     return try JSONDecoder().decode({inner_struct_name}.self, from: d) }}"
-                )
-            } else {
-                format!("rb.{rust_accessor}()")
-            }
-        } else if is_untagged_enum_type(&field.ty, untagged_enum_names) {
-            // Untagged-enum field (`#[serde(untagged)]`): the swift-bridge accessor returns a
-            let swift_ty = mapper.map_type(&field.ty);
-            let swift_ty_with_opt = if is_optional && !matches!(&field.ty, TypeRef::Optional(_)) {
-                format!("{swift_ty}?")
-            } else {
-                swift_ty
-            };
-            let accessor_with_chain = if is_optional {
-                format!("rb.{rust_accessor}()?.toString() ?? \"null\"")
-            } else {
-                format!("rb.{rust_accessor}().toString()")
-            };
-            format!(
-                "try JSONDecoder().decode({swift_ty_with_opt}.self, from: \
-                 (({accessor_with_chain}).data(using: .utf8) ?? Data(\"null\".utf8)))"
-            )
-        } else if needs_json_bridge_for_swift(&field.ty) {
-            let swift_ty = swift_field_type(mapper, &field.ty);
-            let swift_ty_with_opt = if is_optional && !matches!(&field.ty, TypeRef::Optional(_)) {
-                format!("{swift_ty}?")
-            } else {
-                swift_ty
-            };
-            let accessor_with_chain = format!("rb.{rust_accessor}().toString()");
-            format!(
-                "try JSONDecoder().decode({swift_ty_with_opt}.self, from: \
-                 (({accessor_with_chain}).data(using: .utf8) ?? Data(\"null\".utf8)))"
-            )
-        } else {
-            swift_ffi_read_expr(
-                &field.ty,
-                is_optional,
-                &rust_accessor,
-                known_dto_names,
-                unit_enum_names,
-                untagged_enum_names,
-                error_type_name,
-            )
-        };
-        ffi_init_assignments.push_str(&crate::backends::swift::template_env::render(
-            "swift_self_assignment.swift.jinja",
-            crate::alef_context! {
-                field => swift_field,
-                expr => expr,
-            },
-        ));
-    }
+    let ffi_init_assignments = ffi_initializer::assignments(ffi_initializer::Initializer {
+        ty,
+        mapper,
+        exclude_fields,
+        known_dto_names,
+        unit_enum_names,
+        untagged_enum_names,
+        serde_struct_names,
+        error_type_name,
+        text_variants,
+    });
 
     // when the swift-bridge `#[swift_bridge(init)] fn new(...)` extern is emitted for
     let mut into_rust_body = String::new();

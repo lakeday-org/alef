@@ -1,3 +1,5 @@
+mod string_expression;
+
 use crate::e2e::codegen::assertion_type_skip::{
     streaming_assertion_type_skip_line, streaming_assertion_value_skip_line,
 };
@@ -214,10 +216,7 @@ pub(super) fn render_assertion(
     // Such fields are emitted as Swift enums (not `String`) and expose a `.text()` method
     // that concatenates the plain-text representation. The assertion must call `.text()` to
     // compare against the fixture's expected string, mirroring the Kotlin/Go/Java backends.
-    let field_is_display_as_text = assertion
-        .field
-        .as_deref()
-        .is_some_and(|f| field_resolver.is_display_as_text(f));
+    let field_is_display_as_text = string_expression::is_display_text(field_resolver, assertion.field.as_deref());
 
     // A payload-carrying union is the union shape `gen_bindings::enums::emit_enum` renders with
     // associated values instead of a `: String` raw-value enum. It has no `.rawValue`, and every
@@ -366,89 +365,21 @@ pub(super) fn render_assertion(
     // We add .toString() here so string assertions (contains, hasPrefix, etc.) work.
     // Non-string opaque fields (DocumentStructure, etc.) should not appear in string
     // assertions — the fixture schema controls which assertions apply to which fields.
-    let string_expr = if field_is_display_as_text {
-        // Display-as-text content union (e.g. `AssistantContent`): the leaf is a Swift
-        // enum exposing `.text()` returning a non-optional `String`. For optional content
-        // (`AssistantContent?`) or an optional ancestor chain, unwrap with `?.text()` and
-        // coalesce to "" so XCTAssert receives a concrete Swift `String`.
-        if !leaf_is_property_access
-            && let Some(enum_name) = assertion
-                .field
-                .as_deref()
-                .and_then(|field| field_resolver.ir_enum_type_name(field))
-        {
-            // ~keep Opaque enum getters serialize JSON; quoted empty text must not satisfy not_empty.
-            let json = if leaf_getter_is_optional || accessor_is_optional {
-                format!("({field_expr}?.toString() ?? \"null\")")
-            } else {
-                format!("{field_expr}.toString()")
-            };
-            let enum_name = crate::backends::swift::naming::swift_source_ident(&enum_name);
-            format!(
-                "((try JSONDecoder().decode({module_name}.{enum_name}?.self, from: Data({json}.utf8)))?.text() ?? \"\")"
-            )
-        } else if field_is_optional || accessor_is_optional {
-            format!("({field_expr}?.text() ?? \"\")")
-        } else {
-            format!("{field_expr}.text()")
-        }
-    } else if is_map_subscript {
-        // The field_expr already evaluates to `String?` (from a JSON-decoded
-        // `[String: String]` subscript). No `.toString()` chain needed —
-        // coalesce the optional to "" and use the Swift String directly.
-        format!("({field_expr} ?? \"\")")
-    } else if leaf_is_property_access {
-        // First-class Codable struct field access: leaf is already a Swift
-        // `String` (or `String?`/enum type) — never a `RustString` requiring
-        // `.toString()`. For optional leaves, coalesce to "" so XCTAssert
-        // receives a non-optional Swift `String`.
-        if field_is_enum && (field_is_optional || accessor_is_optional) {
-            // Optional first-class Codable enum (e.g. `FinishReason?` where
-            // `FinishReason: String, Codable`). `.rawValue` gives the serde
-            // wire value (e.g. "tool_calls") so assertions match fixture JSON.
-            format!("(({field_expr})?.rawValue ?? \"\")")
-        } else if field_is_enum {
-            format!("{field_expr}.rawValue")
-        } else if field_is_optional || accessor_is_optional || bare_result_is_simple_option {
-            format!("({field_expr} ?? \"\")")
-        } else {
-            field_expr.to_string()
-        }
-    } else if field_is_enum && leaf_getter_is_optional {
-        format!("({field_expr}?.toString() ?? \"\")")
-    } else if field_is_enum && accessor_is_optional {
-        // Enum-typed leaf reached through an ancestor optional chain. The chain's `?`
-        // already propagated, so `field_expr` is `Optional<RustString>` even though
-        // the leaf accessor itself is non-Optional. Use `.toString()` (no extra `?`)
-        // to avoid Swift's "cannot use optional chaining on non-optional value" error.
-        format!("({field_expr}.toString() ?? \"\")")
-    } else if field_is_enum && field_is_optional {
-        // Enum-typed field that is itself Optional<RustString> (e.g. `finish_reason()`
-        // returning `Optional<RustString>` at the binding surface) — unwrap with `?`.
-        format!("({field_expr}?.toString() ?? \"\")")
-    } else if field_is_enum {
-        // Enum-typed fields are now bridged as `String` (RustString in Swift) rather than
-        // as opaque enum handles. The getter on the Rust side calls `to_string()` internally
-        // and returns a `String` across the FFI. In Swift this arrives as `RustString`, so
-        // `.toString()` converts it to a Swift `String` — one call, not two.
-        format!("{field_expr}.toString()")
-    } else if leaf_getter_is_optional {
-        format!("({field_expr}?.toString() ?? \"\")")
-    } else if accessor_is_optional {
-        // Ancestor optional chain already propagated `?` (e.g. `result.summary()?.strategy()`),
-        // so the whole `field_expr` is Optional<RustString> regardless of whether the leaf
-        // field itself is also marked optional. Adding another `?` before `.toString()` here
-        // would emit `result.summary()?.strategy()?.toString()` which Swift rejects:
-        // "cannot use optional chaining on non-optional value of type 'RustString'".
-        // The earlier `?` from the accessor's chain already unwraps; use `.toString()` here.
-        format!("({field_expr}.toString() ?? \"\")")
-    } else if field_is_optional {
-        // Leaf field itself is Optional<RustString> with no ancestor chain — need
-        // ?.toString() to unwrap before stringifying.
-        format!("({field_expr}?.toString() ?? \"\")")
-    } else {
-        format!("{field_expr}.toString()")
-    };
+    let string_expr = string_expression::StringExpression {
+        field_expr: &field_expr,
+        field: assertion.field.as_deref(),
+        field_resolver,
+        module_name,
+        field_is_display_as_text,
+        field_is_optional,
+        leaf_is_property_access,
+        leaf_getter_is_optional,
+        accessor_is_optional,
+        is_map_subscript,
+        bare_result_is_simple_option,
+        field_is_enum,
+    }
+    .render();
 
     match assertion.assertion_type.as_str() {
         "equals" => {
