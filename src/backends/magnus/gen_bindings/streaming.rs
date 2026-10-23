@@ -160,50 +160,22 @@ impl {iter_name} {{
 
 /// Generate the streaming method on the owning opaque type. Returns the method
 /// fragment to be appended inside the type's `impl` block.
-pub(super) fn gen_streaming_method_body(adapter: &StreamingAdapter<'_>) -> String {
+pub(super) fn gen_streaming_method_body(adapter: &StreamingAdapter<'_>) -> anyhow::Result<String> {
     let method_name = adapter.name;
     let core_method = adapter.core_path;
     let iter_name = &adapter.iterator_struct_name;
     let request_binding = adapter.request_binding_type;
     let request_core = adapter.request_core_path;
 
-    format!(
-        r#"    /// Streaming variant of `{method_name}`. Drives the Rust core stream
-    /// natively, yielding each chunk to the caller's block. When called
-    /// without a block, returns a `{iter_name}` (Enumerable via its `each`).
-    fn {method_name}(&self, req: {request_binding}) -> Result<magnus::Value, Error> {{
-        use magnus::IntoValue;
-        use magnus::value::ReprValue;
-        let inner = self.inner.clone();
-        let core_req: {request_core} = req.into();
-        // 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep extraction
-        // future (a nested archive member, a multi-stage OCR pipeline), and a stack overflow
-        // aborts the process with SIGBUS instead of raising a catchable panic.
-        const STREAM_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;
-        let runtime = std::sync::Arc::new(tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .thread_stack_size(STREAM_RUNTIME_STACK_SIZE_BYTES)
-            .build()
-            .map_err(|e| {{
-                magnus::Error::new(unsafe {{ Ruby::get_unchecked() }}.exception_runtime_error(), e.to_string())
-            }})?);
-        let stream = runtime.block_on(async {{ inner.{core_method}(core_req).await }})
-            .map_err(alef_magnus_err)?;
-        let iterator = {iter_name} {{
-            inner: Arc::new(tokio::sync::Mutex::new(Some(stream))),
-            runtime,
-        }};
-        let ruby = unsafe {{ Ruby::get_unchecked() }};
-        if ruby.block_given() {{
-            // Drive the stream synchronously, yielding each chunk to the block.
-            iterator.each()?;
-            Ok(ruby.qnil().as_value())
-        }} else {{
-            Ok(iterator.into_value_with(&ruby))
-        }}
-    }}
-"#
-    )
+    let core_call = crate::adapters::rust_callable::receiver_call(core_method, "inner", "&inner", "core_req")?;
+    Ok(crate::backends::magnus::template_env::render(
+        "streaming_method_body.rs.jinja",
+        crate::alef_context! {
+            core_call => core_call, iter_name => iter_name,
+            method_name => method_name, request_binding => request_binding,
+            request_core => request_core,
+        },
+    ))
 }
 
 /// Generate the Ruby `define_class` + `define_method` registration lines for the
@@ -343,3 +315,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod callable_tests;

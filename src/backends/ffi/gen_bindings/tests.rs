@@ -21,3 +21,5 @@ mod result_presence;
 mod security;
 mod stream_error_messages;
 mod visitor;
+
+mod streaming_callable_tests;

@@ -9,17 +9,17 @@ pub fn generate_body(
     config: &ResolvedCrateConfig,
 ) -> anyhow::Result<String> {
     let body = match language {
-        Language::Python => gen_python_body(adapter, config),
-        Language::Node => gen_node_body(adapter, config),
-        Language::Ruby => gen_ruby_body(adapter, config),
-        Language::Php => gen_php_body(adapter, config),
-        Language::Elixir => gen_elixir_body(adapter, config),
-        Language::Wasm => gen_wasm_body(adapter, config),
-        Language::Ffi => gen_ffi_body(adapter, config),
+        Language::Python => gen_python_body(adapter, config)?,
+        Language::Node => gen_node_body(adapter, config)?,
+        Language::Ruby => gen_ruby_body(adapter, config)?,
+        Language::Php => gen_php_body(adapter, config)?,
+        Language::Elixir => gen_elixir_body(adapter, config)?,
+        Language::Wasm => gen_wasm_body(adapter, config)?,
+        Language::Ffi => gen_ffi_body(adapter, config)?,
         Language::Go => gen_go_body(adapter, config),
         Language::Java => gen_java_body(adapter, config),
         Language::Csharp => gen_csharp_body(adapter, config),
-        Language::R => gen_r_body(adapter, config),
+        Language::R => gen_r_body(adapter, config)?,
         Language::Rust | Language::C | Language::Jni => {
             anyhow::bail!("Rust/C/JNI do not need generated binding adapters")
         }
@@ -148,20 +148,13 @@ fn core_call_args(adapter: &AdapterConfig) -> Vec<String> {
         .collect()
 }
 
-fn gen_python_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
-    let core_path = &adapter.core_path;
+fn gen_python_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     let raw_returns = adapter.returns.as_deref().unwrap_or("()");
     let core_import = config.core_import_name();
 
     let let_bindings = core_let_bindings(adapter, &core_import);
     let core_args = core_call_args(adapter);
-    let core_call_str = core_args.join(", ");
-
-    let bindings_block = if let_bindings.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n    ", let_bindings.join("\n    "))
-    };
+    let core_call = super::rust_callable::receiver_call(&adapter.core_path, "inner", "&inner", &core_args.join(", "))?;
 
     let ok_expr = if raw_returns == "bytes::Bytes" {
         "Ok(result.to_vec())".to_string()
@@ -177,19 +170,18 @@ fn gen_python_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> Str
         ".map_err(|e| PyErr::new::<PyRuntimeError, _>(e.to_string()))".to_string()
     };
 
-    format!(
-        "let inner = self.inner.clone();\n    \
-         {bindings_block}\
-         pyo3_async_runtimes::tokio::future_into_py(py, async move {{\n        \
-             let result = inner.{core_path}({core_call_str}).await\n            \
-                 {err_mapper}?;\n        \
-             {ok_expr}\n    \
-         }})"
+    Ok(crate::codegen::template_env::render(
+        "adapters/async_python_body.rs.jinja",
+        crate::alef_context! {
+            let_bindings => let_bindings, core_call => core_call,
+            err_mapper => err_mapper, ok_expr => ok_expr,
+        },
     )
+    .trim_end()
+    .to_owned())
 }
 
-fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
-    let core_path = &adapter.core_path;
+fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     let prefix = config.node_type_prefix();
     let raw_returns = adapter.returns.as_deref().unwrap_or("()");
 
@@ -205,24 +197,27 @@ fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> Strin
     let args = call_args(adapter);
 
     if args.is_empty() {
-        format!(
-            "self.inner.{core_path}().await\n        \
-             {map_expr}\n        \
-             .map_err(alef_napi_err)"
+        let core_call = super::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", "")?;
+        Ok(crate::codegen::template_env::render(
+            "adapters/async_node_empty.rs.jinja",
+            crate::alef_context! { core_call => core_call, map_expr => map_expr },
         )
+        .trim_end()
+        .to_owned())
     } else {
+        let core_call =
+            super::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", "core_req")?;
         let call_str = args.join(", ");
-        format!(
-            "let core_req = {call_str};\n    \
-             self.inner.{core_path}(core_req).await\n        \
-             {map_expr}\n        \
-             .map_err(alef_napi_err)"
+        Ok(crate::codegen::template_env::render(
+            "adapters/async_node_request.rs.jinja",
+            crate::alef_context! { call_str => call_str, core_call => core_call, map_expr => map_expr },
         )
+        .trim_end()
+        .to_owned())
     }
 }
 
-fn gen_ruby_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> String {
-    let core_path = &adapter.core_path;
+fn gen_ruby_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     let raw_returns = adapter.returns.as_deref().unwrap_or("()");
 
     let map_expr = if raw_returns == "bytes::Bytes" {
@@ -234,52 +229,33 @@ fn gen_ruby_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> Stri
     let args = call_args(adapter);
 
     if args.is_empty() {
-        format!(
-            "// 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep\n    \
-             // extraction future (a nested archive member, a multi-stage OCR pipeline), and a\n    \
-             // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.\n    \
-             const ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;\n    \
-             let rt = tokio::runtime::Builder::new_multi_thread()\n        \
-                 .enable_all()\n        \
-                 .thread_stack_size(ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES)\n        \
-                 .build()\n        \
-                 .map_err(alef_magnus_err)?;\n    \
-             rt.block_on(async {{ self.inner.{core_path}().await }})\n        \
-             {map_expr}\n        \
-             .map_err(alef_magnus_err)"
+        let core_call = super::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", "")?;
+        Ok(crate::codegen::template_env::render(
+            "adapters/async_ruby_empty.rs.jinja",
+            crate::alef_context! { core_call => core_call, map_expr => map_expr },
         )
+        .trim_end()
+        .to_owned())
     } else {
+        let core_call =
+            super::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", "core_req")?;
         let call_str = args.join(", ");
-        format!(
-            "// 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep\n    \
-             // extraction future (a nested archive member, a multi-stage OCR pipeline), and a\n    \
-             // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.\n    \
-             const ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;\n    \
-             let rt = tokio::runtime::Builder::new_multi_thread()\n        \
-                 .enable_all()\n        \
-                 .thread_stack_size(ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES)\n        \
-                 .build()\n        \
-                 .map_err(alef_magnus_err)?;\n    \
-             let core_req = {call_str};\n    \
-             rt.block_on(async {{ self.inner.{core_path}(core_req).await }})\n        \
-             {map_expr}\n        \
-             .map_err(alef_magnus_err)"
+        Ok(crate::codegen::template_env::render(
+            "adapters/async_ruby_request.rs.jinja",
+            crate::alef_context! { call_str => call_str, core_call => core_call, map_expr => map_expr },
         )
+        .trim_end()
+        .to_owned())
     }
 }
 
-fn gen_php_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> String {
-    let core_path = &adapter.core_path;
+fn gen_php_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     let raw_returns = adapter.returns.as_deref().unwrap_or("()");
 
     let args = call_args_cloned(adapter);
 
-    let inner_call = if args.is_empty() {
-        format!("self.inner.{core_path}().await")
-    } else {
-        let call_str = args.join(", ");
-        format!("self.inner.{core_path}({call_str}).await")
-    };
+    let inner_call =
+        super::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", &args.join(", "))?;
 
     let map_expr = if raw_returns == "bytes::Bytes" {
         ".map(|b| b.to_vec())".to_string()
@@ -287,17 +263,15 @@ fn gen_php_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> Strin
         format!(".map({raw_returns}::from)")
     };
 
-    format!(
-        "WORKER_RUNTIME.block_on(async {{\n        \
-             {inner_call}\n    \
-         }})\n    \
-         {map_expr}\n    \
-         .map_err(alef_php_err)"
+    Ok(crate::codegen::template_env::render(
+        "adapters/async_php_body.rs.jinja",
+        crate::alef_context! { inner_call => inner_call, map_expr => map_expr },
     )
+    .trim_end()
+    .to_owned())
 }
 
-fn gen_elixir_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> String {
-    let core_path = &adapter.core_path;
+fn gen_elixir_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     let raw_returns = adapter.returns.as_deref().unwrap_or("()");
 
     let map_expr = if raw_returns == "bytes::Bytes" {
@@ -307,30 +281,26 @@ fn gen_elixir_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> St
     };
 
     let args = call_args(adapter);
-    let call_str = args.join(", ");
+    let core_call = super::rust_callable::receiver_call(
+        &adapter.core_path,
+        "resource.inner",
+        "&resource.inner",
+        &args.join(", "),
+    )?;
 
-    format!(
-        "// 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep\n    \
-         // extraction future (a nested archive member, a multi-stage OCR pipeline), and a\n    \
-         // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.\n    \
-         const ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;\n    \
-         let rt = tokio::runtime::Builder::new_multi_thread()\n        \
-             .enable_all()\n        \
-             .thread_stack_size(ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES)\n        \
-             .build()\n        \
-             .map_err(|e| e.to_string())?;\n    \
-         rt.block_on(async {{ resource.inner.{core_path}({call_str}).await }})\n        \
-         {map_expr}\n        \
-         .map_err(|e| e.to_string())"
+    Ok(crate::codegen::template_env::render(
+        "adapters/async_elixir_body.rs.jinja",
+        crate::alef_context! { core_call => core_call, map_expr => map_expr },
     )
+    .trim_end()
+    .to_owned())
 }
 
-fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
+fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     crate::backends::wasm::gen_bindings::adapters::generate_body(adapter, config)
 }
 
-fn gen_ffi_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
-    let core_path = &adapter.core_path;
+fn gen_ffi_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     let prefix = config.ffi_prefix();
     let owner_type = adapter.owner_type.as_deref().unwrap_or("Self");
     let owner_snake = to_snake_case(owner_type);
@@ -342,69 +312,37 @@ fn gen_ffi_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String
         .iter()
         .map(|p| {
             if p.ty == "String" || p.ty == "&str" {
-                format!(
-                    "let {name} = unsafe {{ std::ffi::CStr::from_ptr({name}) }}\n        \
-                     .to_str()\n        \
-                     .unwrap_or_default()\n        \
-                     .to_owned();",
-                    name = p.name,
+                crate::codegen::template_env::render(
+                    "adapters/async_ffi_string_parameter.rs.jinja",
+                    crate::alef_context! { name => p.name },
                 )
+                .trim_end()
+                .to_owned()
             } else {
-                format!(
-                    "let {name}_str = unsafe {{ std::ffi::CStr::from_ptr({name}_json) }}\n        \
-                     .to_str()\n        \
-                     .unwrap_or_default();\n    \
-                     let {name}: {ty} = match serde_json::from_str({name}_str) {{\n        \
-                         Ok(v) => v,\n        \
-                         Err(e) => {{\n            \
-                             update_last_error(e);\n            \
-                             return std::ptr::null_mut();\n        \
-                         }}\n    \
-                     }};",
-                    name = p.name,
-                    ty = p.ty,
+                crate::codegen::template_env::render(
+                    "adapters/async_ffi_json_parameter.rs.jinja",
+                    crate::alef_context! { name => p.name, ty => p.ty },
                 )
+                .trim_end()
+                .to_owned()
             }
         })
         .collect();
 
     let call_args_list: Vec<String> = adapter.params.iter().map(|p| p.name.clone()).collect();
-    let call_str = call_args_list.join(", ");
-    let conversion_block = if conversions.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n    ", conversions.join("\n    "))
-    };
+    let core_call = super::rust_callable::receiver_call(
+        &adapter.core_path,
+        "client.inner",
+        "&client.inner",
+        &call_args_list.join(", "),
+    )?;
 
-    format!(
-        "let client = unsafe {{ &*client }};\n    \
-         {conversion_block}\
-         // 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep\n    \
-         // extraction future (a nested archive member, a multi-stage OCR pipeline), and a\n    \
-         // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.\n    \
-         const ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;\n    \
-         let rt = match tokio::runtime::Builder::new_multi_thread()\n        \
-             .enable_all()\n        \
-             .thread_stack_size(ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES)\n        \
-             .build()\n    \
-         {{\n        \
-             Ok(rt) => rt,\n        \
-             Err(e) => {{\n            \
-                 update_last_error(e);\n            \
-                 return std::ptr::null_mut();\n        \
-             }}\n    \
-         }};\n    \
-         match rt.block_on(async {{ client.inner.{core_path}({call_str}).await }}) {{\n        \
-             Ok(result) => {{\n            \
-                 let json = serde_json::to_string(&result).unwrap_or_default();\n            \
-                 std::ffi::CString::new(json).unwrap_or_default().into_raw()\n        \
-             }}\n        \
-             Err(e) => {{\n            \
-                 update_last_error(e);\n            \
-                 std::ptr::null_mut()\n        \
-             }}\n    \
-         }}"
+    Ok(crate::codegen::template_env::render(
+        "adapters/async_ffi_body.rs.jinja",
+        crate::alef_context! { conversions => conversions, core_call => core_call },
     )
+    .trim_end()
+    .to_owned())
 }
 
 fn gen_go_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
@@ -523,8 +461,7 @@ fn gen_csharp_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> Str
     )
 }
 
-fn gen_r_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> String {
-    let core_path = &adapter.core_path;
+fn gen_r_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     let raw_returns = adapter.returns.as_deref().unwrap_or("Robj");
 
     let map_expr = if raw_returns == "bytes::Bytes" {
@@ -534,22 +471,15 @@ fn gen_r_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> String 
     };
 
     let args = call_args(adapter);
-    let call_str = args.join(", ");
+    let core_call =
+        super::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", &args.join(", "))?;
 
-    format!(
-        "// 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep\n    \
-         // extraction future (a nested archive member, a multi-stage OCR pipeline), and a\n    \
-         // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.\n    \
-         const ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;\n    \
-         let rt = tokio::runtime::Builder::new_multi_thread()\n        \
-             .enable_all()\n        \
-             .thread_stack_size(ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES)\n        \
-             .build()\n        \
-             .map_err(|e| extendr_api::Error::Other(e.to_string()))?;\n    \
-         rt.block_on(async {{ self.inner.{core_path}({call_str}).await }})\n        \
-         {map_expr}\n        \
-         .map_err(|e| extendr_api::Error::Other(e.to_string()))"
+    Ok(crate::codegen::template_env::render(
+        "adapters/async_r_body.rs.jinja",
+        crate::alef_context! { core_call => core_call, map_expr => map_expr },
     )
+    .trim_end()
+    .to_owned())
 }
 
 fn to_snake_case(s: &str) -> String {
@@ -566,3 +496,8 @@ fn to_snake_case(s: &str) -> String {
     }
     result
 }
+
+#[cfg(test)]
+pub(crate) mod callable_test_support;
+#[cfg(test)]
+pub(crate) mod callable_tests;

@@ -1,6 +1,10 @@
 use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
+    (
+        "stream_handle_functions.rs.jinja",
+        include_str!("templates/stream_handle_functions.rs.jinja"),
+    ),
     ("cbindgen_toml.jinja", include_str!("templates/cbindgen_toml.jinja")),
     ("build_rs.jinja", include_str!("templates/build_rs.jinja")),
     ("last_error.jinja", include_str!("templates/last_error.jinja")),

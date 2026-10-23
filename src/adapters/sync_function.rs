@@ -12,7 +12,7 @@ pub fn generate_body(
         Language::Ruby => gen_ruby_body(adapter, config),
         Language::Php => gen_php_body(adapter, config),
         Language::Elixir => gen_elixir_body(adapter, config),
-        Language::Wasm => gen_wasm_body(adapter, config),
+        Language::Wasm => gen_wasm_body(adapter, config)?,
         Language::Ffi => gen_ffi_body(adapter, config),
         Language::Go => gen_go_body(adapter, config),
         Language::Java => gen_java_body(adapter, config),
@@ -129,7 +129,7 @@ fn gen_elixir_body(adapter: &AdapterConfig, _config: &ResolvedCrateConfig) -> St
     )
 }
 
-fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
+fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     crate::backends::wasm::gen_bindings::adapters::generate_body(adapter, config)
 }
 

@@ -1,0 +1,10 @@
+let {{ name }}_str = unsafe { std::ffi::CStr::from_ptr({{ name }}_json) }
+        .to_str()
+        .unwrap_or_default();
+    let {{ name }}: {{ ty }} = match serde_json::from_str({{ name }}_str) {
+        Ok(v) => v,
+        Err(e) => {
+            update_last_error(e);
+            return std::ptr::null_mut();
+        }
+    };

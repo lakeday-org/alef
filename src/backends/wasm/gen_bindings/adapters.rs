@@ -3,7 +3,7 @@ use crate::codegen::type_mapper::TypeMapper;
 use crate::core::config::{AdapterConfig, AdapterPattern, Language, ResolvedCrateConfig};
 use crate::core::ir::TypeRef;
 
-pub(crate) fn generate_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> String {
+pub(crate) fn generate_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<String> {
     let overrides = config
         .wasm
         .as_ref()
@@ -29,12 +29,12 @@ pub(super) fn build_bodies(
             Some(owner) => format!("{owner}.{}", adapter.name),
             None => adapter.name.clone(),
         };
-        bodies.insert(key, body_with_mapper(adapter, mapper));
+        bodies.insert(key, body_with_mapper(adapter, mapper)?);
     }
     Ok(bodies)
 }
 
-fn body_with_mapper(adapter: &AdapterConfig, mapper: &WasmMapper) -> String {
+fn body_with_mapper(adapter: &AdapterConfig, mapper: &WasmMapper) -> anyhow::Result<String> {
     let raw = adapter.returns.as_deref().unwrap_or("JsValue");
     let map_function = if raw == "bytes::Bytes" {
         Some("|result| result.to_vec()".to_string())
@@ -46,18 +46,24 @@ fn body_with_mapper(adapter: &AdapterConfig, mapper: &WasmMapper) -> String {
             .unwrap_or_else(|_| TypeRef::Named(raw.to_string()));
         (convert_return("value", &ty, mapper) != "value").then(|| conversion_function(&ty, mapper))
     };
-    crate::backends::wasm::template_env::render(
+    let arguments = match adapter.pattern {
+        AdapterPattern::AsyncMethod => crate::adapters::async_method::call_args(adapter),
+        _ => crate::adapters::sync_function::call_args(adapter),
+    }
+    .join(", ");
+    let core_call = if matches!(adapter.pattern, AdapterPattern::AsyncMethod) {
+        crate::adapters::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", &arguments)?
+    } else {
+        format!("{}({arguments})", adapter.core_path)
+    };
+    Ok(crate::backends::wasm::template_env::render(
         "adapter_result_body",
         crate::alef_context! {
-            core_path => &adapter.core_path,
-            arguments => match adapter.pattern {
-                AdapterPattern::AsyncMethod => crate::adapters::async_method::call_args(adapter),
-                _ => crate::adapters::sync_function::call_args(adapter),
-            }.join(", "),
+            core_call => core_call,
             is_async => matches!(adapter.pattern, AdapterPattern::AsyncMethod),
             map_function => map_function,
         },
-    )
+    ))
 }
 
 fn convert_return(expr: &str, ty: &TypeRef, mapper: &WasmMapper) -> String {

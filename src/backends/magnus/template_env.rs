@@ -2,6 +2,10 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "streaming_method_body.rs.jinja",
+        include_str!("templates/streaming_method_body.rs.jinja"),
+    ),
+    (
         "instance_method.rs.jinja",
         include_str!("templates/instance_method.rs.jinja"),
     ),

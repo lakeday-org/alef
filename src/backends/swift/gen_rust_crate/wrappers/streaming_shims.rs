@@ -35,7 +35,7 @@ use crate::core::keywords::swift_ident;
 pub(crate) fn emit_streaming_adapter_shims(
     adapters: &[crate::core::config::AdapterConfig],
     source_crate: &str,
-) -> String {
+) -> anyhow::Result<String> {
     use crate::core::config::AdapterPattern;
     use heck::{ToPascalCase, ToSnakeCase};
 
@@ -76,17 +76,17 @@ pub(crate) fn emit_streaming_adapter_shims(
             .map(|p| {
                 let name = p.name.to_snake_case();
                 let bound = format!("__alef_{name}");
-                param_bindings.push_str(&format!("    let {bound} = {name}.0.clone();\n"));
+                param_bindings.push_str(&crate::backends::swift::template_env::render(
+                    "rust_stream_param_binding.rs.jinja",
+                    crate::alef_context! { bound => &bound, name => &name },
+                ));
                 bound
             })
             .collect();
         let call_args_str = call_args.join(", ");
 
-        let core_call = if adapter.core_path.contains("::") {
-            format!("{}(&client.0, {call_args_str})", adapter.core_path)
-        } else {
-            format!("client.0.{}({call_args_str})", adapter.core_path)
-        };
+        let core_call =
+            crate::adapters::rust_callable::receiver_call(&adapter.core_path, "client.0", "&client.0", &call_args_str)?;
 
         out.push_str(&crate::backends::swift::template_env::render(
             "rust_stream_handle_struct.rs.jinja",
@@ -121,7 +121,7 @@ pub(crate) fn emit_streaming_adapter_shims(
         ));
     }
 
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -157,7 +157,7 @@ mod tests {
     /// `block_on` calls that park a thread for the stream's whole life.
     #[test]
     fn start_and_next_are_async_and_never_block_a_thread() {
-        let out = emit_streaming_adapter_shims(&[adapter()], "sample_crate");
+        let out = emit_streaming_adapter_shims(&[adapter()], "sample_crate").unwrap();
 
         assert!(
             out.contains("pub async fn client_chat_stream_start(client: &Client, req: &ChatRequest)"),
@@ -185,7 +185,7 @@ mod tests {
     /// the core call receives the owned clone, not the borrow.
     #[test]
     fn start_clones_request_params_before_spawning() {
-        let out = emit_streaming_adapter_shims(&[adapter()], "sample_crate");
+        let out = emit_streaming_adapter_shims(&[adapter()], "sample_crate").unwrap();
 
         assert!(out.contains("let __alef_req = req.0.clone();"), "got:\n{out}");
         assert!(
@@ -195,5 +195,40 @@ mod tests {
         let clone_at = out.find("let __alef_req = req.0.clone();").expect("checked above");
         let spawn_at = out.find(".spawn(async move").expect("start must spawn");
         assert!(clone_at < spawn_at, "the clone must precede the spawn, got:\n{out}");
+    }
+}
+
+#[cfg(test)]
+mod callable_tests {
+    use super::emit_streaming_adapter_shims;
+    use crate::adapters::async_method::{callable_test_support, callable_tests::adapter};
+    use crate::core::config::AdapterPattern;
+
+    #[test]
+    fn streaming_shims_compile_qualified_bare_and_generic_core_calls() {
+        let paths = [
+            ("events", 6),
+            ("Engine::events", 6),
+            ("<Engine as Events>::events", 7),
+            ("helpers::events", 8),
+            ("generic::<u8>", 9),
+            ("r#type", 10),
+        ];
+        let mut calls = Vec::new();
+        for (path, expected) in paths {
+            let config = adapter(AdapterPattern::Streaming, path);
+            let body = emit_streaming_adapter_shims(&[config], "sample").unwrap();
+            let call = callable_test_support::awaited_core_call(&body);
+            calls.push((call, expected));
+        }
+        assert_eq!(calls.len(), 6);
+        callable_test_support::verify_dispatch(&calls, true);
+        let config = adapter(AdapterPattern::Streaming, "events()");
+        assert!(
+            emit_streaming_adapter_shims(&[config], "sample")
+                .unwrap_err()
+                .to_string()
+                .contains("parsing adapter Rust callable")
+        );
     }
 }

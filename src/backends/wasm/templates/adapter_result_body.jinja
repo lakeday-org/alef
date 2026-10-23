@@ -1,4 +1,4 @@
-{% if is_async %}self.inner.{% endif %}{{ core_path }}({{ arguments }}){% if is_async %}.await{% endif %}
+{{ core_call }}{% if is_async %}.await{% endif %}
 {% if map_function %}    .map({{ map_function }})
 {% endif %}
     .map_err(alef_wasm_err)

@@ -2,6 +2,50 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "adapters/async_r_body.rs.jinja",
+        include_str!("templates/adapters/async_r_body.rs.jinja"),
+    ),
+    (
+        "adapters/async_ffi_string_parameter.rs.jinja",
+        include_str!("templates/adapters/async_ffi_string_parameter.rs.jinja"),
+    ),
+    (
+        "adapters/async_ffi_json_parameter.rs.jinja",
+        include_str!("templates/adapters/async_ffi_json_parameter.rs.jinja"),
+    ),
+    (
+        "adapters/async_ffi_body.rs.jinja",
+        include_str!("templates/adapters/async_ffi_body.rs.jinja"),
+    ),
+    (
+        "adapters/async_elixir_body.rs.jinja",
+        include_str!("templates/adapters/async_elixir_body.rs.jinja"),
+    ),
+    (
+        "adapters/async_php_body.rs.jinja",
+        include_str!("templates/adapters/async_php_body.rs.jinja"),
+    ),
+    (
+        "adapters/async_ruby_empty.rs.jinja",
+        include_str!("templates/adapters/async_ruby_empty.rs.jinja"),
+    ),
+    (
+        "adapters/async_ruby_request.rs.jinja",
+        include_str!("templates/adapters/async_ruby_request.rs.jinja"),
+    ),
+    (
+        "adapters/async_node_empty.rs.jinja",
+        include_str!("templates/adapters/async_node_empty.rs.jinja"),
+    ),
+    (
+        "adapters/async_node_request.rs.jinja",
+        include_str!("templates/adapters/async_node_request.rs.jinja"),
+    ),
+    (
+        "adapters/async_python_body.rs.jinja",
+        include_str!("templates/adapters/async_python_body.rs.jinja"),
+    ),
+    (
         "struct_field_wire_probe.rs.jinja",
         include_str!("templates/struct_field_wire_probe.rs.jinja"),
     ),

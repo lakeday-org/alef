@@ -269,7 +269,8 @@ fn generated_stream_next_transition() -> (String, String) {
         "Chunk",
         "sample::Request",
         "sample",
-    );
+    )
+    .unwrap();
     let parsed = syn::parse_file(&generated).expect("parse generated stream implementation");
     let carrier_name = "SmpClientWatchStreamHandleError";
     let carrier: Vec<_> = parsed

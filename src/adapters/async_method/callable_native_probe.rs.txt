@@ -1,0 +1,28 @@
+#![allow(dead_code, unused_variables)]
+use std::future::Future;
+use std::task::{Context, Poll, Waker};
+struct Engine;
+impl Engine {
+    async fn events(&self, value: u32) -> Result<u32, String> { Ok(1 + value) }
+    async fn generic<T>(&self, value: u32) -> Result<u32, String> { Ok(4 + value) }
+    async fn r#type(&self, value: u32) -> Result<u32, String> { Ok(5 + value) }
+}
+trait Events { async fn events(&self, value: u32) -> Result<u32, String>; }
+impl Events for Engine { async fn events(&self, value: u32) -> Result<u32, String> { Ok(2 + value) } }
+mod helpers {
+    pub async fn events(_: &super::Engine, value: u32) -> Result<u32, String> { Ok(3 + value) }
+}
+struct Wrapper { inner: Engine }
+struct TupleClient(Engine);
+impl Wrapper {
+    async fn proof(&self) {
+        __CHECKS__
+    }
+}
+fn main() {
+    let wrapper = Wrapper { inner: Engine };
+    let mut future = std::pin::pin!(wrapper.proof());
+    let waker = Waker::noop();
+    let mut context = Context::from_waker(waker);
+    assert!(matches!(future.as_mut().poll(&mut context), Poll::Ready(())));
+}

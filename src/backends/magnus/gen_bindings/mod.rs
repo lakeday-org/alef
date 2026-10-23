@@ -387,7 +387,7 @@ impl Backend for MagnusBackend {
                 if !owner_streaming.is_empty() {
                     let mut impl_block = format!("impl {} {{\n", typ.name);
                     for adapter in &owner_streaming {
-                        impl_block.push_str(&streaming::gen_streaming_method_body(adapter));
+                        impl_block.push_str(&streaming::gen_streaming_method_body(adapter)?);
                     }
                     impl_block.push_str("}\n");
                     builder.add_item(&prepend_cfg(typ_cfg, impl_block));

@@ -1,0 +1,12 @@
+// 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep
+    // extraction future (a nested archive member, a multi-stage OCR pipeline), and a
+    // stack overflow aborts the process with SIGBUS instead of raising a catchable panic.
+    const ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(ASYNC_METHOD_RUNTIME_STACK_SIZE_BYTES)
+        .build()
+        .map_err(|e| e.to_string())?;
+    rt.block_on(async { {{ core_call }}.await })
+        {{ map_expr }}
+        .map_err(|e| e.to_string())

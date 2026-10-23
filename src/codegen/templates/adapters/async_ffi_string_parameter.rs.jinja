@@ -1,0 +1,4 @@
+let {{ name }} = unsafe { std::ffi::CStr::from_ptr({{ name }}) }
+        .to_str()
+        .unwrap_or_default()
+        .to_owned();

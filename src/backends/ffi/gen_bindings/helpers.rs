@@ -686,14 +686,12 @@ pub(super) fn gen_stream_handle_functions(
     item_type: &str,
     request_type: &str,
     core_import: &str,
-) -> String {
+) -> anyhow::Result<String> {
     use heck::{ToPascalCase, ToSnakeCase};
-
     let pascal_prefix = prefix.to_pascal_case();
     let pascal_owner = owner_type.to_pascal_case();
     let pascal_name = adapter_name.to_pascal_case();
     let owner_snake = owner_type.to_snake_case();
-
     let handle_name = format!("{pascal_prefix}{pascal_owner}{pascal_name}StreamHandle");
     let fn_start = c_consumer::stream_adapter_symbol(prefix, owner_type, adapter_name, "start");
     let fn_next = c_consumer::stream_adapter_symbol(prefix, owner_type, adapter_name, "next");
@@ -714,256 +712,21 @@ pub(super) fn gen_stream_handle_functions(
     let error_capture =
         crate::backends::ffi::template_env::render("stream_error_capture.rs.jinja", crate::alef_context! {});
 
-    format!(
-        r#"{error_carrier}
-/// Opaque handle owning a tokio runtime and a boxed chat-stream for iterator-style consumption.
-///
-/// Created by `{fn_start}`, advanced by `{fn_next}`, destroyed by `{fn_free}`.
-/// The handle is NOT thread-safe — callers must ensure only one thread calls `_next` at a time.
-pub struct {handle_name} {{
-    rt: tokio::runtime::Runtime,
-    stream: std::sync::Mutex<Option<{stream_ty}>>,
-    cancel: Option<std::sync::Arc<AlefCancelState>>,
-}}
-
-/// Start a streaming chat completion and return an opaque iterator handle.
-///
-/// Returns null and sets `{prefix}_last_error_code` on failure (null pointers or stream-open error).
-/// On success the caller owns the returned pointer and MUST call `{fn_free}` when done.
-///
-/// # Safety
-/// `client` must be a non-null valid pointer to a live `{owner_ty}` produced by this library.
-/// `req` must be a non-null valid pointer to a live `{request_type}` produced by this library.
-/// Both pointers must remain valid until this function returns.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn {fn_start}(
-    client: AlefHandle,
-    req: AlefHandle,
-) -> AlefHandle {{
-    catch_ffi_panic(0, || {{
-    clear_last_error();
-    // SAFETY: the caller upholds this function's contract, which `{fn_start}_open` shares.
-    unsafe {{ {fn_start}_open(client, req, None) }}
-    }})
-}}
-
-/// Start a streaming chat completion that a cancel token can abort, and return an opaque iterator handle.
-///
-/// Behaves exactly like `{fn_start}`, and additionally tripping `alef_cancel_token` (created by
-/// `{prefix}_cancel_token_new`, `0` for none) aborts both the stream-open request and any later
-/// blocking `{fn_next}` call on the returned handle: each returns null with last-error code
-/// `Cancelled`. The handle keeps its own reference to the token, so the token may be freed
-/// before the handle is.
-///
-/// # Safety
-/// Same contract as `{fn_start}`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn {fn_start}_cancellable(
-    client: AlefHandle,
-    req: AlefHandle,
-    alef_cancel_token: AlefHandle,
-) -> AlefHandle {{
-    catch_ffi_panic(0, || {{
-    clear_last_error();
-    let cancel = match alef_cancel_state(alef_cancel_token) {{
-        Ok(state) => state,
-        Err(error) => {{ set_handle_error(&error); return 0; }}
-    }};
-    // SAFETY: the caller upholds this function's contract, which `{fn_start}_open` shares.
-    unsafe {{ {fn_start}_open(client, req, cancel) }}
-    }})
-}}
-
-unsafe fn {fn_start}_open(
-    client: AlefHandle,
-    req: AlefHandle,
-    cancel: Option<std::sync::Arc<AlefCancelState>>,
-) -> AlefHandle {{
-
-    let requests = [
-        HandleRequest {{ handle: client, expected_type: std::any::TypeId::of::<{owner_ty}>() }},
-        HandleRequest {{ handle: req, expected_type: std::any::TypeId::of::<{request_type}>() }},
-    ];
-    let values = match acquire_handles(&requests) {{
-        Ok(values) => values,
-        Err(error) => {{ set_handle_error(&error); return 0; }}
-    }};
-    let mut guards = Vec::with_capacity(values.len());
-    for (token, value) in &values {{
-        match alef_lock_handle(value, cancel.as_deref()) {{
-            Some(guard) => guards.push((*token, guard)),
-            None => return 0,
-        }}
-    }}
-    let client_ptr = match locked_handle_ptr::<{owner_ty}>(&mut guards, client) {{
-        Ok(value) => value,
-        Err(error) => {{ set_handle_error(&error); return 0; }}
-    }};
-    let request_ptr = match locked_handle_ptr::<{request_type}>(&mut guards, req) {{
-        Ok(value) => value,
-        Err(error) => {{ set_handle_error(&error); return 0; }}
-    }};
-    // SAFETY: both registry entry guards remain held for the duration of this call.
-    let client_ref = unsafe {{ &*client_ptr }};
-    // SAFETY: both registry entry guards remain held for the duration of this call.
-    let req_owned = unsafe {{ &*request_ptr }}.clone();
-
-    // 16 MiB: tokio's ~2 MB default worker stack can overflow on a deep extraction
-    // future (a nested archive member, a multi-stage OCR pipeline), and a stack overflow
-    // aborts the process with SIGBUS instead of raising a catchable panic.
-    const STREAM_HANDLE_RUNTIME_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;
-    let rt = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(STREAM_HANDLE_RUNTIME_STACK_SIZE_BYTES)
-        .build()
-    {{
-        Ok(r) => r,
-        Err(e) => {{
-            set_last_error(99, &format!("{fn_start}: failed to create tokio runtime: {{e}}"));
-            return 0;
-        }}
-    }};
-
-    let stream_result = match alef_block_on_in(&rt, cancel.as_ref(), async {{ client_ref.{core_path}(req_owned).await }}) {{
-        Some(result) => result,
-        None => return 0,
-    }};
-
-    let raw_stream = match stream_result {{
-        Ok(s) => s,
-        Err(e) => {{
-            set_last_error_from(&e, &e.to_string());
-            return 0;
-        }}
-    }};
-
-    let mapped: {stream_ty} = {{
-        use futures_util::StreamExt;
-        {error_map}
-    }};
-
-    let handle = {handle_name} {{
-        rt,
-        stream: std::sync::Mutex::new(Some(mapped)),
-        cancel,
-    }};
-    match insert_handle(handle) {{
-        Ok(handle) => handle,
-        Err(error) => {{ set_handle_error(&error); 0 }}
-    }}
-}}
-
-/// Advance the stream and return a heap-allocated chunk, or null.
-///
-/// Returns null in two cases:
-/// - Clean end-of-stream: `{prefix}_last_error_code()` returns 0.
-/// - Stream error: `{prefix}_last_error_code()` returns non-zero.
-///
-/// The returned pointer is heap-allocated and the caller MUST free it by calling
-/// `{prefix}_{owner_snake}_{item_type}_free` (or the appropriate type-free function).
-///
-/// # Safety
-/// `handle` must be a non-null valid pointer previously returned by `{fn_start}` and not yet
-/// freed. Calling `_next` after `_free` is undefined behaviour. The handle must not be shared
-/// across threads without external synchronisation.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn {fn_next}(
-    handle: AlefHandle,
-) -> AlefHandle {{
-    catch_ffi_panic(0, || {{
-    clear_last_error();
-
-    let value = match acquire_handles(&[HandleRequest {{
-        handle,
-        expected_type: std::any::TypeId::of::<{handle_name}>(),
-    }}]) {{
-        Ok(mut values) => match values.pop() {{
-            Some(value) => value,
-            None => {{ set_handle_error(&HandleError::UnknownSlot); return 0; }}
-        }},
-        Err(error) => {{ set_handle_error(&error); return 0; }}
-    }};
-    let h_guard = match value.1.lock() {{
-        Ok(guard) => guard,
-        Err(_) => {{ set_handle_error(&HandleError::RegistryPoisoned); return 0; }}
-    }};
-    let h = match h_guard.downcast_ref::<{handle_name}>() {{
-        Some(value) => value,
-        None => {{ set_handle_error(&HandleError::WrongType); return 0; }}
-    }};
-
-    let mut guard = match h.stream.lock() {{
-        Ok(g) => g,
-        Err(_) => {{
-            set_last_error(99, "{fn_next}: stream mutex is poisoned");
-            return 0;
-        }}
-    }};
-
-    let stream = match guard.as_mut() {{
-        Some(s) => s,
-        None => {{
-            // Stream already exhausted or taken.
-            return 0;
-        }}
-    }};
-
-    use futures_util::StreamExt;
-    let next = match alef_block_on_in(&h.rt, h.cancel.as_ref(), stream.next()) {{
-        Some(next) => next,
-        None => return 0,
-    }};
-    match next {{
-        Some(Ok(chunk)) => {{
-            // SAFETY: We box the chunk and transfer ownership to the caller via raw pointer.
-            // The caller must free it via the appropriate type-free function.
-            match insert_handle(chunk) {{
-                Ok(handle) => handle,
-                Err(error) => {{ set_handle_error(&error); 0 }}
-            }}
-        }}
-        Some(Err(e)) => {{
-            {error_capture}
-            0
-        }}
-        None => {{
-            // Clean end-of-stream — error code remains 0 (cleared at top of function).
-            *guard = None;
-            0
-        }}
-    }}
-    }})
-}}
-
-/// Free a stream handle created by `{fn_start}`.
-///
-/// Safe to call with a null pointer (no-op). After this call the handle pointer is invalid.
-///
-/// # Safety
-/// `handle` must either be null or a valid pointer previously returned by `{fn_start}` and
-/// not yet freed. Double-free is undefined behaviour.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn {fn_free}(handle: AlefHandle) {{
-    catch_ffi_panic((), || {{
-    if handle != 0
-        && let Err(error) = remove_handle::<{handle_name}>(handle)
-    {{
-        set_handle_error(&error);
-    }}
-    }})
-}}"#,
-        handle_name = handle_name,
-        fn_start = fn_start,
-        fn_next = fn_next,
-        fn_free = fn_free,
-        prefix = prefix,
-        owner_ty = owner_ty,
-        request_type = request_type,
-        core_path = core_path,
-        stream_ty = stream_ty,
-        owner_snake = owner_snake,
-        item_type = item_type,
+    let core_call = crate::adapters::rust_callable::receiver_call(core_path, "client_ref", "client_ref", "req_owned")?;
+    Ok(crate::backends::ffi::template_env::render(
+        "stream_handle_functions.rs.jinja",
+        crate::alef_context! {
+            core_call => core_call, error_capture => error_capture,
+            error_carrier => error_carrier, error_map => error_map,
+            fn_free => fn_free, fn_next => fn_next,
+            fn_start => fn_start, handle_name => handle_name,
+            item_type => item_type, owner_snake => owner_snake,
+            owner_ty => owner_ty, prefix => prefix,
+            request_type => request_type, stream_ty => stream_ty,
+        },
     )
+    .trim_end()
+    .to_owned())
 }
 
 #[cfg(test)]

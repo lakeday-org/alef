@@ -233,7 +233,7 @@ pub(super) fn gen_lib_rs(api: &ApiSurface, prefix: &str, config: &ResolvedCrateC
                 item_type,
                 request_type,
                 &core_import,
-            ));
+            )?);
         }
     }
 

@@ -1,5 +1,9 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
     (
+        "rust_stream_param_binding.rs.jinja",
+        include_str!("../templates/rust_stream_param_binding.rs.jinja"),
+    ),
+    (
         "swift_streaming_client_method.swift.jinja",
         include_str!("../templates/swift_streaming_client_method.swift.jinja"),
     ),

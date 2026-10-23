@@ -1,0 +1,5 @@
+WORKER_RUNTIME.block_on(async {
+        {{ inner_call }}.await
+    })
+    {{ map_expr }}
+    .map_err(alef_php_err)

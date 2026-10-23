@@ -863,7 +863,7 @@ fn emit_lib_rs(
         }
     }
 
-    let streaming_shims = wrappers::emit_streaming_adapter_shims(&config.adapters, &source_crate);
+    let streaming_shims = wrappers::emit_streaming_adapter_shims(&config.adapters, &source_crate)?;
     if !streaming_shims.is_empty() {
         out.push_str(&streaming_shims);
     }
