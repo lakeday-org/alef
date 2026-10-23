@@ -6,6 +6,10 @@ mod static_error_registry_tests;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "rust_streaming_layout_probe.rs.jinja",
+        include_str!("templates/rust_streaming_layout_probe.rs.jinja"),
+    ),
+    (
         "rust_streaming_transport.rs.jinja",
         include_str!("templates/rust_streaming_transport.rs.jinja"),
     ),

@@ -1,0 +1,28 @@
+pub struct SampleItem { pub bytes: [u8; {{ item_size }}] }
+pub struct SampleError { pub bytes: [u8; {{ error_size }}] }
+{{ declaration }}
+fn main() {
+    assert!(std::mem::size_of::<{{ wire_name }}>() <= std::mem::size_of::<String>() + std::mem::size_of::<usize>());
+{% if unit_item %}
+    let item = {{ wire_name }}::Item;
+    assert!(matches!(item, {{ wire_name }}::Item));
+{% else %}
+    let value = SampleItem { bytes: [7; {{ item_size }}] };
+    let item = {{ wire_name }}::Item { value: {% if boxed_item %}::std::boxed::Box::new(value){% else %}value{% endif %} };
+    match item {
+        {{ wire_name }}::Item { value } => assert_eq!(value.bytes[0], 7),
+        _ => panic!("expected item payload"),
+    }
+{% endif %}
+    let error = SampleError { bytes: [9; {{ error_size }}] };
+    let failure = {{ wire_name }}::Error { error: {% if boxed_error %}::std::boxed::Box::new(error){% else %}error{% endif %} };
+    match failure {
+        {{ wire_name }}::Error { error } => assert_eq!(error.bytes[0], 9),
+        _ => panic!("expected typed error payload"),
+    }
+    let failure = {{ wire_name }}::NativeFailure { message: "native failure".into() };
+    match failure {
+        {{ wire_name }}::NativeFailure { message } => assert_eq!(message, "native failure"),
+        _ => panic!("expected native failure"),
+    }
+}

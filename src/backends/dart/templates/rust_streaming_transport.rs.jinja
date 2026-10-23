@@ -10,8 +10,8 @@ mod {{ transport.module }} {
 
 {% if source_cfg %}#[cfg({{ source_cfg }})]
 {% endif %}pub enum {{ transport.wire }} {
-    Item{% if not transport.unit_item %} { value: {{ item_type }} }{% endif %},
-    Error { error: {{ error_type }} },
+    Item{% if not transport.unit_item %} { value: ::std::boxed::Box<{{ item_type }}> }{% endif %},
+    Error { error: ::std::boxed::Box<{{ error_type }}> },
     NativeFailure { message: String },
 }
 
@@ -19,7 +19,7 @@ mod {{ transport.module }} {
 {% endif %}impl From<{{ core_error_type }}> for {{ transport.carrier }} {
     fn from(value: {{ core_error_type }}) -> Self {
         Self(match {{ error_type }}::try_from(value) {
-            Ok(error) => {{ transport.wire }}::Error { error },
+            Ok(error) => {{ transport.wire }}::Error { error: ::std::boxed::Box::new(error) },
             Err(message) => {{ transport.wire }}::NativeFailure { message },
         })
     }
