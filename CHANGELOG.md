@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Pin shared validation to its merged commit so GitHub can resolve the reusable workflow.
-
 ## [0.113.3] - 2026-10-23
 
 ### Fixed
@@ -23,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep Swift compiler and runtime regression probes in registered templates and owned temporary working directories.
 - Update the reviewed Ruby setup action to v1.334.0 and MiniJinja lockfile to v3.0.3.
 - Keep validation, build, and publish jobs running when the optional compiler-cache service is unavailable.
+- Pin shared validation to its merged commit so GitHub can resolve the reusable workflow.
 
 ## [0.113.2] - 2026-10-23
 
