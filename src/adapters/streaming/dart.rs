@@ -5,18 +5,18 @@ pub(crate) fn generate_body(
     adapter: &AdapterConfig,
     config: &ResolvedCrateConfig,
     typed_error: bool,
-) -> (String, Option<String>) {
+) -> anyhow::Result<(String, Option<String>)> {
     let body = crate::backends::dart::template_env::render(
         "rust_streaming_body.rs.jinja",
         crate::alef_context! {
-            core_path => &adapter.core_path,
+            core_call => crate::adapters::rust_callable::receiver_call(&adapter.core_path, "inner", "&inner", &super::call_args(adapter).join(", "))?,
             item_type => adapter.item_type.as_deref().unwrap_or("()"),
             call_args => super::call_args(adapter).join(", "),
             bindings => super::core_let_bindings(adapter, &config.core_import_name()),
             transport => typed_error.then(|| transport_names(adapter)),
         },
     );
-    (body, None)
+    Ok((body, None))
 }
 
 #[derive(serde::Serialize)]

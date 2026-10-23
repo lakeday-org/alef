@@ -12,7 +12,7 @@ pub(super) fn emit_streaming_sink_method(
     adapter: &AdapterConfig,
     errors: &[ErrorDef],
     config: &ResolvedCrateConfig,
-) {
+) -> anyhow::Result<()> {
     let params = adapter
         .params
         .iter()
@@ -26,7 +26,7 @@ pub(super) fn emit_streaming_sink_method(
         })
         .collect::<String>();
     let typed_error = error_definition(adapter, config, errors).is_some();
-    let (body, _) = crate::adapters::streaming::dart_body(adapter, config, typed_error);
+    let (body, _) = crate::adapters::streaming::dart_body(adapter, config, typed_error)?;
     let item_type = if typed_error {
         crate::adapters::streaming::dart_transport_names(adapter).carrier
     } else {
@@ -41,6 +41,7 @@ pub(super) fn emit_streaming_sink_method(
             body => body,
         },
     ));
+    Ok(())
 }
 
 fn error_definition<'a>(

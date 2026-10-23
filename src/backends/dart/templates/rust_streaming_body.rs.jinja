@@ -15,7 +15,7 @@ let inner = self.inner.clone();
 {{ binding }}
 {% endfor %}
 _rt.spawn(async move {
-    match inner.{{ core_path }}({{ call_args }}).await {
+    match {{ core_call }}.await {
         Ok(mut stream) => {
             while let Some(item) = stream.next().await {
                 match item {

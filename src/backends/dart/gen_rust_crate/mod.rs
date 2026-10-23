@@ -359,7 +359,7 @@ fn emit_lib_rs(
             &type_paths_for_impls,
             &mirror_type_names,
             &api.errors,
-        );
+        )?;
     }
 
     // Client constructors for opaque handles (emit a separate impl block with #[frb])

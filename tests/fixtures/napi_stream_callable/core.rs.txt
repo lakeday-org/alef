@@ -1,0 +1,11 @@
+pub struct Engine;
+pub struct CrawlRequest { pub url: String }
+pub struct CrawlEvent { pub message: String }
+impl Engine {
+    pub async fn crawl_stream(&self, request: CrawlRequest)
+        -> Result<futures_util::stream::BoxStream<'static, Result<CrawlEvent, String>>, String>
+    {
+        use futures_util::StreamExt;
+        Ok(futures_util::stream::iter([Ok(CrawlEvent { message: request.url })]).boxed())
+    }
+}

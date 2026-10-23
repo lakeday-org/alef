@@ -496,7 +496,7 @@ impl Backend for NapiBackend {
         }
 
         for adapter in &config.adapters {
-            builder.add_item(&functions::gen_adapter_wrapper(adapter, &core_import, &api.types));
+            builder.add_item(&functions::gen_adapter_wrapper(adapter, &core_import, &api.types)?);
         }
 
         // `#[napi]` entrypoints (e.g. `app_run`) are compiled and exported.

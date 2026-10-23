@@ -107,10 +107,11 @@ fn streaming_adapter() -> AdapterConfig {
         name: "crawl_stream".to_string(),
         pattern: AdapterPattern::Streaming,
         core_path: "test_lib::Engine::crawl_stream".to_string(),
-        // The napi `.d.ts` class-method loop reads params from `MethodDef::params`, not from
-        // here -- see `gen_dts`'s `dts_params(&method.params, ...)` call, the same authority the
-        // Go fixture relies on (unlike the PHP fixture, which must populate this field).
-        params: Vec::new(),
+        params: vec![alef::core::config::AdapterParam {
+            name: "req".into(),
+            ty: "CrawlRequest".into(),
+            optional: false,
+        }],
         returns: None,
         error_type: Some("String".to_string()),
         owner_type: Some("Engine".to_string()),
@@ -233,4 +234,97 @@ fn node_streaming_signature_matches_backend_emitted_shape() {
         backend_shape.return_type,
         "Promise<AsyncGenerator<CrawlEvent, void, undefined>>"
     );
+}
+
+#[test]
+#[ignore = "compiles actual NAPI macro output with native Rust dependencies"]
+fn node_streaming_qualified_calls_and_public_aliases_compile() {
+    let directory = native_probe_directory();
+    let mut executed = 0;
+    for alias in [false, true] {
+        let mut api = streaming_api();
+        let mut config = streaming_config();
+        if alias {
+            api.types[0].methods.clear();
+            config.adapters[0].name = "public_events".into();
+        }
+        let files = NapiBackend.generate_bindings(&api, &config).unwrap();
+        assert_eq!(files.len(), 1);
+        let source = &files[0].content;
+        syn::parse_file(source).expect("actual exported module parses");
+        assert!(
+            source.contains("test_lib::Engine::crawl_stream(&inner, core_req)"),
+            "{source}"
+        );
+        let declarations = NapiBackend.generate_type_stubs(&api, &config).unwrap();
+        let esm = declarations
+            .iter()
+            .find(|file| file.path.ends_with("index.mjs"))
+            .unwrap();
+        let public_name = if alias { "publicEvents" } else { "crawlStream" };
+        assert!(
+            esm.content
+                .contains(&format!("export const {public_name} = binding.{public_name};"))
+        );
+        executed += check_native_controls(directory.path(), source, alias);
+    }
+    assert_eq!(
+        executed, 4,
+        "both actual modules and both malformed-call controls compile"
+    );
+}
+
+fn native_probe_directory() -> tempfile::TempDir {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(directory.path().join("src")).unwrap();
+    std::fs::create_dir_all(directory.path().join("core/src")).unwrap();
+    std::fs::write(
+        directory.path().join("Cargo.toml"),
+        include_str!("fixtures/napi_stream_callable/Cargo.toml.txt"),
+    )
+    .unwrap();
+    std::fs::write(
+        directory.path().join("core/Cargo.toml"),
+        "[package]\nname='test-lib'\nversion='0.1.0'\nedition='2024'\n[dependencies]\nfutures-util='0.3'\n",
+    )
+    .unwrap();
+    std::fs::write(
+        directory.path().join("core/src/lib.rs"),
+        include_str!("fixtures/napi_stream_callable/core.rs.txt"),
+    )
+    .unwrap();
+    std::fs::write(
+        directory.path().join("Taskfile.yml"),
+        "version: '3'\ntasks:\n  proof:\n    cmds:\n      - cargo check --quiet\n",
+    )
+    .unwrap();
+    directory
+}
+
+fn check_native_controls(directory: &std::path::Path, source: &str, alias: bool) -> usize {
+    for valid in [false, true] {
+        let candidate = if valid {
+            source.to_string()
+        } else {
+            source.replace(
+                "test_lib::Engine::crawl_stream(&inner, core_req)",
+                "inner.test_lib::Engine::crawl_stream(core_req)",
+            )
+        };
+        std::fs::write(directory.join("src/lib.rs"), candidate).unwrap();
+        let output = std::process::Command::new("task")
+            .arg("proof")
+            .current_dir(directory)
+            .env("RUSTC_WRAPPER", "")
+            .env("RUSTC_WORKSPACE_WRAPPER", "")
+            .env("CARGO_TARGET_DIR", directory.join("target"))
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.success(), valid, "alias={alias}, valid={valid}: {stderr}");
+        if !valid {
+            assert!(stderr.contains("expected") && stderr.contains("::"), "{stderr}");
+        }
+    }
+    2
 }

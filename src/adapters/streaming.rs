@@ -25,21 +25,21 @@ pub fn generate_body(
         return Ok((String::new(), None));
     }
     match language {
-        Language::Python => Ok(gen_python_body(adapter, config)),
-        Language::Node => Ok(gen_node_body(adapter, config)),
-        Language::Ruby => Ok(gen_ruby_body(adapter, config)),
-        Language::Php => Ok(gen_php_body(adapter, config)),
-        Language::Elixir => Ok(gen_elixir_body(adapter, config)),
-        Language::Wasm => Ok(gen_wasm_body(adapter, config)),
+        Language::Python => gen_python_body(adapter, config),
+        Language::Node => gen_node_body(adapter, config),
+        Language::Ruby => gen_ruby_body(adapter, config),
+        Language::Php => gen_php_body(adapter, config),
+        Language::Elixir => gen_elixir_body(adapter, config),
+        Language::Wasm => gen_wasm_body(adapter, config),
         Language::Ffi => gen_ffi_body(adapter, config),
         Language::Go => Ok(gen_go_body(adapter)),
         Language::Java => Ok(gen_java_body(adapter)),
         Language::Csharp => Ok(gen_csharp_body(adapter)),
-        Language::R => Ok(gen_r_body(adapter, config)),
+        Language::R => gen_r_body(adapter, config),
         Language::Rust | Language::C | Language::Jni => {
             anyhow::bail!("Rust/C/JNI do not need generated binding adapters")
         }
-        Language::Dart => Ok(dart_body(adapter, config, false)),
+        Language::Dart => dart_body(adapter, config, false),
         Language::Kotlin | Language::KotlinAndroid | Language::Swift | Language::Gleam | Language::Zig => {
             anyhow::bail!("Phase 1: {language} backend not yet implemented")
         }
@@ -101,15 +101,14 @@ fn iterator_name(adapter: &AdapterConfig) -> String {
     to_pascal_case(&adapter.name) + "Iterator"
 }
 
-fn gen_python_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String, Option<String>) {
-    let core_path = &adapter.core_path;
+fn gen_python_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<(String, Option<String>)> {
     let item_type = adapter.item_type.as_deref().unwrap_or("()");
     let error_type = adapter.error_type.as_deref().unwrap_or("anyhow::Error");
     let core_import = config.core_import_name();
     let iter_name = iterator_name(adapter);
 
     let args = call_args(adapter);
-    let call_str = args.join(", ");
+    let core_call = super::rust_callable::receiver_call(&adapter.core_path, "inner", "&inner", &args.join(", "))?;
 
     let anext_err_handler = if error_type != "anyhow::Error" {
         let simple_name = error_type.split("::").last().unwrap_or(error_type);
@@ -176,7 +175,7 @@ fn gen_python_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (St
          {bindings_block}\
          let (tx, rx) = tokio::sync::mpsc::channel(32);\n    \
          pyo3_async_runtimes::tokio::get_runtime().spawn(async move {{\n        \
-             match inner.{core_path}({call_str}).await {{\n            \
+             match {core_call}.await {{\n            \
                  Err(e) => {{\n                \
                      let _ = tx.send(Err(e)).await;\n            \
                  }}\n            \
@@ -191,11 +190,10 @@ fn gen_python_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (St
          Ok(Bound::new(py, iter)?.into_any())"
     );
 
-    (method_body, Some(struct_def))
+    Ok((method_body, Some(struct_def)))
 }
 
-fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String, Option<String>) {
-    let core_path = &adapter.core_path;
+fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<(String, Option<String>)> {
     let prefix = config.node_type_prefix();
     let raw_item = adapter.item_type.as_deref().unwrap_or("()");
     let item_type = if raw_item == "()" {
@@ -207,7 +205,7 @@ fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
     let iter_name = iterator_name(adapter);
 
     let args = call_args(adapter);
-    let call_str = args.join(", ");
+    let core_call = super::rust_callable::receiver_call(&adapter.core_path, "inner", "&inner", &args.join(", "))?;
 
     let let_bindings = core_let_bindings(adapter, &core_import);
     let bindings_block = if let_bindings.is_empty() {
@@ -278,7 +276,7 @@ fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
         "let inner = self.inner.clone();\n    \
          {bindings_block}\
          use futures_util::StreamExt;\n    \
-         let mut stream = inner.{core_path}({call_str}).await\n        \
+         let mut stream = {core_call}.await\n        \
              .map_err(alef_napi_err)?;\n    \
          let (tx, rx) = tokio::sync::mpsc::channel(32);\n    \
          tokio::spawn(async move {{\n        \
@@ -290,16 +288,16 @@ fn gen_node_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
          Ok(iter)"
     );
 
-    (method_body, Some(struct_def))
+    Ok((method_body, Some(struct_def)))
 }
 
-fn gen_ruby_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String, Option<String>) {
-    let core_path = &adapter.core_path;
+fn gen_ruby_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<(String, Option<String>)> {
     let item_type = adapter.item_type.as_deref().unwrap_or("()");
     let core_import = config.core_import_name();
 
     let args = call_args(adapter);
-    let call_str = args.join(", ");
+    let core_call =
+        super::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", &args.join(", "))?;
 
     let let_bindings = core_let_bindings(adapter, &core_import);
     let bindings_block = if let_bindings.is_empty() {
@@ -321,7 +319,7 @@ fn gen_ruby_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
              .map_err(alef_magnus_err)?;\n    \
          {bindings_block}\
          rt.block_on(async {{\n        \
-             let stream = self.inner.{core_path}({call_str}).await\n            \
+             let stream = {core_call}.await\n            \
                  .map_err(alef_magnus_err)?;\n        \
              let chunks: Vec<{item_type}> = stream\n            \
                  .collect::<Vec<_>>().await\n            \
@@ -334,7 +332,7 @@ fn gen_ruby_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
          }})"
     );
 
-    (body, None)
+    Ok((body, None))
 }
 
 /// The Rust name of the PHP class that holds the open stream of a streaming adapter.
@@ -355,7 +353,7 @@ pub(crate) fn php_stream_handle_name(adapter: &AdapterConfig) -> String {
 ///
 /// The corresponding method on the owner type is suppressed in `mod.rs` to avoid
 /// double-emitting a NIF for the same method name.
-fn gen_elixir_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String, Option<String>) {
+fn gen_elixir_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<(String, Option<String>)> {
     let core_path = &adapter.core_path;
     let item_type = adapter.item_type.as_deref().unwrap_or("()");
     let error_type = adapter.error_type.as_deref().unwrap_or("anyhow::Error");
@@ -378,7 +376,7 @@ fn gen_elixir_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (St
         .unwrap_or_else(|| "rustler::Term".to_string());
 
     let args = call_args(adapter);
-    let call_str = args.join(", ");
+    let core_call = super::rust_callable::receiver_call(&adapter.core_path, "inner", "&inner", &args.join(", "))?;
 
     let let_bindings = core_let_bindings(adapter, &core_import);
     let bindings_block = if let_bindings.is_empty() {
@@ -424,7 +422,7 @@ fn gen_elixir_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (St
              );\n    \
              let inner = resource.inner.read().unwrap_or_else(|e| e.into_inner()).clone();\n    \
              let stream = runtime\n        \
-                 .block_on(async move {{ inner.{core_path}({call_str}).await }})\n        \
+                 .block_on(async move {{ {core_call}.await }})\n        \
                  .map_err(alef_nif_err)?;\n    \
              let handle = {handle_struct} {{\n        \
                  runtime,\n        \
@@ -464,11 +462,10 @@ fn gen_elixir_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (St
          }}"
     );
 
-    (body, Some(struct_def))
+    Ok((body, Some(struct_def)))
 }
 
-fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String, Option<String>) {
-    let core_path = &adapter.core_path;
+fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<(String, Option<String>)> {
     let prefix = config.wasm_type_prefix();
     let raw_item = adapter.item_type.as_deref().unwrap_or("JsValue");
     let item_type = if raw_item == "()" || raw_item == "JsValue" {
@@ -480,7 +477,8 @@ fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
     let iter_name = iterator_name(adapter);
 
     let args = call_args(adapter);
-    let call_str = args.join(", ");
+    let core_call =
+        super::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", &args.join(", "))?;
 
     let let_bindings = core_let_bindings(adapter, &core_import);
     let bindings_block = if let_bindings.is_empty() {
@@ -515,7 +513,7 @@ fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
     // the stream rejects the call itself. Only the forward loop runs in the spawned task.
     let method_body = format!(
         "{bindings_block}\
-         let mut stream = self.inner.{core_path}({call_str}).await.map_err(alef_wasm_err)?;\n    \
+         let mut stream = {core_call}.await.map_err(alef_wasm_err)?;\n    \
          let (tx, rx) = futures::channel::mpsc::channel(32);\n    \
          wasm_bindgen_futures::spawn_local(async move {{\n        \
              use futures_util::StreamExt;\n        \
@@ -540,11 +538,11 @@ fn gen_wasm_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (Stri
          Ok(iter)"
     );
 
-    (method_body, Some(struct_def))
+    Ok((method_body, Some(struct_def)))
 }
 
 fn gen_ffi_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<(String, Option<String>)> {
-    let core_path = &adapter.core_path;
+    let core_call = super::rust_callable::receiver_call(&adapter.core_path, "client_ref", "client_ref", "request")?;
     let prefix = config.ffi_prefix();
     let request_type = adapter.request_type.as_deref().ok_or_else(|| {
         anyhow::anyhow!(
@@ -583,7 +581,7 @@ fn gen_ffi_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow
          let rt = get_ffi_runtime();\n\n    \
          let result = rt.block_on(async {{\n        \
              use futures_util::StreamExt;\n\n        \
-             let mut stream = match client_ref.{core_path}(request).await {{\n            \
+             let mut stream = match {core_call}.await {{\n            \
                  Ok(s) => s,\n            \
                  Err(e) => return Err(format!(\"{prefix}_{name}: failed to open stream: {{e}}\")),\n        \
              }};\n\n        \
@@ -619,7 +617,7 @@ fn gen_ffi_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow
          }}",
         name = adapter.name,
         prefix = prefix,
-        core_path = core_path,
+        core_call = core_call,
         request_type = request_type,
     );
 
@@ -641,13 +639,13 @@ fn gen_csharp_body(adapter: &AdapterConfig) -> (String, Option<String>) {
     (body, None)
 }
 
-fn gen_r_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String, Option<String>) {
-    let core_path = &adapter.core_path;
+fn gen_r_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> anyhow::Result<(String, Option<String>)> {
     let item_type = adapter.item_type.as_deref().unwrap_or("Robj");
     let core_import = config.core_import_name();
 
     let args = call_args(adapter);
-    let call_str = args.join(", ");
+    let core_call =
+        super::rust_callable::receiver_call(&adapter.core_path, "self.inner", "&self.inner", &args.join(", "))?;
 
     let let_bindings = core_let_bindings(adapter, &core_import);
     let bindings_block = if let_bindings.is_empty() {
@@ -669,7 +667,7 @@ fn gen_r_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String,
              .map_err(|e| extendr_api::Error::Other(e.to_string()))?;\n    \
          {bindings_block}\
          rt.block_on(async {{\n        \
-             let stream = self.inner.{core_path}({call_str}).await\n            \
+             let stream = {core_call}.await\n            \
                  .map_err(|e| extendr_api::Error::Other(e.to_string()))?;\n        \
              let chunks: Vec<{item_type}> = stream\n            \
                  .collect::<Vec<_>>().await\n            \
@@ -682,7 +680,7 @@ fn gen_r_body(adapter: &AdapterConfig, config: &ResolvedCrateConfig) -> (String,
          }})"
     );
 
-    (body, None)
+    Ok((body, None))
 }
 
 fn to_pascal_case(s: &str) -> String {

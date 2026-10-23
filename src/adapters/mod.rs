@@ -3,6 +3,7 @@
 
 pub mod async_method;
 pub mod callback_bridge;
+pub(crate) mod rust_callable;
 pub mod streaming;
 pub mod sync_function;
 

@@ -1,0 +1,16 @@
+use std::sync::Arc;
+struct Engine;
+impl Engine {
+    fn events(&self) -> u8 { 1 }
+    fn helper(&self) -> u8 { 3 }
+    fn generic<T>(&self) -> u8 { let _ = std::marker::PhantomData::<T>; 5 }
+    fn r#type(&self) -> u8 { 6 }
+}
+trait Events { fn events(&self) -> u8; }
+impl Events for Engine { fn events(&self) -> u8 { 2 } }
+mod helpers { pub(super) fn events(_: &super::Engine) -> u8 { 4 } }
+fn main() {
+    let inner = Arc::new(Engine);
+    let borrowed = inner.as_ref();
+    __ASSERTIONS__
+}

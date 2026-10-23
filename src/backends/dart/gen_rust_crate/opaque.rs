@@ -63,7 +63,7 @@ pub(super) fn emit_opaque_impl_block(
     type_paths: &std::collections::HashMap<String, String>,
     mirror_type_names: &HashSet<String>,
     errors: &[crate::core::ir::ErrorDef],
-) {
+) -> anyhow::Result<()> {
     let type_name = &ty.name;
 
     let mut trait_uses: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
@@ -142,7 +142,7 @@ pub(super) fn emit_opaque_impl_block(
         if method.sanitized {
             let adapter_key = format!("{type_name}.{method_name}");
             if let Some(adapter) = streaming_adapters.get(&adapter_key) {
-                emit_streaming_sink_method(out, method_name, adapter, errors, config);
+                emit_streaming_sink_method(out, method_name, adapter, errors, config)?;
             } else {
                 out.push_str(&crate::backends::dart::template_env::render(
                     "rust_skipped_sanitized_method_comment.rs.jinja",
@@ -176,8 +176,8 @@ pub(super) fn emit_opaque_impl_block(
             errors,
         );
     }
-
     out.push_str("}\n");
+    Ok(())
 }
 
 /// Emit one method inside an `impl TypeName { }` block for an FRB opaque type.
