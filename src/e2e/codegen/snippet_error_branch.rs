@@ -65,9 +65,8 @@ pub(crate) fn for_fixture(lang: &str, fixture: &Fixture, errors: &[ErrorDef]) ->
 /// [`tests::branch_and_classify_never_disagree_across_backends`] fails on it.
 fn host_error_type(lang: &str, error_name: &str, variant: &ErrorVariant, errors: &[ErrorDef]) -> Option<String> {
     match lang {
-        // ~keep `backends/pyo3/gen_bindings/errors.rs` re-exports one `create_exception!` class
-        // per variant from the package root.
-        "python" => Some(crate::codegen::error_gen::python_exception_name(
+        // ~keep PyO3 and Magnus register each variant through the shared exception naming policy.
+        "python" | "ruby" => Some(crate::codegen::error_gen::python_exception_name(
             &variant.name,
             error_name,
         )),
@@ -184,7 +183,7 @@ mod tests {
             let branch = for_fixture(lang, &fixture, &errors);
             assert_eq!(
                 branch.is_some(),
-                matches!(*lang, "python" | "dart"),
+                matches!(*lang, "python" | "dart" | "ruby"),
                 "lang={lang}: an uncoded variant yielded {branch:?}"
             );
         }

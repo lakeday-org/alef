@@ -1,14 +1,8 @@
+mod ruby_templates;
+
 use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
-    (
-        "ruby/json_field_runtime.rb.jinja",
-        include_str!("templates/ruby/json_field_runtime.rb.jinja"),
-    ),
-    (
-        "ruby/typed_constructor.jinja",
-        include_str!("templates/ruby/typed_constructor.jinja"),
-    ),
     (
         "go/optional_wildcard_runtime.go.jinja",
         include_str!("templates/go/optional_wildcard_runtime.go.jinja"),
@@ -136,10 +130,6 @@ static TEMPLATES: &[(&str, &str)] = &[
     (
         "go/mock_request_helper.go.jinja",
         include_str!("templates/go/mock_request_helper.go.jinja"),
-    ),
-    (
-        "ruby/mock_request_helper.rb.jinja",
-        include_str!("templates/ruby/mock_request_helper.rb.jinja"),
     ),
     (
         "php/mock_request_helper.php.jinja",
@@ -271,58 +261,6 @@ static TEMPLATES: &[(&str, &str)] = &[
     (
         "python/mock_request_helper.py.jinja",
         include_str!("templates/python/mock_request_helper.py.jinja"),
-    ),
-    ("ruby/Gemfile.jinja", include_str!("templates/ruby/Gemfile.jinja")),
-    (
-        "ruby/snippet_body.jinja",
-        include_str!("templates/ruby/snippet_body.jinja"),
-    ),
-    (
-        "ruby/http_snippet.jinja",
-        include_str!("templates/ruby/http_snippet.jinja"),
-    ),
-    (
-        "ruby/rubocop.yml.jinja",
-        include_str!("templates/ruby/rubocop.yml.jinja"),
-    ),
-    ("ruby/assertion.jinja", include_str!("templates/ruby/assertion.jinja")),
-    (
-        "ruby/visitor_method.jinja",
-        include_str!("templates/ruby/visitor_method.jinja"),
-    ),
-    ("ruby/test_file.jinja", include_str!("templates/ruby/test_file.jinja")),
-    (
-        "ruby/test_function.jinja",
-        include_str!("templates/ruby/test_function.jinja"),
-    ),
-    ("ruby/http_test.jinja", include_str!("templates/ruby/http_test.jinja")),
-    (
-        "ruby/http_test_close.jinja",
-        include_str!("templates/ruby/http_test_close.jinja"),
-    ),
-    (
-        "ruby/http_request.jinja",
-        include_str!("templates/ruby/http_request.jinja"),
-    ),
-    (
-        "ruby/http_test_body.jinja",
-        include_str!("templates/ruby/http_test_body.jinja"),
-    ),
-    (
-        "ruby/http_101_skip.jinja",
-        include_str!("templates/ruby/http_101_skip.jinja"),
-    ),
-    (
-        "ruby/app_harness.rb.jinja",
-        include_str!("templates/ruby/app_harness.rb.jinja"),
-    ),
-    (
-        "ruby/http_test_sut.jinja",
-        include_str!("templates/ruby/http_test_sut.jinja"),
-    ),
-    (
-        "ruby/spec_helper_mock_server.rb.jinja",
-        include_str!("templates/ruby/spec_helper_mock_server.rb.jinja"),
     ),
     ("r/description.jinja", include_str!("templates/r/description.jinja")),
     ("r/snippet_body.jinja", include_str!("templates/r/snippet_body.jinja")),
@@ -462,10 +400,6 @@ static TEMPLATES: &[(&str, &str)] = &[
     (
         "kotlin/test_imports.kt.jinja",
         include_str!("templates/kotlin/test_imports.kt.jinja"),
-    ),
-    (
-        "ruby/docs_file_read.jinja",
-        include_str!("templates/ruby/docs_file_read.jinja"),
     ),
     (
         "elixir/docs_file_read.jinja",
@@ -775,7 +709,7 @@ static TEMPLATES: &[(&str, &str)] = &[
 pub(crate) fn make_env() -> Environment<'static> {
     let mut env = Environment::new();
     crate::template::configure_env(&mut env);
-    for (name, src) in TEMPLATES {
+    for (name, src) in TEMPLATES.iter().chain(ruby_templates::TEMPLATES) {
         env.add_template(name, src).expect("built-in template is valid");
     }
     env

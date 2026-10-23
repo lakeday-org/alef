@@ -5,8 +5,7 @@
    - description: fixture description as a Ruby string literal (already quoted)
    - expects_error: bool
    - raise_error_clause: the `raise_error(...)` matcher expression, fully rendered
-     (plain `raise_error(RuntimeError)` when no error value is declared, or that plus
-     a message/class-name block when one is)
+     (canonical variant class, or a family/native fallback with optional message check)
    - setup_lines: list of setup line strings
    - call_expr: the function call expression
    - result_var: variable to store result

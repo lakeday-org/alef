@@ -1,0 +1,10 @@
+version: "3"
+tasks:
+  build:
+    cmds:
+      - >-
+        {{if eq OS "darwin"}}cargo rustc --lib --
+        -C link-arg=-undefined -C link-arg=dynamic_lookup{{else}}cargo build{{end}}
+  test:
+    cmds:
+      - ruby matcher_spec.rb

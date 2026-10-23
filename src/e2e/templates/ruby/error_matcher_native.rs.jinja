@@ -1,0 +1,28 @@
+use magnus::prelude::*;
+mod sample {
+    pub enum ApiError { BadRequest, Connection, Unknown }
+    impl std::fmt::Display for ApiError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("missing.field[0]")
+        }
+    }
+}
+{{ converter }}
+fn bad_request() -> Result<(), magnus::Error> { Err(api_error_to_magnus_err(sample::ApiError::BadRequest)) }
+fn connection() -> Result<(), magnus::Error> { Err(api_error_to_magnus_err(sample::ApiError::Connection)) }
+fn base_error() -> Result<(), magnus::Error> { Err(api_error_to_magnus_err(sample::ApiError::Unknown)) }
+fn runtime_error(ruby: &magnus::Ruby) -> Result<(), magnus::Error> {
+    Err(magnus::Error::new(ruby.exception_runtime_error(), "native fallback"))
+}
+#[magnus::init]
+fn init(ruby: &magnus::Ruby) -> Result<(), magnus::Error> {
+    let module = ruby.define_module("Sample")?;
+{% for line in registrations %}
+{{ line }}
+{% endfor %}
+    module.define_singleton_method("bad_request", magnus::function!(bad_request, 0))?;
+    module.define_singleton_method("connection", magnus::function!(connection, 0))?;
+    module.define_singleton_method("base_error", magnus::function!(base_error, 0))?;
+    module.define_singleton_method("runtime_error", magnus::function!(runtime_error, 0))?;
+    Ok(())
+}

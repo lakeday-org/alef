@@ -57,7 +57,7 @@ fn streaming_literal_error_messages_retain_the_escaped_predicate() {
 }
 
 #[test]
-fn streaming_known_variants_record_identity_and_status_gaps() {
+fn streaming_known_variants_preserve_identity_and_record_only_status_gaps() {
     let errors = vec![ErrorDef {
         exception_base: None,
         name: "ApiError".into(),
@@ -74,9 +74,9 @@ fn streaming_known_variants_record_identity_and_status_gaps() {
         version: Default::default(),
     }];
     let source = render(Some("Authentication"), &errors);
-    assert!(source.contains("raise_error(RuntimeError)"), "{source}");
-    assert!(source.contains("declared error variant 'Authentication'"), "{source}");
+    assert!(source.contains("raise_error(Sample::AuthenticationError)"), "{source}");
+    assert!(!source.contains("declared error variant 'Authentication'"), "{source}");
     assert!(!source.contains("/Authentication/"), "{source}");
     let records = crate::e2e::codegen::take_skip_records();
-    assert_eq!(records.len(), 2, "{records:?}");
+    assert_eq!(records.len(), 1, "{records:?}");
 }

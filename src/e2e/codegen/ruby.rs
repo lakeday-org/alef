@@ -241,6 +241,7 @@ mod assertions;
 #[cfg(test)]
 mod element_accessor_wildcard_tests;
 mod enum_variant_access;
+mod error_matcher;
 mod examples;
 mod http;
 #[cfg(test)]

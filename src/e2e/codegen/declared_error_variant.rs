@@ -136,10 +136,7 @@ pub(crate) fn declared_variant<'a>(
 ///   (`backends/swift/gen_bindings/errors.rs`), but no real business-call failure ever
 ///   constructs a case of it — real throw sites use generic `ServiceError` cases or a
 ///   `Result<T, String>` shim instead. The capability exists and is simply unused.
-/// - `ruby`: every fallible call throws a fixed `RuntimeError` via
-///   `magnus::Error::new(ruby.exception_runtime_error(), e.to_string())`; no per-variant class is
-///   ever defined, even though Magnus supports custom exception classes the same way Python's
-///   `create_exception!` does.
+/// - `ruby`: Magnus registers a class per variant using the shared exception naming policy. ~keep
 /// - `elixir`, `gleam`: the Rustler NIF boundary both ride on collapses every error to a string
 ///   via `.map_err(|e| e.to_string())`; a dedicated error-converter exists in the generator but is
 ///   dead code that also stringifies. Gleam's nominally-typed external signature does not change
@@ -157,13 +154,13 @@ pub(crate) fn declared_variant<'a>(
 /// did not audit and rewrite is never silently weakened.
 pub(crate) fn substantiates_variant_identity(lang: &str, variant: &ErrorVariant) -> bool {
     match lang {
-        "python" | "dart" => true,
+        "python" | "dart" | "ruby" => true,
         "go" | "java" | "zig" => variant.error_code.is_some(),
         "csharp" => crate::backends::csharp::gen_bindings::variant_dispatch_prefix(variant).is_some(),
         // The shared TypeScript renderer passes `node` or `wasm` through its `lang` parameter.
         // `"typescript"` here was dead: it never matched what the backend actually threads
         // through, so the wiring silently fell through to the `true` default below. ~keep
-        "c" | "php" | "swift" | "ruby" | "elixir" | "gleam" | "r" | "node" | "wasm" => false,
+        "c" | "php" | "swift" | "elixir" | "gleam" | "r" | "node" | "wasm" => false,
         _ => true,
     }
 }
@@ -410,10 +407,10 @@ mod tests {
     }
 
     #[test]
-    fn swift_ruby_elixir_gleam_r_node_never_substantiate_a_known_variant() {
+    fn swift_elixir_gleam_r_node_never_substantiate_a_known_variant() {
         let fixture = fixture_with("BadRequest");
         let errors = vec![error_def(vec![coded_variant("BadRequest", Some(200))])];
-        for lang in ["swift", "ruby", "elixir", "gleam", "r", "node"] {
+        for lang in ["swift", "elixir", "gleam", "r", "node"] {
             assert_eq!(
                 classify(lang, &fixture, &errors),
                 DeclaredErrorAssertion::Unsubstantiable("BadRequest"),
@@ -428,7 +425,7 @@ mod tests {
     /// literal prefix (`compute_variant_dispatch`, `variant_dispatch_prefix`) — a variant with
     /// no template, or a template that opens directly on a `{placeholder}`, has nothing for
     /// `message.StartsWith(...)` to match and falls through to the generic exception. A coded
-    /// `error_code` alone (as `swift_ruby_elixir_gleam_r_node_never_substantiate_a_known_variant`
+    /// `error_code` alone (as `swift_elixir_gleam_r_node_never_substantiate_a_known_variant`
     /// exercises above) does NOT make a C# variant substantiable — only the message template does.
     #[test]
     fn csharp_is_conditional_on_message_template_prefix() {

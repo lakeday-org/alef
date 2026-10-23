@@ -1,0 +1,8 @@
+raise_error({{ matcher_class }}){% if bases or regex %} { |error|
+{% if bases %}
+      expect(error).to {% for base in bases %}be_a({{ base }}).or {% endfor %}be_a(RuntimeError)
+{% endif %}
+{% if regex %}
+      expect(error.message =~ {{ regex }} || error.class.name =~ {{ regex }}).to be_truthy
+{% endif %}
+    }{% endif %}

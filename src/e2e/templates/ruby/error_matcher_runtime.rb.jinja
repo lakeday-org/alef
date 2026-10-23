@@ -1,0 +1,15 @@
+require 'rspec/autorun'
+require_relative 'ruby_error_matcher_fixture'
+RSpec.describe 'generated native error matchers' do
+{% for case in cases %}
+  it '{{ case.name }}' do
+{% if case.rejected %}
+    expect {
+      expect { {{ case.call }} }.to {{ case.matcher }}
+    }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+{% else %}
+    expect { {{ case.call }} }.to {{ case.matcher }}
+{% endif %}
+  end
+{% endfor %}
+end

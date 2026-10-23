@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::core::config::ResolvedCrateConfig;
 use crate::e2e::config::E2eConfig;
-use crate::e2e::escape::{ruby_regex_literal, ruby_string_literal, sanitize_ident};
+use crate::e2e::escape::{ruby_string_literal, sanitize_ident};
 use crate::e2e::field_access::FieldResolver;
 use crate::e2e::fixture::Fixture;
 
@@ -12,44 +12,8 @@ use crate::e2e::codegen::inert_example::{self, InertCause, InertExample};
 
 use super::args::build_args_and_setup;
 use super::assertions::render_assertion;
+use super::error_matcher::render_raise_error_clause;
 use super::visitor::build_ruby_visitor;
-
-/// Build the RSpec `raise_error(...)` matcher expression for an `error`-asserting test.
-///
-/// ~keep With no declared value this returns the original bare `raise_error(RuntimeError)`
-/// unchanged, byte-for-byte, for fixtures predating this check. When a value is declared,
-/// checking `error.message` OR `error.class.name` against the same regex mirrors the
-/// message-or-type disjunction other backends use (see `declared_error_value`'s doc
-/// comment): config-validation fixtures name text that only appears in the message,
-/// API-error fixtures name a type prefix that only appears in the class name. Which of those
-/// two conventions applies, and whether Ruby can ever satisfy the second, is decided once by
-/// `declared_error_variant::classify` — see its doc for why Ruby lands on "not yet" today
-/// (every fallible call throws a fixed `RuntimeError`, never a per-variant class).
-///
-/// ~keep When the declared value names a real variant Ruby cannot substantiate, this still
-/// returns a single-expression matcher (spliced into `}.to {{ raise_error_clause }}` with
-/// nothing else on that template line) — `raise_error(RuntimeError)`, the same honest "the call
-/// must fail" check the undeclared case renders — with the registered skip appended as a
-/// trailing `#`-comment on that same line, so it is visible in the generated file AND counted on
-/// the shared ledger.
-pub(super) fn render_raise_error_clause(fixture: &Fixture, errors: &[crate::core::ir::ErrorDef]) -> String {
-    use crate::e2e::codegen::declared_error_variant::{DeclaredErrorAssertion, classify, skip_line};
-    match classify("ruby", fixture, errors) {
-        DeclaredErrorAssertion::Undeclared => "raise_error(RuntimeError)".to_string(),
-        DeclaredErrorAssertion::Assert(declared) => {
-            let regex = ruby_regex_literal(declared);
-            format!(
-                "raise_error(RuntimeError) {{ |error|\n      expect(error.message =~ {regex} || error.class.name =~ {regex}).to be_truthy\n    }}"
-            )
-        }
-        DeclaredErrorAssertion::Unsubstantiable(variant) => {
-            format!(
-                "raise_error(RuntimeError) {}",
-                skip_line("", "#", variant, &fixture.id, "ruby")
-            )
-        }
-    }
-}
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render_chat_stream_example(
@@ -203,7 +167,7 @@ pub(super) fn render_chat_stream_example(
     };
 
     if expects_error {
-        let clause = render_raise_error_clause(fixture, errors);
+        let clause = render_raise_error_clause(fixture, errors, module_name);
         out.push_str(&format!("    expect {{ {call_expr} {{ |_chunk| }} }}.to {clause}\n"));
         out.push_str("  end\n");
         return out;
@@ -584,7 +548,7 @@ pub(super) fn render_example(
     let api_key_var = fixture.env.as_ref().and_then(|e| e.api_key_var.as_deref());
     let has_mock_and_key = has_mock && api_key_var.is_some();
 
-    let raise_error_clause = render_raise_error_clause(fixture, errors);
+    let raise_error_clause = render_raise_error_clause(fixture, errors, module_name);
 
     // Emit the post-clear list assertion for clear operations.
     let post_clear_list_call = if is_clear_op {
@@ -705,91 +669,6 @@ mod dropped_field_marker_tests {
         assert!(
             out.contains("field 'nonexistent_field' not available on result type"),
             "got:\n{out}"
-        );
-    }
-}
-
-#[cfg(test)]
-mod raise_error_clause_tests {
-    use super::render_raise_error_clause;
-    use crate::core::ir::{ErrorDef, ErrorVariant};
-    use crate::e2e::fixture::{Assertion, Fixture};
-
-    fn fixture_with_declared_error(value: &str) -> Fixture {
-        Fixture {
-            id: "declares_error".to_string(),
-            assertions: vec![Assertion {
-                assertion_type: "error".to_string(),
-                value: Some(serde_json::Value::String(value.to_string())),
-                ..Assertion::default()
-            }],
-            ..Fixture::default()
-        }
-    }
-
-    fn coded_error_def(variant_name: &str) -> ErrorDef {
-        ErrorDef {
-            exception_base: None,
-            name: "ApiError".to_string(),
-            rust_path: "lib::ApiError".to_string(),
-            original_rust_path: String::new(),
-            variants: vec![ErrorVariant {
-                name: variant_name.to_string(),
-                error_code: Some(100),
-                is_unit: true,
-                ..ErrorVariant::default()
-            }],
-            doc: String::new(),
-            methods: vec![],
-            binding_excluded: false,
-            binding_exclusion_reason: None,
-            version: Default::default(),
-        }
-    }
-
-    #[test]
-    fn no_declared_value_is_byte_identical_to_bare_raise_error() {
-        let fixture = Fixture {
-            id: "no_error".to_string(),
-            ..Fixture::default()
-        };
-        assert_eq!(render_raise_error_clause(&fixture, &[]), "raise_error(RuntimeError)");
-    }
-
-    /// With no `errors` IR supplied, a value cannot be recognised as a known variant name, so it
-    /// renders exactly like a message-style value always did before this fix.
-    #[test]
-    fn declared_value_adds_message_or_class_name_check() {
-        let fixture = fixture_with_declared_error("BadRequest");
-        let clause = render_raise_error_clause(&fixture, &[]);
-        assert_eq!(
-            clause,
-            "raise_error(RuntimeError) { |error|\n      expect(error.message =~ /BadRequest/ || error.class.name =~ /BadRequest/).to be_truthy\n    }"
-        );
-    }
-
-    #[test]
-    fn declared_value_with_regex_metacharacters_is_escaped() {
-        let fixture = fixture_with_declared_error("field.name[0]");
-        let clause = render_raise_error_clause(&fixture, &[]);
-        assert!(
-            clause.contains("/field\\.name\\[0\\]/"),
-            "expected escaped regex literal, got: {clause}"
-        );
-    }
-
-    /// The defect this fix closes: a declared value that names a real `ErrorVariant` — every
-    /// Ruby fallible call throws a fixed `RuntimeError`, never a per-variant class — must render
-    /// the registered skip, not a message-or-class-name comparison that can never pass.
-    #[test]
-    fn declared_value_naming_a_known_variant_falls_back_to_bare_raise_error_with_a_trailing_skip_comment() {
-        let fixture = fixture_with_declared_error("Authentication");
-        let errors = vec![coded_error_def("Authentication")];
-        let clause = render_raise_error_clause(&fixture, &errors);
-        assert_eq!(
-            clause,
-            "raise_error(RuntimeError) # skipped: declared error variant 'Authentication' not yet preserved as a \
-             distinct identity by this backend's generator"
         );
     }
 }
