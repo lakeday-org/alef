@@ -1,0 +1,11 @@
+pub enum Failure {
+    Named { message: String, source: Option<String> },
+    Hidden { source: Option<String> },
+    Tuple(String, Option<String>),
+}
+fn selected(value: &Failure) -> Option<&str> {
+    match value { {{ pattern }} => {{ selected }}, _ => Some("wrong variant") }
+}
+fn main() {
+    assert_eq!(selected(&{{ value }}), {{ expected }});
+}

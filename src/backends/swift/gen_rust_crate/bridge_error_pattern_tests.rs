@@ -19,24 +19,18 @@ fn variant(name: &str, fields: &[(&str, bool)]) -> ErrorVariant {
 
 fn compile_and_run_pattern(variant: &ErrorVariant, value: &str, selected: &str, expected: &str) {
     let pattern = payload_pattern("Failure", variant);
-    let source = format!(
-        r#"
-pub enum Failure {{
-    Named {{ message: String, source: Option<String> }},
-    Hidden {{ source: Option<String> }},
-    Tuple(String, Option<String>),
-}}
-fn selected(value: &Failure) -> Option<&str> {{
-    match value {{ {pattern} => {selected}, _ => Some("wrong variant") }}
-}}
-fn main() {{ assert_eq!(selected(&{value}), {expected}); }}
-"#
+    let source = crate::backends::swift::template_env::render(
+        "rust_error_pattern_probe.rs.jinja",
+        crate::alef_context! { pattern => pattern, selected => selected, value => value, expected => expected },
     );
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("probe.rs");
     let binary = directory.path().join(if cfg!(windows) { "probe.exe" } else { "probe" });
     std::fs::write(&path, source).unwrap();
-    let output = std::process::Command::new("clippy-driver")
+    let compiler = which::which_in("clippy-driver", std::env::var_os("PATH"), directory.path())
+        .expect("clippy-driver must be available for strict generated Rust pattern checks");
+    let output = std::process::Command::new(compiler)
+        .current_dir(directory.path())
         .args(["--edition=2024", "-D", "warnings"])
         .arg(&path)
         .arg("-o")
@@ -44,7 +38,13 @@ fn main() {{ assert_eq!(selected(&{value}), {expected}); }}
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    assert!(std::process::Command::new(binary).status().unwrap().success());
+    assert!(
+        std::process::Command::new(binary)
+            .current_dir(directory.path())
+            .status()
+            .unwrap()
+            .success()
+    );
 }
 
 #[test]
