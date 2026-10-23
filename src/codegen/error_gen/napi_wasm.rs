@@ -258,7 +258,9 @@ fn wasm_error_properties(error: &ErrorDef) -> Vec<(String, String)> {
 ///
 /// The `Error` keeps the display text as its `message`. It carries `code` (the snake-case variant
 /// name), the structured properties of [`wasm_error_properties`], and the payload fields of the
-/// variant. A private `error_code` helper returns the variant code string.
+/// variant. Complete safe payload fields are available under `Symbol.for("alef.error.payload")`;
+/// `payload` aliases that object only when no existing metadata property uses the name. ~keep
+/// A private `error_code` helper returns the variant code string.
 pub fn gen_wasm_error_converter(error: &ErrorDef, core_import: &str, source_remaps: &[(&str, &str)]) -> String {
     let rust_path = wasm_error_rust_path(error, core_import, source_remaps);
 
@@ -287,38 +289,10 @@ pub fn gen_wasm_error_converter(error: &ErrorDef, core_import: &str, source_rema
     format!("{}\n\n{}", code_fn, converter_fn)
 }
 
-fn wasm_payload_variants<'a>(error: &'a ErrorDef, rust_path: &str) -> Vec<(String, Vec<&'a str>)> {
-    error
-        .variants
-        .iter()
-        .filter(|variant| !variant.is_unit && !variant.is_tuple)
-        .filter_map(|variant| {
-            let fields: Vec<_> = variant
-                .fields
-                .iter()
-                .filter(|field| {
-                    !field.binding_excluded
-                        && !field.serde_skip
-                        && field.cfg.is_none()
-                        && !field.sanitized
-                        && !field.name.starts_with('_')
-                        && wasm_payload_type_is_safe(&field.ty)
-                })
-                .collect();
-            if fields.is_empty() {
-                return None;
-            }
-            let names = fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>();
-            Some((
-                format!("{rust_path}::{} {{ {}, .. }}", variant.name, names.join(", ")),
-                names,
-            ))
-        })
-        .collect::<Vec<_>>()
-}
-
 fn render_wasm_converter(error: &ErrorDef, rust_path: &str, fn_name: &str, code_fn_name: &str) -> String {
-    let payload_variants = wasm_payload_variants(error, rust_path);
+    let properties = wasm_error_properties(error);
+    let payload_variants = wasm_payload::variants(error, rust_path, &properties);
+    let attach_payload = !properties.iter().any(|(name, _)| name == "payload");
     let unknown_code = crate::core::ir::ApiSurface::FFI_ERROR_CODE_UNKNOWN;
     let kind_arms = error
         .variants
@@ -339,8 +313,9 @@ fn render_wasm_converter(error: &ErrorDef, rust_path: &str, fn_name: &str, code_
             code_fn_name => code_fn_name,
             kind_arms => kind_arms,
             unknown_code => unknown_code,
-            properties => wasm_error_properties(error),
+            properties => properties,
             payload_variants => payload_variants,
+            attach_payload => attach_payload,
         },
     )
 }
@@ -620,3 +595,6 @@ use super::shared::{
 #[cfg(test)]
 #[path = "tests/wasm_borrowed_error_type.rs"]
 mod wasm_borrowed_error_type;
+
+#[path = "wasm_payload.rs"]
+mod wasm_payload;

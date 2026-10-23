@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve configured Rust call paths for async adapters and standalone Ruby, C FFI, and Swift streaming wrappers, including qualified trait calls, generic methods, and public aliases.
 - Reject Rust path keywords used as bare adapter method names before emitting invalid receiver calls, while preserving qualified paths.
 - Render streaming Rust method bodies and Node adapter wrappers through registered templates while preserving generated bindings.
+- Preserve WASM errors' original Display text and typed metadata when payload fields share reserved JavaScript property names, retaining complete payload values under `Symbol.for("alef.error.payload")` and the `payload` alias when no existing metadata uses that name.
 
 ## [0.113.3] - 2026-10-23
 

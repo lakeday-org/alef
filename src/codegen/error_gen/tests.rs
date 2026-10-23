@@ -477,11 +477,11 @@ fn test_gen_wasm_error_converter() {
     assert!(output.contains("js_sys::Reflect::set(&obj, &\"code\".into(), &code.into()).ok()"));
     assert!(
         output
-            .contains("if let sample_markup_rs::ConversionError::InputTooLarge { observed_size, max_size, .. } = &e {")
+            .contains("if let sample_markup_rs::ConversionError::InputTooLarge { observed_size: __alef_error_field_0, max_size: __alef_error_field_1, .. } = &e {")
     );
     assert_eq!(output.matches("match &e {").count(), 1);
-    assert!(output.contains("js_sys::Reflect::set(&obj, &\"observed_size\".into(), &observed_size_value).ok()"));
-    assert!(output.contains("js_sys::Reflect::set(&obj, &\"max_size\".into(), &max_size_value).ok()"));
+    assert!(output.contains("js_sys::Reflect::set(&obj, &\"observed_size\".into(), &__alef_error_value_0).ok()"));
+    assert!(output.contains("js_sys::Reflect::set(&obj, &\"max_size\".into(), &__alef_error_value_1).ok()"));
     for field in ["source", "internal_limit", "skipped_limit", "feature_limit"] {
         assert!(
             !output.contains(&format!("&\"{field}\".into()")),
@@ -511,8 +511,14 @@ fn test_gen_wasm_error_converter_uses_match_for_multiple_payload_variants() {
 
     let output = gen_wasm_error_converter(&error, "sample_markup_rs", &[]);
     assert!(output.contains("match &e {"));
-    assert!(output.contains("sample_markup_rs::ConversionError::InputTooLarge { observed_size, .. } =>"));
-    assert!(output.contains("sample_markup_rs::ConversionError::RateLimited { retry_after, .. } =>"));
+    assert!(
+        output.contains(
+            "sample_markup_rs::ConversionError::InputTooLarge { observed_size: __alef_error_field_0, .. } =>"
+        )
+    );
+    assert!(
+        output.contains("sample_markup_rs::ConversionError::RateLimited { retry_after: __alef_error_field_0, .. } =>")
+    );
 }
 
 #[test]

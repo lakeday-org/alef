@@ -15,27 +15,40 @@ fn {{ fn_name }}(e: {{ rust_path }}) -> wasm_bindgen::JsValue {
 {% for name, value in properties %}
     js_sys::Reflect::set(&obj, &"{{ name }}".into(), &{{ value }}).ok();
 {% endfor %}
+{% if payload_variants %}
+    let __alef_error_payload = js_sys::Object::create(&wasm_bindgen::JsValue::NULL.into());
 {% if payload_variants | length == 1 %}
     if let {{ payload_variants[0][0] }} = &e {
-{% for name in payload_variants[0][1] %}
-        let {{ name }}_value = serde_wasm_bindgen::to_value({{ name }})
+{% for field in payload_variants[0][1] %}
+        let {{ field.value }} = serde_wasm_bindgen::to_value({{ field.binding }})
             .unwrap_or(wasm_bindgen::JsValue::NULL);
-        js_sys::Reflect::set(&obj, &"{{ name }}".into(), &{{ name }}_value).ok();
+        js_sys::Reflect::set(&__alef_error_payload, &"{{ field.name }}".into(), &{{ field.value }}).ok();
+{% if field.expose_flat %}
+        js_sys::Reflect::set(&obj, &"{{ field.name }}".into(), &{{ field.value }}).ok();
+{% endif %}
 {% endfor %}
     }
-{% elif payload_variants %}
+{% else %}
     match &e {
-{% for pattern, names in payload_variants %}
+{% for pattern, fields in payload_variants %}
         {{ pattern }} => {
-{% for name in names %}
-            let {{ name }}_value = serde_wasm_bindgen::to_value({{ name }})
+{% for field in fields %}
+            let {{ field.value }} = serde_wasm_bindgen::to_value({{ field.binding }})
                 .unwrap_or(wasm_bindgen::JsValue::NULL);
-            js_sys::Reflect::set(&obj, &"{{ name }}".into(), &{{ name }}_value).ok();
+            js_sys::Reflect::set(&__alef_error_payload, &"{{ field.name }}".into(), &{{ field.value }}).ok();
+{% if field.expose_flat %}
+            js_sys::Reflect::set(&obj, &"{{ field.name }}".into(), &{{ field.value }}).ok();
+{% endif %}
 {% endfor %}
         },
 {% endfor %}
         _ => {}
     }
+{% endif %}
+    js_sys::Reflect::set(&obj, &js_sys::Symbol::for_("alef.error.payload").into(), &__alef_error_payload).ok();
+{% if attach_payload %}
+    js_sys::Reflect::set(&obj, &"payload".into(), &__alef_error_payload).ok();
+{% endif %}
 {% endif %}
     obj.into()
 }
