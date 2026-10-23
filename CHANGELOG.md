@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep validation, build, and publish jobs running when the optional compiler-cache service is unavailable.
 - Render strict Swift bridge-pattern Rust probes through registered templates and isolate compiler lookup and subprocess working directories.
 - Render the Swift error compatibility probe through the backend template registry and anchor compiler and runtime probes to their owned temporary directory.
 

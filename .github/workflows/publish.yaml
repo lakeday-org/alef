@@ -272,6 +272,7 @@ jobs:
       - name: Setup Rust
         uses: xberg-io/actions/setup-rust@v1
         with:
+          use-sccache: "false"
           target: ${{ matrix.target }}
           cache-key-prefix: publish-cli-${{ matrix.label }}
           install-llvm-cov: "false"
@@ -683,6 +684,7 @@ jobs:
       - name: Setup Rust
         uses: xberg-io/actions/setup-rust@v1
         with:
+          use-sccache: "false"
           install-llvm-cov: "false"
 
       - name: Install Task for package verification

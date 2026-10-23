@@ -36,6 +36,7 @@ jobs:
           version: "3.54.0"
       - uses: xberg-io/actions/setup-rust@cc89740654cef67b752113ddd87d4f0d23dda3f5
         with:
+          use-sccache: "false"
           install-llvm-cov: "false"
           cache-key-prefix: zig-windows-diagnostics
       - uses: xberg-io/actions/setup-zig@cc89740654cef67b752113ddd87d4f0d23dda3f5

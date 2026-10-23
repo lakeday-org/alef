@@ -28,6 +28,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: xberg-io/actions/setup-rust@v1
         with:
+          use-sccache: "false"
           components: "rustfmt, clippy"
           install-llvm-cov: "false"
           macos-dynamic-lookup: "false"
@@ -46,9 +47,10 @@ jobs:
         run: cargo sort --check --workspace
 
   poly-validate:
-    uses: xberg-io/actions/.github/workflows/reusable-validate.yml@v1
+    uses: xberg-io/actions/.github/workflows/reusable-validate.yml@c2525cd5fabf1619f76253284e46cc5c7aaff81e
     with:
       setup-rust: true
+      rust-use-sccache: false
       setup-python: true
 
   test:
@@ -80,6 +82,7 @@ jobs:
           if-no-files-found: error
       - uses: xberg-io/actions/setup-rust@v1
         with:
+          use-sccache: "false"
           install-llvm-cov: "false"
           cache-key-prefix: ci-test
           # ~keep Only the Ruby native fixture selects GNU; the workspace continues to use MSVC.
@@ -292,6 +295,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: xberg-io/actions/setup-rust@v1
         with:
+          use-sccache: "false"
           components: "clippy"
           install-llvm-cov: "false"
           cache-key-prefix: ci-generated-output-gate
@@ -389,6 +393,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: xberg-io/actions/setup-rust@v1
         with:
+          use-sccache: "false"
           install-llvm-cov: "false"
           cache-key-prefix: ci-build
       - uses: xberg-io/actions/build-rust-cli@v1

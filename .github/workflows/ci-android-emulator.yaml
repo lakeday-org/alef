@@ -27,6 +27,7 @@ jobs:
 
       - uses: xberg-io/actions/setup-rust@v1
         with:
+          use-sccache: "false"
           components: ""
           install-llvm-cov: "false"
           macos-dynamic-lookup: "false"
