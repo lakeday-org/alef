@@ -18,6 +18,14 @@ use crate::e2e::field_access::FieldResolver;
 ///
 /// The returned line carries its own trailing newline, so callers `push_str` it directly.
 pub(super) fn refusal_line(field: &str, field_resolver: &FieldResolver, lang: &str) -> Option<String> {
+    if lang == "wasm"
+        && let Some(owner) = field_resolver.text_projected_crossing(field)
+    {
+        return Some(crate::e2e::template_env::render(
+            "typescript/text_projection_skip.jinja",
+            crate::alef_context! { field => field, owner => owner },
+        ));
+    }
     if !field_resolver.is_valid_for_result(field) {
         return Some(skip_line(FieldSkip::NotAvailableOnResultType, field));
     }

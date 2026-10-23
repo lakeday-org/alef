@@ -1,0 +1,12 @@
+export {};
+let checks = 0;
+const it = Object.assign((_name: string, body: () => void, _timeout?: number) => body(), {
+  skip(_name: string, _body: () => void) {}
+});
+export function reply() { return {content: "hello world", summary: "report"}; }
+export function expect(actual: unknown) {
+  checks += 1;
+  return {toBe(expected: unknown) { if (actual !== expected) throw new Error(`expected ${expected}, got ${actual}`); }};
+}
+{{ test }}
+if (checks !== {{ expected_checks }}) throw new Error(`unexpected executed assertion count ${checks}`);

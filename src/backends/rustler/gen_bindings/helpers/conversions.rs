@@ -384,7 +384,7 @@ pub(in crate::backends::rustler::gen_bindings) fn gen_elixir_enum_module(
 /// `NifTaggedEnum` tuple. The Elixir-side `wire_value/1` dispatch (below) must agree with this
 /// gate exactly, so both sides call this single function instead of keeping the condition in
 /// sync by hand. ~keep
-pub(in crate::backends::rustler::gen_bindings) fn is_flat_data_enum(enum_def: &crate::core::ir::EnumDef) -> bool {
+pub(crate) fn is_flat_data_enum(enum_def: &crate::core::ir::EnumDef) -> bool {
     let has_data = enum_def.variants.iter().any(|v| !v.fields.is_empty());
     has_data
         && enum_def
@@ -431,7 +431,7 @@ fn escape_elixir_string_literal(value: &str) -> String {
 /// ones: an Elixir caller could reference an atom the NIF layer can never actually produce or
 /// accept. A host-owned cfg-gated variant is still always kept, matching every other backend's
 /// declaration surface. ~keep
-pub(in crate::backends::rustler::gen_bindings) fn gen_elixir_enum_module_with_known_types(
+pub(crate) fn gen_elixir_enum_module_with_known_types(
     enum_def: &crate::core::ir::EnumDef,
     app_module: &str,
     known_types: &AHashSet<String>,

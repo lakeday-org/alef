@@ -7,6 +7,8 @@ use crate::e2e::fixture::Assertion;
 
 use super::json::json_to_js;
 
+#[path = "assertions/collection_payload.rs"]
+mod collection_payload;
 #[path = "assertions/mock_capture.rs"]
 mod mock_capture;
 #[path = "assertions/napi_enum.rs"]
@@ -159,6 +161,10 @@ pub(super) fn render_assertion_with_streaming_item_type(
         return;
     }
 
+    if lang == "wasm" && collection_payload::render(out, assertion, result_var, field_resolver) {
+        return;
+    }
+
     // A `foo[].bar` fixture path means "some element of foo satisfies this", but
     // `FieldResolver::accessor` lowers `[]` to index 0 (`result.foo[0].bar`), which
     // silently checks only the first element and reads as coverage. Quantify over every
@@ -195,13 +201,6 @@ pub(super) fn render_assertion_with_streaming_item_type(
         return;
     }
 
-    // A field surviving the refusal above by way of `typescript_tagged_union_accessor` needs
-    // THAT accessor, not the ordinary one: the ordinary renderer walks the fixture path as plain
-    // field segments and has no notion of a tagged-union variant crossing, so it would spell the
-    // variant segment (`html`, `excel`) as just another `.field` access -- correct for node's
-    // real flattened property, but wrong for wasm's flattened `JsValue` payload, which has no
-    // such segment at all. Falling back to the ordinary accessor for every other field keeps
-    // this additive. ~keep
     let mut field_expr = match &assertion.field {
         Some(f) if !f.is_empty() => field_resolver
             .typescript_tagged_union_accessor(f, lang, result_var)

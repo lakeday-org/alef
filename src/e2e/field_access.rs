@@ -19,6 +19,7 @@ mod python_typeddict;
 mod python_wire_shapes;
 mod renderers;
 mod resolver;
+mod text_projection;
 mod types;
 mod variant_crossings;
 

@@ -11,24 +11,9 @@ use std::fmt::Write as FmtWrite;
 
 use super::values::json_to_elixir;
 
-/// Returns true if the field expression is a numeric/integer expression
-/// (e.g., a `length(...)` call) rather than a string.
-pub(super) fn is_numeric_expr(field_expr: &str) -> bool {
-    field_expr.starts_with("length(")
-}
-
-/// Build a call to the generated enum module's `wire_value/1` function.
-///
-/// Enum submodules (`AppModule.EnumName`) live under the app's top-level Elixir module,
-/// regardless of which (possibly nested) module a given NIF call is dispatched through --
-/// see `enum_module_header.jinja` in the rustler backend, which always nests enum modules one
-/// level under `app_module`. `module_path` here is the *call's* module (`E2eConfig`'s
-/// `[crates.e2e.call] module`, e.g. `MyLib` or a nested `MyLib.Service`), so only its first
-/// dot-segment is the app root the enum module actually lives under. ~keep
-fn elixir_enum_wire_value_expr(module_path: &str, enum_type_name: &str, field_expr: &str) -> String {
-    let app_root = module_path.split('.').next().unwrap_or(module_path);
-    format!("{app_root}.{enum_type_name}.wire_value({field_expr})")
-}
+#[path = "assertions/collection_payload.rs"]
+mod collection_payload;
+use collection_payload::{elixir_enum_wire_value_expr, is_numeric_expr};
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render_assertion(
@@ -342,6 +327,10 @@ pub(super) fn render_assertion(
             "      # skipped: {}",
             FieldSkip::NotAvailableOnResultType.message(f)
         );
+        return;
+    }
+
+    if collection_payload::render(out, assertion, result_var, field_resolver) {
         return;
     }
 

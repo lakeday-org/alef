@@ -735,3 +735,7 @@ fn prune_orphaned_snippets(output_root: &Path, coverage: &snippets::SnippetCover
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "codegen/collection_payload_test_support.rs"]
+pub(crate) mod collection_payload_test_support;

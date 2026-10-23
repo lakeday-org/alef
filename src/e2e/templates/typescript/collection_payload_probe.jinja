@@ -1,0 +1,43 @@
+function expect(actual: unknown) {
+  return {
+    toBe(expected: unknown) { if (actual !== expected) throw new Error(`expected ${expected}, got ${actual}`); },
+    toEqual(expected: unknown) { if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`expected ${expected}, got ${actual}`); }
+  };
+}
+function verify(result: {content: unknown}) {
+{{ assertions }}
+}
+function verifyCount(result: {content: unknown}) {
+{{ count_assertion }}
+}
+function oldVerify(result: {content: unknown}) {
+{{ old_assertions }}
+}
+const producer = {{ producer }};
+verify(producer);
+const cases = [
+  {content: [producer.content[0]]},
+  {content: [{kind: "text", value: "wrong"}, producer.content[1]]},
+  {content: [producer.content[0], {kind: "text", value: "wrong"}]},
+  {content: "xx"},
+  {content: null},
+  {content: 2}
+];
+for (const value of cases) {
+  let failed = false;
+  try { verify(value); } catch { failed = true; }
+  if (!failed) throw new Error("invalid payload passed");
+}
+verifyCount(producer);
+const countCases = [{content: []}, {content: "xx"}, {content: null}, {content: 2}];
+for (const value of countCases) {
+  let failed = false;
+  try { verifyCount(value); } catch { failed = true; }
+  if (!failed) throw new Error("invalid count-only payload passed");
+}
+let oldFailed = false;
+try { oldVerify(producer); } catch (error) {
+  oldFailed = error instanceof Error && error.message === "expected hello, got undefined";
+}
+if (!oldFailed) throw new Error("old wire field read did not fail for missing canonical key");
+console.log(`verified ${cases.length + 1} WASM wire cases, ${countCases.length + 1} count cases and old canonical-field failure`);

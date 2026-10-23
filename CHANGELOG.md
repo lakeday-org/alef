@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep generated Java streaming methods within Checkstyle method-length limits by moving iterator state into private helpers, with an always-on generated-output length guard (#685).
 
 - Preserve exact list-variant counts and indexed text assertions in generated C#, Dart, Kotlin, and Kotlin Android tests, including enum elements and explicit wire field names.
+- Lower Elixir tagged tuple list payload assertions correctly and respect WASM text projections when checking structural parts (#684).
+
 - Preserve absent optional Swift error durations as nil while retaining explicit zero and positive delays (#683).
 
 - Preserve indexed list-variant paths and canonical payload field metadata when lowering generated assertions (#682).

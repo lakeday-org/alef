@@ -1,6 +1,7 @@
 //! Elixir (Rustler) binding generator backend for alef.
 
 mod elixir_escape;
+pub(crate) use elixir_escape::elixir_atom_body;
 pub(crate) mod gen_bindings;
 pub(crate) mod template_env;
 pub mod trait_bridge;

@@ -111,6 +111,7 @@ pub struct FieldResolver {
     pub(super) rust_enum_module: Option<String>,
     /// Enum names whose serde wire representation has no discriminator at all.
     pub(super) wasm_untagged_enum_names: HashSet<String>,
+    pub(super) text_projected_enum_names: HashSet<String>,
     /// Names of IR enum types for which the Java binding backend does NOT emit a plain
     /// `enum` with a `getValue()` accessor — i.e. `!backends::java::gen_bindings::emits_get_value`
     /// (tagged- or untagged-union wrapper classes). Populated once per crate IR, from the exact

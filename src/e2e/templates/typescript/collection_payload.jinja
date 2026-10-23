@@ -1,0 +1,15 @@
+{% if assertion_type in ["equals", "count_equals", "count_min", "not_empty", "is_empty"] %}
+{% if assertion_type == "equals" and expected is not none %}
+    expect({{ expression }}).toEqual({{ expected }});
+{% elif assertion_type == "count_equals" and expected is not none %}
+    expect({{ size }}).toBe({{ expected }});
+{% elif assertion_type == "count_min" and expected is not none %}
+    expect({{ size }}).toBeGreaterThanOrEqual({{ expected }});
+{% elif assertion_type == "not_empty" %}
+    expect({{ size }}).toBeGreaterThan(0);
+{% elif assertion_type == "is_empty" %}
+    expect({{ size }}).toBe(0);
+{% endif %}
+{% else %}
+    // skipped: unsupported collection payload assertion {{ assertion_type }} on {{ field }}
+{% endif %}

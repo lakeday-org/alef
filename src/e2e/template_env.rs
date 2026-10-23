@@ -5,6 +5,38 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "typescript/nested_collection_probe.jinja",
+        include_str!("templates/typescript/nested_collection_probe.jinja"),
+    ),
+    (
+        "typescript/text_projection_skip.jinja",
+        include_str!("templates/typescript/text_projection_skip.jinja"),
+    ),
+    (
+        "typescript/projected_test_probe.jinja",
+        include_str!("templates/typescript/projected_test_probe.jinja"),
+    ),
+    (
+        "elixir/collection_payload_probe.jinja",
+        include_str!("templates/elixir/collection_payload_probe.jinja"),
+    ),
+    (
+        "typescript/collection_payload_probe.jinja",
+        include_str!("templates/typescript/collection_payload_probe.jinja"),
+    ),
+    (
+        "elixir/collection_payload.jinja",
+        include_str!("templates/elixir/collection_payload.jinja"),
+    ),
+    (
+        "elixir/tagged_payload_field.jinja",
+        include_str!("templates/elixir/tagged_payload_field.jinja"),
+    ),
+    (
+        "typescript/collection_payload.jinja",
+        include_str!("templates/typescript/collection_payload.jinja"),
+    ),
+    (
         "go/optional_wildcard_runtime.go.jinja",
         include_str!("templates/go/optional_wildcard_runtime.go.jinja"),
     ),

@@ -1,0 +1,22 @@
+function expect(actual: unknown) {
+  return {toBe(expected: unknown) { if (actual !== expected) throw new Error(`expected ${expected}, got ${actual}`); }};
+}
+function verify(result: {content: unknown}) {
+{{ assertions }}
+}
+const producer = {{ producer }};
+verify(producer);
+const invalid = [
+  {content: [{kind: "group", values: "xx"}]},
+  {content: [{kind: "group", values: null}]},
+  {content: [{kind: "group", values: ["only"]}]}
+];
+for (const value of invalid) {
+  let failure = "";
+  try { verify(value); } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+  }
+  const expected = Array.isArray(value.content[0].values) ? "expected 2, got 1" : "expected array payload";
+  if (failure !== expected) throw new Error(`wrong nested-count failure ${failure}`);
+}
+console.log(`verified ${invalid.length + 1} nested collection count cases`);

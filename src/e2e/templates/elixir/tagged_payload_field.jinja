@@ -1,0 +1,1 @@
+(case {{ expression }} do {tag, payload} when tag == :{{ tag }} and is_map(payload) -> Map.fetch!(payload, :{{ name }}); _ -> raise "unexpected enum payload" end)

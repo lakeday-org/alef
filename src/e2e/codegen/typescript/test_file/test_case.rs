@@ -91,6 +91,7 @@ pub(in crate::e2e::codegen::typescript::test_file) fn render_test_case(
     // named against the IR's real union type rather than re-derived from the path's shape.
     .with_ir_enum_map(FieldResolver::ir_enum_fields(type_defs, enums), call_root_type.clone())
     .with_wasm_enum_representations(enums)
+    .with_text_projected_enums(&config.untagged_union_text_types)
     .with_napi_tagged_object_enums(enums, type_defs)
     .with_napi_flattened_newtype_variants(enums, type_defs)
     .with_ir_collection_map(FieldResolver::ir_collection_fields(type_defs), call_root_type)
@@ -446,8 +447,16 @@ pub(in crate::e2e::codegen::typescript::test_file) fn render_test_case(
     // which never reports a pass, unless the fixture declared `not_error` — there the drive itself
     // is the check and refusing would delete it.
     let mut refusal_body = String::new();
+    let has_projected_assertion = lang == "wasm"
+        && fixture
+            .assertions
+            .iter()
+            .filter_map(|assertion| assertion.field.as_deref())
+            .any(|field| field_resolver.text_projected_crossing(field).is_some());
     let refuse = verdict.as_ref().is_some_and(|refusal| {
-        refusal.cause == InertCause::UnresolvedFieldPath || (is_streaming && !declares_not_error)
+        refusal.cause == InertCause::UnresolvedFieldPath
+            || (is_streaming && !declares_not_error)
+            || has_projected_assertion
     });
     match verdict.filter(|_| refuse) {
         Some(refusal) => {

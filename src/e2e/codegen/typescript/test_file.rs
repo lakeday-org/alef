@@ -119,3 +119,7 @@ pub(in crate::e2e::codegen::typescript::test_file) use wasm::{
     wasm_call_roots_are_exported, wasm_class_name, wasm_excluded_class_names, wasm_import_is_exported,
     wasm_prefixed_wrapped_type, without_excluded_wasm_nested_types,
 };
+
+#[cfg(test)]
+#[path = "test_file/collection_payload_wiring_tests.rs"]
+mod collection_payload_wiring_tests;

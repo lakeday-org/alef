@@ -1,0 +1,35 @@
+{{ producer }}
+ExUnit.start(autorun: false)
+defmodule PayloadProbe do
+  import ExUnit.Assertions
+  def verify(result) do
+{{ assertions }}
+  end
+end
+parts = [Sample.Piece.text("hello"), Sample.Piece.text(" world")]
+PayloadProbe.verify(%{content: %{parts: parts}})
+invalid = [
+  %{content: %{parts: Enum.take(parts, 1)}},
+  %{content: %{parts: [Sample.Piece.text("wrong"), Enum.at(parts, 1)]}},
+  %{content: %{parts: [Enum.at(parts, 0), Sample.Piece.text("wrong")]}},
+  %{content: %{parts: "xx"}},
+  %{content: %{parts: nil}},
+  %{content: nil}
+]
+for value <- invalid do
+  failed = try do
+    PayloadProbe.verify(value)
+    false
+  rescue
+    _ -> true
+  end
+  unless failed, do: raise("invalid payload passed")
+end
+old_failed = try do
+  Enum.at(parts, 0).text
+  false
+rescue
+  BadMapError -> true
+end
+unless old_failed, do: raise("old tuple read did not fail with BadMapError")
+IO.puts("verified #{length(invalid) + 1} Elixir payload cases and old tuple failure")

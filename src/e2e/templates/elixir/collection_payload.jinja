@@ -1,0 +1,13 @@
+{% if assertion_type == "equals" and expected is not none %}
+      assert {{ expression }} == {{ expected }}
+{% elif assertion_type == "count_equals" and expected is not none %}
+      assert length({{ expression }}) == {{ expected }}
+{% elif assertion_type == "count_min" and expected is not none %}
+      assert length({{ expression }}) >= {{ expected }}
+{% elif assertion_type == "not_empty" %}
+      assert is_list({{ expression }}) and {{ expression }} != []
+{% elif assertion_type == "is_empty" %}
+      assert {{ expression }} == []
+{% else %}
+      # skipped: unsupported collection payload assertion {{ assertion_type }} on {{ field }}
+{% endif %}
