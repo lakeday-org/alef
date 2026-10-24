@@ -29,6 +29,7 @@ mod overloads;
 pub mod plugin_marshal;
 pub mod service_api;
 mod streaming;
+mod struct_references;
 mod text_value_accessors;
 pub mod trait_bridge;
 pub(crate) mod zero_arg_default;
@@ -361,22 +362,7 @@ impl Backend for SwiftBackend {
             body.push('\n');
         }
 
-        for type_name in &first_class_struct_names {
-            body.push_str(&crate::backends::swift::template_env::render(
-                "typealias.jinja",
-                crate::alef_context! {
-                    name => &format!("{type_name}Ref"),
-                },
-            ));
-            body.push('\n');
-            body.push_str(&crate::backends::swift::template_env::render(
-                "typealias.jinja",
-                crate::alef_context! {
-                    name => &format!("{type_name}RefMut"),
-                },
-            ));
-            body.push('\n');
-        }
+        struct_references::emit(&first_class_struct_names, &mut body);
 
         text_value_accessors::emit(
             api,

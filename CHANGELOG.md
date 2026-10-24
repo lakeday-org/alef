@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Record multiple ordered Swift constructor signatures with `constructor_history`, preserving released public initializer and RustBridge factory function references and native symbols alongside the current full constructor. Existing `legacy_constructor_fields` behavior is retained. Rust callers constructing `VersionAnnotation` literals must add `constructor_history: vec![]` or use `..Default::default()`; old serialized IR remains readable.
 
+### Changed
+
+- Extract Swift DTO reference aliases and the Rust assertion entry point into focused modules without changing generated output.
+
 ### Fixed
 
 - Execute scalar Swift text-enum variant assertions and compare finite JSON numeric and Boolean expectations without coercion, signed wrapping, truncation or floating-point rounding (#691).
