@@ -4,8 +4,8 @@ pub(super) static TEMPLATES: &[(&str, &str)] = &[
         include_str!("../templates/swift_serde_vector_read.swift.jinja"),
     ),
     (
-        "swift_text_projected_read.swift.jinja",
-        include_str!("../templates/swift_text_projected_read.swift.jinja"),
+        "swift_text_value_accessors.swift.jinja",
+        include_str!("../templates/swift_text_value_accessors.swift.jinja"),
     ),
     (
         "components.swift.jinja",

@@ -9,7 +9,7 @@
 
 use crate::backends::swift::gen_rust_crate::type_bridge::{
     bridge_type_enum_aware_ref, field_needs_json_bridge, is_enum_named, is_vec_of_enum, needs_json_bridge,
-    text_projected_getter_type,
+    text_projected_getter_type, text_projected_value_names,
 };
 use crate::codegen::conversions::helpers::{apply_explicit_field_newtype_from_core, is_explicit_newtype};
 use crate::core::ir::{CoreWrapper, FieldDef, TypeDef, TypeRef};
@@ -233,11 +233,22 @@ fn emit_remaining_getter(ty: &TypeDef, field: &crate::core::ir::FieldDef, ctx: &
 /// The value converts through the core type's `Display` impl, the same conversion the WASM
 /// backend uses for these fields. A `Text` value gives its string without JSON quotes, and a
 /// list of parts gives the joined text of its text parts.
+///
+/// A second getter returns the whole value as JSON, because the text of a list of parts does not
+/// hold the parts. The Swift facade decodes it into the union type. A value that fails to
+/// serialise gives the JSON text `null`, which the Swift decode rejects, so the failure reaches the
+/// caller as a thrown error and never as a panic across the bridge.
 fn emit_text_type_getter(field: &FieldDef, ctx: &GetterCtx, out: &mut String) {
+    let optional = field.optional || matches!(field.ty, TypeRef::Optional(_));
     out.push_str(&crate::backends::swift::template_env::render(
         "getter_display_text.rs.jinja",
         crate::alef_context! { getter_name => &ctx.getter_name, return_type => &ctx.bridge_ty_owned,
-        name => &ctx.name, optional => field.optional || matches!(field.ty, TypeRef::Optional(_)) },
+        name => &ctx.name, optional => optional },
+    ));
+    out.push_str(&crate::backends::swift::template_env::render(
+        "getter_display_text_json.rs.jinja",
+        crate::alef_context! { json_name => text_projected_value_names(&ctx.name).json_getter,
+        return_type => &ctx.bridge_ty_owned, name => &ctx.name, optional => optional },
     ));
 }
 
@@ -836,8 +847,10 @@ mod tests {
             "a text-type field getter must return the text of the value:\n{out}"
         );
         assert!(
-            !out.contains("serde_json::to_string"),
-            "a text-type field getter must not return JSON text:\n{out}"
+            !out.contains(
+                "pub fn content(&self) -> Option<String> {\n        self.0.content.as_ref().map(|v| serde_json"
+            ),
+            "the text getter must not return JSON text:\n{out}"
         );
     }
 
@@ -851,8 +864,46 @@ mod tests {
             "a required text-type field getter must return the text of the value:\n{out}"
         );
         assert!(
-            !out.contains("serde_json::to_string"),
-            "no JSON round-trip expected:\n{out}"
+            !out.contains("pub fn content(&self) -> String {\n        serde_json"),
+            "the text getter must not return JSON text:\n{out}"
+        );
+    }
+
+    /// The text getter joins the parts of a reply, so a second getter returns the whole value as
+    /// JSON for the Swift side to decode into the union type.
+    #[test]
+    fn should_return_the_whole_value_as_json_beside_the_text_of_an_optional_text_type_field() {
+        let text_types: HashSet<&str> = ["AssistantContent"].into_iter().collect();
+        let out = emit_message_getters(true, &text_types);
+
+        assert!(
+            out.contains(
+                "pub fn content_json(&self) -> Option<String> {\n        self.0.content.as_ref().map(|v| serde_json::to_string(v).unwrap_or_else(|_| \"null\".to_string()))"
+            ),
+            "an optional text-type field needs a JSON getter beside the text getter:\n{out}"
+        );
+    }
+
+    #[test]
+    fn should_return_the_whole_value_as_json_beside_the_text_of_a_required_text_type_field() {
+        let text_types: HashSet<&str> = ["AssistantContent"].into_iter().collect();
+        let out = emit_message_getters(false, &text_types);
+
+        assert!(
+            out.contains(
+                "pub fn content_json(&self) -> String {\n        serde_json::to_string(&self.0.content).unwrap_or_else(|_| \"null\".to_string())"
+            ),
+            "a required text-type field needs a JSON getter beside the text getter:\n{out}"
+        );
+    }
+
+    #[test]
+    fn should_not_add_a_json_getter_for_an_enum_outside_the_text_types() {
+        let out = emit_message_getters(true, &HashSet::new());
+
+        assert!(
+            !out.contains("content_json"),
+            "only text-type fields get the extra JSON getter:\n{out}"
         );
     }
 
