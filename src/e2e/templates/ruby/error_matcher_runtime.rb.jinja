@@ -1,4 +1,17 @@
 require 'rspec/autorun'
+require 'json'
+raised_errors = []
+trace = TracePoint.new(:raise) do |event|
+  error = event.raised_exception
+  raised_errors << {class: error.class.name, message: error.message} if error.is_a?(NameError)
+end
+trace.enable
+RSpec.configure do |config|
+  config.after(:suite) do
+    trace.disable
+    File.write(File.join(__dir__, 'raised_errors.json'), JSON.generate(raised_errors))
+  end
+end
 require_relative 'ruby_error_matcher_fixture'
 RSpec.describe 'generated native error matchers' do
 {% for case in cases %}

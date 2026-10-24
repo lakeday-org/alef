@@ -1,12 +1,18 @@
 use super::render_raise_error_clause;
-use super::tests::{errors, fixture};
+use super::tests::{errors, errors_with_hidden, fixture};
 use crate::core::ir::ApiSurface;
 use std::path::Path;
 use std::process::{Command, Output};
 
 fn task(directory: &Path, target: &str) -> Output {
+    task_args(directory, target, &[])
+}
+
+fn task_args(directory: &Path, target: &str, arguments: &[&str]) -> Output {
     Command::new(executable("task", directory))
         .arg(target)
+        .arg("--")
+        .args(arguments)
         .current_dir(directory)
         .env("CARGO_TARGET_DIR", directory.join("target"))
         .env("RUSTC_WRAPPER", "")
@@ -100,10 +106,10 @@ fn prepare_native(path: &Path, errors: &[crate::core::ir::ErrorDef]) {
         include_str!("../../../../../tests/fixtures/ruby_error_matcher/Taskfile.yml"),
     )
     .expect("tasks");
-    let api = ApiSurface {
+    let api = crate::codegen::binding_projection::project_owned(ApiSurface {
         errors: errors.to_vec(),
         ..Default::default()
-    };
+    });
     let source = crate::e2e::template_env::render(
         "ruby/error_matcher_native.rs.jinja",
         crate::alef_context! {
@@ -160,4 +166,67 @@ fn positive_cases(errors: &[crate::core::ir::ErrorDef]) -> [NativeCase; 8] {
             true,
         ),
     ]
+}
+
+#[test]
+#[ignore = "requires Ruby headers, Magnus and RSpec"]
+fn skipped_error_matchers_reject_the_missing_constant_negative_control() {
+    let directory = tempfile::tempdir().expect("owned native fixture");
+    let path = directory.path();
+    let errors = errors_with_hidden();
+    prepare_native(path, &errors);
+    let mut unprojected = errors.clone();
+    unprojected.last_mut().expect("Rust-only error").binding_excluded = false;
+    let old = [(
+        "unprojected matcher",
+        "Sample.bad_request",
+        render_raise_error_clause(&fixture(None), &unprojected, "Sample"),
+        false,
+    )];
+    std::fs::write(path.join("matcher_spec.rb"), render_cases(&old)).expect("negative spec");
+    let output = task_args(path, "test", &["--format", "json"]);
+    assert_missing_constant(path, &output);
+    let cases = positive_cases(&errors);
+    std::fs::write(path.join("matcher_spec.rb"), render_cases(&cases)).expect("fixed spec");
+    let output = task(path, "test");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "{stdout}\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("8 examples, 0 failures"), "{stdout}");
+}
+
+fn assert_missing_constant(path: &Path, output: &Output) {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(!output.status.success(), "missing constant control unexpectedly passed");
+    let report: serde_json::Value = serde_json::from_str(&stdout).expect("RSpec JSON report");
+    assert_eq!(report["summary"]["example_count"], 1, "{stdout}");
+    assert_eq!(report["summary"]["failure_count"], 1, "{stdout}");
+    assert_eq!(
+        report["examples"][0]["exception"]["class"], "RSpec::Expectations::ExpectationNotMetError",
+        "{stdout}"
+    );
+    let raised: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path.join("raised_errors.json")).expect("actual Ruby raises"))
+            .expect("raised error report");
+    assert!(
+        raised
+            .as_array()
+            .expect("raised errors")
+            .iter()
+            .any(|error| error["class"] == "NameError"
+                && error["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("Sample::HiddenCompileError"))),
+        "{raised}"
+    );
+    assert!(
+        report["examples"][0]["exception"]["message"]
+            .as_str()
+            .expect("exception message")
+            .contains("Sample::HiddenCompileError"),
+        "{stdout}"
+    );
 }

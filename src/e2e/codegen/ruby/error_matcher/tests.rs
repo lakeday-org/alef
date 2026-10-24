@@ -88,3 +88,70 @@ fn a_declared_variant_of_an_excluded_error_falls_back_to_the_message_check() {
     );
     assert!(clause.starts_with("raise_error(StandardError) { |error|"), "{clause}");
 }
+
+pub(in crate::e2e::codegen::ruby) fn errors_with_hidden() -> Vec<ErrorDef> {
+    let mut errors = errors();
+    errors.push(
+        serde_json::from_value(serde_json::json!({
+            "name": "HiddenCompileError", "rust_path": "sample::HiddenCompileError", "doc": "",
+            "binding_excluded": true,
+            "variants": [{"name": "HiddenSyntax", "is_unit": true, "doc": ""}]
+        }))
+        .expect("Rust-only error"),
+    );
+    errors
+}
+
+#[test]
+fn rust_only_errors_never_supply_matcher_constants() {
+    for (declared, expected) in [
+        (None, "be_a(Sample::RootError).or be_a(RuntimeError)"),
+        (Some("BadRequest"), "raise_error(Sample::BadRequestError)"),
+        (Some("HiddenSyntax"), "/HiddenSyntax/"),
+        (Some("missing.field[0]"), r"/missing\.field\[0\]/"),
+    ] {
+        let clause = render_raise_error_clause(&fixture(declared), &errors_with_hidden(), "Sample");
+        assert!(clause.contains(expected), "{clause}");
+        assert!(!clause.contains("Sample::Hidden"), "{clause}");
+    }
+    let hidden = errors_with_hidden().pop().expect("hidden error");
+    assert_eq!(
+        render_raise_error_clause(&fixture(None), &[hidden], "Sample"),
+        "raise_error(RuntimeError)"
+    );
+}
+
+#[test]
+fn full_generator_retains_error_fixtures_and_only_names_exported_classes() {
+    use crate::e2e::codegen::{E2eCodegen, ruby::RubyCodegen};
+    let mut config = crate::e2e::config::E2eConfig::default();
+    config.call.module = "Sample".into();
+    config.call.function = "bad_request".into();
+    let groups = [crate::e2e::fixture::FixtureGroup {
+        category: "errors".into(),
+        fixtures: vec![fixture(None)],
+    }];
+    let files = RubyCodegen
+        .generate(
+            &groups,
+            &config,
+            &Default::default(),
+            &[],
+            &[],
+            &[],
+            &errors_with_hidden(),
+        )
+        .expect("Ruby generation");
+    let specs: Vec<_> = files
+        .iter()
+        .filter(|file| file.path.to_string_lossy().ends_with("errors_spec.rb"))
+        .collect();
+    assert_eq!(specs.len(), 1, "one emitted spec must be checked");
+    let source = &specs[0].content;
+    assert!(
+        source.contains("be_a(Sample::RootError).or be_a(RuntimeError)"),
+        "{source}"
+    );
+    assert!(!source.contains("Sample::HiddenCompileError"), "{source}");
+    assert!(source.contains("it "), "fixture must be emitted: {source}");
+}

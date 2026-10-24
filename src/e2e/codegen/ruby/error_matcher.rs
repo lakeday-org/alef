@@ -56,4 +56,4 @@ pub(super) fn render_raise_error_clause(fixture: &Fixture, errors: &[ErrorDef], 
 #[cfg(test)]
 mod native_tests;
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

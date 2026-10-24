@@ -80,3 +80,18 @@ fn streaming_known_variants_preserve_identity_and_record_only_status_gaps() {
     let records = crate::e2e::codegen::take_skip_records();
     assert_eq!(records.len(), 1, "{records:?}");
 }
+
+#[test]
+fn generated_streaming_specs_omit_rust_only_errors_without_skipping_assertions() {
+    let errors = super::error_matcher::tests::errors_with_hidden();
+    for (declared, expected) in [
+        (None, "be_a(Sample::RootError).or be_a(RuntimeError)"),
+        (Some("BadRequest"), "raise_error(Sample::BadRequestError)"),
+        (Some("HiddenSyntax"), "/HiddenSyntax/"),
+    ] {
+        let source = render(declared, &errors);
+        assert!(source.contains(expected), "{source}");
+        assert!(!source.contains("Sample::Hidden"), "{source}");
+        assert!(source.contains("it "), "fixture was not emitted: {source}");
+    }
+}

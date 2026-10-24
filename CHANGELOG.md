@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Exclude Rust-only skipped errors from generated Ruby error matchers while preserving visible typed errors, shared inheritance, and literal message assertions.
+
 ## [0.113.4] - 2026-10-23
 
 ### Fixed
