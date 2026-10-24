@@ -17,15 +17,9 @@ pub(super) fn try_render(out: &mut String, assertion: &Assertion, result_var: &s
         return false;
     };
     let kind = assertion.assertion_type.as_str();
-    let Some(expected) = assertion.value.as_ref() else {
+    let Some(expected) = expected_value(assertion) else {
         return false;
     };
-    if !matches!(kind, "count_equals" | "equals") || (kind == "equals" && !expected.is_string()) {
-        return false;
-    }
-    if kind == "count_equals" && !expected.is_u64() {
-        return false;
-    }
     let Some((prefix, owner, variant, suffix)) = resolver.ir_tagged_union_split(resolver.resolve(field)) else {
         return false;
     };
@@ -35,15 +29,28 @@ pub(super) fn try_render(out: &mut String, assertion: &Assertion, result_var: &s
     if !definition.serde_untagged || !resolver.union_variant_payload_is_collection(&owner, &variant) {
         return false;
     }
-    if prefix.is_empty() {
-        return false;
-    }
     let Some(steps) = resolver.enum_payload_wire_steps(&owner, &variant, &suffix) else {
         return false;
     };
-    let container = resolver.accessor(&prefix, "java", result_var);
+    let container = if prefix.is_empty() {
+        result_var.to_string()
+    } else {
+        resolver.accessor(&prefix, "java", result_var)
+    };
     let payload = format!("{container}.value()");
-    let mut expression = payload.clone();
+    let expression = wire_expression(&payload, steps);
+    out.push_str(&crate::e2e::template_env::render(
+        "java/list_variant_json_assertion.jinja",
+        crate::alef_context! {
+            container => container, payload => payload, expression => expression,
+            expected => json_to_java(expected), count => kind == "count_equals",
+        },
+    ));
+    true
+}
+
+fn wire_expression(payload: &str, steps: Vec<WireAccessStep>) -> String {
+    let mut expression = payload.to_string();
     for step in steps {
         match step {
             WireAccessStep::Field(key) => {
@@ -53,12 +60,14 @@ pub(super) fn try_render(out: &mut String, assertion: &Assertion, result_var: &s
             WireAccessStep::Index(index) => expression.push_str(&format!(".get({index})")),
         }
     }
-    out.push_str(&crate::e2e::template_env::render(
-        "java/list_variant_json_assertion.jinja",
-        crate::alef_context! {
-            container => container, payload => payload, expression => expression,
-            expected => json_to_java(expected), count => kind == "count_equals",
-        },
-    ));
-    true
+    expression
+}
+
+fn expected_value(assertion: &Assertion) -> Option<&serde_json::Value> {
+    let expected = assertion.value.as_ref()?;
+    match assertion.assertion_type.as_str() {
+        "count_equals" if expected.is_u64() => Some(expected),
+        "equals" if expected.is_string() => Some(expected),
+        _ => None,
+    }
 }

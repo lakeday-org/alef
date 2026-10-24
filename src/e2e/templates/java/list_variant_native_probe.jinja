@@ -1,0 +1,8 @@
+import static org.junit.jupiter.api.Assertions.*;
+public final class Probe {
+    public static void main(String[] args) throws Exception {
+        var result = new com.fasterxml.jackson.databind.ObjectMapper().readValue(args[0], Reply.class);
+{{ assertions }}
+        System.out.println("PASS:3");
+    }
+}

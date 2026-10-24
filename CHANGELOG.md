@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Exercise nested Go and C enum-list assertions through full call generation and support Java root enum-list results without growing oversized generator modules (#688).
 - Exclude Rust-only skipped errors from generated Ruby error matchers while preserving visible typed errors, shared inheritance, and literal message assertions.
 
 ## [0.113.4] - 2026-10-23

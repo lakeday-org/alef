@@ -121,3 +121,63 @@ pub(crate) fn verify_cases(
     }
     assert_eq!(checked, 6);
 }
+
+pub(crate) fn call_surface(wire: bool) -> ApiSurface {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("lib.rs");
+    std::fs::write(
+        &path,
+        core_source(wire) + "\npub fn fetch_reply() -> Reply { unimplemented!() }\n",
+    )
+    .unwrap();
+    let api = crate::extract::extractor::extract(&[path.as_path()], "sample", "1.0.0", None).unwrap();
+    assert_eq!(api.functions.len(), 1);
+    api
+}
+
+pub(crate) fn generate_collection_call(
+    generator: &dyn crate::e2e::codegen::E2eCodegen,
+    api: &ApiSurface,
+) -> Vec<crate::core::backend::GeneratedFile> {
+    use crate::e2e::fixture::{Fixture, FixtureGroup};
+    let e2e = crate::e2e::config::E2eConfig {
+        call: crate::e2e::config::CallConfig {
+            function: "fetch_reply".to_string(),
+            module: "example.com/sample".to_string(),
+            returns_result: true,
+            overrides: HashMap::from([(
+                "c".to_string(),
+                crate::e2e::config::CallOverride {
+                    function: Some("sample_fetch_reply".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let assertions = assertions();
+    assert_eq!(assertions.len(), 3);
+    let groups = [FixtureGroup {
+        category: "payload".to_string(),
+        fixtures: vec![Fixture {
+            id: "nested_collection".to_string(),
+            assertions,
+            ..Default::default()
+        }],
+    }];
+    generator
+        .generate(
+            &groups,
+            &e2e,
+            &crate::core::config::ResolvedCrateConfig {
+                name: "sample".to_string(),
+                ..Default::default()
+            },
+            &api.types,
+            &api.enums,
+            &api.functions,
+            &api.errors,
+        )
+        .unwrap()
+}

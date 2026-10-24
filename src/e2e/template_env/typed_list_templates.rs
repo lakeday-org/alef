@@ -1,5 +1,9 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
     (
+        "java/list_variant_native_probe.jinja",
+        include_str!("../templates/java/list_variant_native_probe.jinja"),
+    ),
+    (
         "csharp/list_variant_assertion.jinja",
         include_str!("../templates/csharp/list_variant_assertion.jinja"),
     ),

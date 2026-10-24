@@ -30,7 +30,7 @@ fn issue684_go_collection_assertions_execute_producer_backed_cases() {
 
 fn render_assertions(wire: bool) -> String {
     let api = support::surface(wire);
-    let resolver = support::resolver(&api, "go");
+    let resolver = call_resolver(&api);
     let context = super::super::AssertionRenderContext {
         effective_result_var: "result",
         import_alias: "sample",
@@ -134,6 +134,49 @@ fn project_declarations(wire: bool, directory: &std::path::Path, go: &std::path:
     );
     std::fs::remove_file(projector).unwrap();
     String::from_utf8(projection.stdout).unwrap()
+}
+
+#[test]
+fn issue688_go_full_generator_uses_enum_collection_lowering() {
+    for wire in [false, true] {
+        let files =
+            support::generate_collection_call(&crate::e2e::codegen::go::GoCodegen, &support::call_surface(wire));
+        let output = &files
+            .iter()
+            .find(|file| file.path.ends_with("payload_test.go"))
+            .expect("category test emitted")
+            .content;
+        assert!(output.contains("result, err := pkg.FetchReply()"), "{output}");
+        assert!(!output.contains(".Parts"), "{output}");
+        assert_eq!(output.matches("json.Marshal(").count(), 3, "{output}");
+        if wire {
+            assert!(output.contains("\"wireText\""), "{output}");
+        }
+    }
+}
+
+fn call_resolver(api: &crate::core::ir::ApiSurface) -> crate::e2e::field_access::FieldResolver {
+    let call = crate::e2e::config::CallConfig {
+        function: "fetch_reply".to_string(),
+        ..Default::default()
+    };
+    let functions = [crate::core::ir::FunctionDef {
+        name: "fetch_reply".to_string(),
+        return_type: crate::core::ir::TypeRef::Named("Reply".to_string()),
+        ..Default::default()
+    }];
+    let facts = crate::e2e::codegen::go::test_function::call_resolver::GoCrateResolverFacts::new(
+        &api.types,
+        &api.enums,
+        &ResolvedCrateConfig::default(),
+    );
+    crate::e2e::codegen::go::test_function::call_resolver::build_call_field_resolver_with_facts(
+        &crate::e2e::config::E2eConfig::default(),
+        &call,
+        &functions,
+        &api.types,
+        &facts,
+    )
 }
 
 /// The resolver the generator builds for a real call must resolve the union crossing; a resolver

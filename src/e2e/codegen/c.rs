@@ -1047,6 +1047,7 @@ mod assertions;
 mod bytes_arg;
 #[cfg(test)]
 mod bytes_len_arg_regression_tests;
+mod call_field_resolver;
 mod call_patterns;
 #[cfg(test)]
 mod client_factory_optional_arg_tests;
@@ -1207,25 +1208,7 @@ fn render_test_file(
         // pass above declared (no config entry at all) is also recognized as enum-shaped here. ~keep
         effective_fields_enum.extend(enum_fields_from_ir(&effective_fields_c_types, enums));
 
-        // Per-call field resolver: overrides the top-level resolver when this call
-        // declares its own result_fields / fields / fields_optional / fields_array.
-        // Without this, `pages.length` on a `crawl` call would skip because the
-        // default `result_fields` (configured for the top-level `scrape` call)
-        // does not contain `pages`.
-        let (ir_reachable_fields, ir_known_excluded_fields, ir_optional_fields) =
-            FieldResolver::ir_field_sets(type_defs);
-        let per_call_field_resolver = FieldResolver::new(
-            e2e_config.effective_fields(fixture_call),
-            e2e_config.effective_fields_optional(fixture_call),
-            e2e_config.effective_result_fields(fixture_call),
-            e2e_config.effective_fields_array(fixture_call),
-            &std::collections::HashSet::new(),
-        )
-        .with_ir_fields(ir_reachable_fields, ir_known_excluded_fields, ir_optional_fields)
-        .with_ir_enum_map(
-            FieldResolver::ir_enum_fields(type_defs, enums),
-            crate::e2e::codegen::call_ir::resolve_declared_result_type(fixture_call, lang, ir),
-        );
+        let per_call_field_resolver = call_field_resolver::build(e2e_config, fixture_call, lang, ir, enums);
         let _ = field_resolver; // top-level resolver retained for compat; per-call wins
         let field_resolver = &per_call_field_resolver;
 

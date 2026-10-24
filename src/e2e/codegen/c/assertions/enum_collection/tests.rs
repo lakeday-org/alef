@@ -87,7 +87,7 @@ struct Rendered {
 
 fn render(wire: bool) -> Rendered {
     let api = support::surface(wire);
-    let resolver = support::resolver(&api, "c");
+    let resolver = call_resolver(&api);
     let sources = super::super::FieldConfigSources {
         result_fields: super::super::EffectiveConfigSource::Global,
         fields: super::super::EffectiveConfigSource::Global,
@@ -236,6 +236,49 @@ fn compile_probe(wire: bool, directory: &std::path::Path) -> std::path::PathBuf 
         .unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
     binary
+}
+
+#[test]
+fn issue688_c_full_generator_preserves_collection_json() {
+    let files = support::generate_collection_call(&crate::e2e::codegen::c::CCodegen, &support::call_surface(false));
+    let output = &files
+        .iter()
+        .find(|file| file.path.ends_with("test_payload.c"))
+        .expect("category test emitted")
+        .content;
+    assert!(
+        !output.contains("alef_json_get_string(content_json, \"parts\")"),
+        "{output}"
+    );
+    assert!(output.contains("sample_fetch_reply"), "{output}");
+    assert_eq!(
+        output.matches("expected enum collection payload").count(),
+        3,
+        "{output}"
+    );
+    assert!(!output.contains("SKIP"), "{output}");
+}
+
+fn call_resolver(api: &crate::core::ir::ApiSurface) -> crate::e2e::field_access::FieldResolver {
+    let call = crate::e2e::config::CallConfig {
+        function: "fetch_reply".to_string(),
+        ..Default::default()
+    };
+    let functions = [crate::core::ir::FunctionDef {
+        name: "fetch_reply".to_string(),
+        return_type: crate::core::ir::TypeRef::Named("Reply".to_string()),
+        ..Default::default()
+    }];
+    crate::e2e::codegen::c::call_field_resolver::build(
+        &crate::e2e::config::E2eConfig::default(),
+        &call,
+        "c",
+        crate::e2e::codegen::call_ir::CallIr {
+            functions: &functions,
+            type_defs: &api.types,
+        },
+        &api.enums,
+    )
 }
 
 /// The test file the generator writes for a real call must read the parts through the union

@@ -1,11 +1,5 @@
 //! Java assertion rendering helpers.
 //!
-//! ~keep This file is already over the repo's 1,000-line file-modularization cap. The
-//! `not_error_may_assert_presence` unification (routing `not_error` through
-//! `not_error_presence::may_assert_presence`) added one parameter to `render_assertion`,
-//! required at every call site, plus removed the old ad hoc `result_is_option && bare_field`
-//! special case for `not_error` (now folded into the general arm) — a net small growth of
-//! wiring and doc comments, not new unrelated functionality.
 
 use crate::e2e::codegen::assertion_recipes::chunks_result_var;
 use crate::e2e::codegen::assertion_type_skip::{

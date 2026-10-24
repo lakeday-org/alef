@@ -82,7 +82,12 @@ fn ir() -> (Vec<TypeDef>, Vec<EnumDef>, Vec<FunctionDef>) {
 }
 
 fn render(assertion_type: &str, path: &str, value: serde_json::Value) -> String {
-    let (types, enums, functions) = ir();
+    render_returning(assertion_type, path, value, "Reply")
+}
+
+fn render_returning(assertion_type: &str, path: &str, value: serde_json::Value, root: &str) -> String {
+    let (types, enums, mut functions) = ir();
+    functions[0].return_type = named(root);
     let fixture = Fixture {
         id: "parts".to_string(),
         description: "test".to_string(),
@@ -146,4 +151,22 @@ fn the_text_of_a_part_is_read_from_the_wrapper_json() {
         rendered.contains("assertEquals(\" world\", result.choices().get(0).message().content().value().get(1).get(\"text\").asText());"),
         "{rendered}"
     );
+}
+
+#[test]
+fn issue688_java_root_enum_collection_uses_json_wrapper() {
+    for (kind, field, value, expected) in [
+        ("count_equals", "parts", serde_json::json!(2), "result.value().size()"),
+        (
+            "equals",
+            "parts[1].text",
+            serde_json::json!(" world"),
+            "result.value().get(1).get(\"text\").asText()",
+        ),
+    ] {
+        let output = render_returning(kind, field, value, "Body");
+        assert!(output.contains(expected), "{output}");
+        assert!(output.contains("isArray()"), "{output}");
+        assert!(!output.contains(".parts()"), "{output}");
+    }
 }
