@@ -40,7 +40,7 @@ public final class DefaultClient {
         self.inner = inner
     }
     public func ping() -> String {
-        return RustBridge.defaultClientPing(self.inner)
+        return RustBridge.defaultClientPing(self.inner).toString()
     }
     public func chatStream(_ req: ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error> {
         let handle = try await alefBridgedCallAsync { try await RustBridge.defaultClientChatStreamStart(self.inner, req) }

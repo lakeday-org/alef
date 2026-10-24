@@ -87,7 +87,7 @@ mod ffi {
     }
 
     extern "Rust" {
-        #[swift_bridge(swift_name = "extractKeywords")]
+        #[swift_bridge(swift_name = "__alef_owned_vec_extract_keywords")]
         fn extract_keywords(text: String, config: KeywordConfig) -> Result<Vec<String>, AlefBridgeError>;
     }
 

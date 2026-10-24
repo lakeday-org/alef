@@ -84,7 +84,7 @@ mod ffi {
     }
 
     extern "Rust" {
-        #[swift_bridge(swift_name = "getItems")]
+        #[swift_bridge(swift_name = "__alef_owned_vec_get_items")]
         fn get_items() -> Vec<Item>;
     }
 

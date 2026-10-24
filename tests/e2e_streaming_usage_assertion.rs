@@ -201,17 +201,19 @@ fn csharp_usage_assertion_reads_the_last_chunk() {
     assert_reads_last_chunk(&CSharpCodegen, "csharp");
 }
 
-/// wasm-bindgen maps the `u64` counter to a `BigInt`, which never equals a numeric literal, so
-/// the generated assertion must widen it with `Number(...)` before comparing.
+/// ~keep WASM counters may exceed Number's exact range, so compare their rational values without narrowing.
 #[test]
-fn wasm_usage_counter_is_widened_before_the_comparison() {
+fn wasm_usage_counter_comparison_preserves_bigint_precision() {
     let content = generated(&WasmCodegen, "usage.total_tokens");
     let lines = usage_lines(&content);
     assert!(
-        lines.iter().any(|l| l.contains("Number(")),
-        "wasm: the counter is compared as a BigInt. Emitted:\n{content}"
+        !lines.is_empty() && lines.iter().all(|line| !line.contains("Number(")),
+        "wasm: the counter must not lose precision through Number. Emitted:\n{content}"
     );
-    // Positive twin of the node arm: node has no BigInt, so it must stay unwrapped.
+    assert!(
+        content.contains("typeof actual !== \"bigint\"") && content.contains("BigInt(\"18\")"),
+        "wasm: the comparison must accept BigInt and retain the exact expected value. Emitted:\n{content}"
+    );
     let node = generated(&TypeScriptCodegen, "usage.total_tokens");
     assert!(
         usage_lines(&node).iter().all(|l| !l.contains("Number(")),
@@ -278,15 +280,19 @@ fn a_non_streaming_call_still_reads_usage_off_the_response_in_php() {
     assert_non_streaming_reads_the_response(&PhpCodegen, "php");
 }
 
-/// Go compares a `uint64` counter with an `int` literal, which testify reports as unequal, so the
-/// read is widened. Only an assertion that compares the counter with a number widens it.
+/// ~keep Go's signed, unsigned and fractional counters require an exact comparison rather than an int cast.
 #[test]
-fn go_widens_a_counter_only_when_the_assertion_compares_it_with_a_number() {
+fn go_numeric_usage_comparison_preserves_counter_precision() {
     let (e2e, resolved) = build_config();
     let number = generated_with(&GoCodegen, &e2e, &resolved, "usage.total_tokens", serde_json::json!(18));
     assert!(
-        number.contains("int(chunks[len(chunks)-1].Usage.TotalTokens)"),
-        "go: the counter must be widened to int. Emitted:\n{number}"
+        number.contains("reflect.ValueOf(chunks[len(chunks)-1].Usage.TotalTokens)")
+            && number.contains("strconv.FormatInt(value.Int(), 10)")
+            && number.contains("strconv.FormatUint(value.Uint(), 10)")
+            && number.contains("strconv.FormatFloat(value.Float(), 'g', -1, 64)")
+            && number.contains("new(big.Rat).SetString(\"18\")")
+            && !number.contains("int(chunks[len(chunks)-1].Usage.TotalTokens)"),
+        "go: the comparison must preserve the counter's value and exact expectation. Emitted:\n{number}"
     );
     let text = generated_with(&GoCodegen, &e2e, &resolved, "usage.model", serde_json::json!("gpt-4"));
     let model_lines: Vec<_> = text.lines().filter(|l| l.contains("Usage.Model")).collect();

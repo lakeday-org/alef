@@ -89,7 +89,9 @@ mod ffi {
         #[swift_bridge(init)]
         fn new(language: String, diagnostics: Vec<Diagnostic>, tags: Vec<String>) -> ProcessResult;
         fn language(&self) -> String;
+        #[swift_bridge(swift_name = "__alef_owned_vec_diagnostics")]
         fn diagnostics(&self) -> Vec<String>;
+        #[swift_bridge(swift_name = "__alef_owned_vec_tags")]
         fn tags(&self) -> Vec<String>;
     }
 

@@ -42,7 +42,7 @@ func alefBridgedCallAsync<T>(_ body: () async throws -> T) async throws -> T {
 
 /// Get all items.
 public func getItems() -> [Item] {
-    return RustBridge.getItems().map { ref in var item = try RustBridge.Item(ptr: ref.ptr); item.isOwned = false; return item }
+    return RustBridge.getItems()
 }
 // swift-bridge opaque type used across Task.detached boundaries — Rust type is Send + Sync.
 extension RustBridge.Item: @unchecked Sendable {}

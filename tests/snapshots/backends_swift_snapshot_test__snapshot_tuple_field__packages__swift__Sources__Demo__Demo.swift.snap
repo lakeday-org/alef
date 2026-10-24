@@ -182,7 +182,7 @@ public func keywordConfigFromJson(_ json: String) throws -> KeywordConfig {
 public func extractKeywords(text: String, config: KeywordConfig) throws -> [String] {
         let _rb_text = RustString(text)
         let _rb_config = try config.intoRust()
-    return try alefBridgedCall { try RustBridge.extractKeywords(_rb_text, _rb_config) }.map { $0.as_str().toString() }
+    return try alefBridgedCall { try RustBridge.extractKeywords(_rb_text, _rb_config) }.map { $0.toString() }
 }
 // swift-bridge opaque type used across Task.detached boundaries — Rust type is Send + Sync.
 extension RustBridge.KeywordConfig: @unchecked Sendable {}

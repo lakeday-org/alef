@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Count skipped-assertion comments once when collecting strict coverage diagnostics, and emit unsupported Ruby error-field warnings inside regular and streaming error examples.
 - Reject compiler-incompatible cached libraries in generated enum producer probes before selecting a compatible dependency.
+- Refresh Swift integration snapshots for owned collection helpers and reserved bridge aliases; verify exact Go and WASM streaming counter comparisons without requiring lossy numeric conversions.
 
 ## [0.114.0] - 2026-10-24
 
