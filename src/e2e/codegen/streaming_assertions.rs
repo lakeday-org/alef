@@ -38,7 +38,10 @@ mod python_typeddict_accessor;
 mod renderers;
 mod snippets;
 
-pub use model::{STREAMING_VIRTUAL_FIELDS, StreamingFieldResolver, is_streaming_virtual_field, resolve_is_streaming};
+pub use model::{
+    STREAMING_VIRTUAL_FIELDS, StreamingFieldResolver, is_stream_counter_assertion, is_stream_scoped_field,
+    is_streaming_call_field, is_streaming_virtual_field, resolve_is_streaming,
+};
 pub use snippets::RUST_STREAM_CRATE_PATH;
 
 #[cfg(test)]
@@ -48,3 +51,5 @@ use renderers::{TailSeg, parse_tail};
 mod kotlin_android_accessor_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod usage_accessor_tests;

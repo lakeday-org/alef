@@ -118,6 +118,24 @@ pub(super) fn parse_tail(tail: &str) -> Vec<TailSeg> {
     segs
 }
 
+/// Render the tail below an optional root with optional chaining (`?.`, `?[n]`) at every step,
+/// camel-casing each field. Swift and Dart share this syntax and this casing.
+pub(super) fn render_optional_chain_tail(root_expr: &str, tail: &str) -> String {
+    use heck::ToLowerCamelCase;
+
+    let mut out = root_expr.to_string();
+    for seg in parse_tail(tail) {
+        match seg {
+            TailSeg::Index(n) => out.push_str(&format!("?[{n}]")),
+            TailSeg::Field(f) => {
+                out.push_str("?.");
+                out.push_str(&f.to_lower_camel_case());
+            }
+        }
+    }
+    out
+}
+
 /// Render the full deep accessor expression by appending per-language tail
 /// segments onto `root_expr`.
 pub(super) fn render_deep_tail(root_expr: &str, tail: &str, lang: &str) -> String {
@@ -196,12 +214,11 @@ pub(super) fn render_deep_tail(root_expr: &str, tail: &str, lang: &str) -> Strin
                 out.push_str(&f.to_pascal_case());
             }
             (TailSeg::Field(f), "php") => {
-                // Streaming PHP accessors operate on json_decoded stdClass with
-                // snake_case property names (JSON wire format), not the camelCase
-                // properties exposed on the PHP wrapper class. Use the raw field
-                // name verbatim.
+                // The PHP collect snippet camelCases every key of the decoded chunk (see
+                // `collect_snippet`), so a multi-word field such as `total_tokens` is read as
+                // `totalTokens`. Single-word fields are unchanged.
                 out.push_str("->");
-                out.push_str(f);
+                out.push_str(&f.to_lower_camel_case());
             }
             (TailSeg::Field(f), "elixir") => {
                 out.push('.');

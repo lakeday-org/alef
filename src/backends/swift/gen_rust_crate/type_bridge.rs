@@ -5,7 +5,7 @@
 //! side effects used across all other submodules.
 
 use crate::core::ir::{ApiSurface, FieldDef, ParamDef, PrimitiveType, TypeRef};
-use heck::ToSnakeCase;
+use heck::{ToLowerCamelCase, ToSnakeCase};
 use std::collections::HashSet;
 
 /// Compute the set of api type names that are directly returned as opaque handles.
@@ -255,8 +255,10 @@ pub(crate) fn is_enum_named(ty: &TypeRef, enum_names: &HashSet<&str>) -> bool {
 ///   `ExtractionResult`), there is no Codable wrapper; consumers access elements through the
 ///   opaque `RustBridge.{Elem}` accessors (`results()[0].mimeType()`). The getter must therefore
 ///   return a real `Vec<Opaque>`, matching the constructor param. swift-bridge supports this for
-///   declared opaque `type T;` — the accessor's `RustVec` is lifetime-hoisted on the Swift side
-///   to avoid the ARC use-after-free that motivated the old blanket JSON degradation.
+///   declared opaque `type T;`. The extern getter keeps its `RustVec` return but takes the Swift
+///   name `<field>RustVec`; the `owned_vec` module declares `<field>()` on top of it, returning
+///   an array of owned elements, because an element read from a `RustVec` by index does not
+///   keep the vector alive.
 ///
 /// `Vec<Named(enum)>` is always `Vec<String>` (swift-bridge's `Vectorizable` is broken for enums),
 /// regardless of the parent.
@@ -383,6 +385,31 @@ pub(crate) fn text_projected_getter_type(field: &FieldDef, text_types: &HashSet<
     } else {
         "String"
     })
+}
+
+/// The names of the second getter of a text-projected field, which returns the whole value.
+///
+/// The text getter of such a field returns the plain text of the union, so the parts of a list
+/// variant are lost. This getter returns the value as JSON, and the Swift facade decodes it into
+/// the union type. The Rust side, the bridge declaration and the Swift facade all take their names
+/// from here, so the three cannot drift.
+pub(crate) struct TextProjectedValueNames {
+    /// The name of the Rust getter and of its bridge declaration.
+    pub(crate) json_getter: String,
+    /// The name the bridge gives the getter in Swift.
+    pub(crate) json_getter_swift: String,
+    /// The name of the public typed accessor on the Swift bridge type.
+    pub(crate) accessor: String,
+}
+
+pub(crate) fn text_projected_value_names(field_name: &str) -> TextProjectedValueNames {
+    let snake = field_name.to_snake_case();
+    let json_getter = format!("{snake}_json");
+    TextProjectedValueNames {
+        json_getter_swift: json_getter.to_lower_camel_case(),
+        accessor: format!("{}Value", snake.to_lower_camel_case()),
+        json_getter,
+    }
 }
 
 #[cfg(test)]

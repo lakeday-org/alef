@@ -58,16 +58,11 @@ pub(super) fn render_assertion(
     // Also intercept `usage.*` deep-paths in streaming tests: `AsyncThrowingStream` does
     // not have a `usage()` method, so we must route them through the chunks accessor.
     if let Some(f) = &assertion.field {
-        let is_streaming_usage_path =
-            is_streaming && (f == "usage" || (f.starts_with("usage.") || f.starts_with("usage[")));
         // Only route through the streaming-virtual `chunks` accessor when this is
         // actually a streaming fixture. Non-streaming fixtures (e.g. `process()`
         // with `chunkMaxSize`) expose `chunks` as a real `ProcessResult` field, so
         // emit `result.chunks()` via the regular field-accessor path below.
-        if is_streaming
-            && !f.is_empty()
-            && (crate::e2e::codegen::streaming_assertions::is_streaming_virtual_field(f) || is_streaming_usage_path)
-        {
+        if is_streaming && !f.is_empty() && crate::e2e::codegen::streaming_assertions::is_streaming_call_field(f) {
             if let Some(expr) =
                 crate::e2e::codegen::streaming_assertions::StreamingFieldResolver::accessor(f, "swift", "chunks")
             {
@@ -92,6 +87,10 @@ pub(super) fn render_assertion(
                             format!("        XCTAssertEqual({expr}, \"{escaped}\")\n")
                         } else if let Some(b) = assertion.value.as_ref().and_then(|v| v.as_bool()) {
                             format!("        XCTAssertEqual({expr}, {b})\n")
+                        } else if let Some(n) = assertion.value.as_ref().filter(|v| v.is_number()) {
+                            // A counter such as `usage.total_tokens` is an optional integer; the
+                            // literal converts to the same optional type.
+                            format!("        XCTAssertEqual({expr}, {n})\n")
                         } else {
                             streaming_assertion_value_skip_line("        ", "//", f, &assertion.assertion_type) + "\n"
                         }
@@ -107,6 +106,23 @@ pub(super) fn render_assertion(
                     }
                     "is_false" => {
                         format!("        XCTAssertFalse({expr})\n")
+                    }
+                    "greater_than" | "greater_than_or_equal" | "less_than" | "less_than_or_equal"
+                        if crate::e2e::codegen::streaming_assertions::is_stream_counter_assertion(
+                            f,
+                            assertion.value.as_ref(),
+                        ) =>
+                    {
+                        // The counter is optional (`Usage?`), so unwrap it: a stream without a
+                        // usage payload fails here instead of passing a comparison with `nil`.
+                        let comparison = match assertion.assertion_type.as_str() {
+                            "greater_than" => "XCTAssertGreaterThan",
+                            "greater_than_or_equal" => "XCTAssertGreaterThanOrEqual",
+                            "less_than" => "XCTAssertLessThan",
+                            _ => "XCTAssertLessThanOrEqual",
+                        };
+                        let n = assertion.value.as_ref().map(ToString::to_string).unwrap_or_default();
+                        format!("        {comparison}(try XCTUnwrap({expr}), {n})\n")
                     }
                     "greater_than" => {
                         if let Some(n) = assertion.value.as_ref().and_then(|v| v.as_u64()) {
@@ -156,6 +172,28 @@ pub(super) fn render_assertion(
             out,
             "        // skipped: {}",
             FieldSkip::NotAvailableOnResultType.message(f)
+        );
+        return;
+    }
+
+    // A path that steps into a variant of a display-text union reads the typed value that the
+    // bridge type exposes for the union field, since the text getter drops the parts. ~keep
+    if super::union_value_assertion::try_render(out, assertion, result_var, field_resolver) {
+        return;
+    }
+
+    // Fallback for a path the renderer above cannot read: a union read as display text reaches
+    // Swift as its plain-text rendering only, so a path that steps into another variant has
+    // nothing to read. Skip it rather than call an accessor the `RustString` lacks. This must stay
+    // after the renderer, or every parts path is skipped. ~keep
+    if let Some(f) = assertion.field.as_deref().filter(|f| !f.is_empty())
+        && let Some((union_field, ..)) = field_resolver.ir_tagged_union_split(field_resolver.resolve(f))
+        && string_expression::is_display_text(field_resolver, Some(&union_field))
+    {
+        let _ = writeln!(
+            out,
+            "        // skipped: {}",
+            FieldSkip::DisplayTextUnionVariantNotReadableInSwift.message(f)
         );
         return;
     }

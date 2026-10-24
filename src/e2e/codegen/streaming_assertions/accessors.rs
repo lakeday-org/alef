@@ -4,7 +4,9 @@ use super::model::{StreamingFieldResolver, split_streaming_deep_path};
 use super::python_typeddict_accessor::{
     python_field_access, python_tool_call_element_type, render_python_tool_calls_deep,
 };
-use super::renderers::{render_deep_tail, render_rust_tool_calls_deep, render_swift_tool_calls_deep};
+use super::renderers::{
+    render_deep_tail, render_optional_chain_tail, render_rust_tool_calls_deep, render_swift_tool_calls_deep,
+};
 
 impl StreamingFieldResolver {
     /// Returns the language-specific expression for a streaming-virtual field,
@@ -582,6 +584,8 @@ impl StreamingFieldResolver {
                 "ruby" => {
                     format!("({chunks_var}.empty? ? nil : {chunks_var}.last&.usage)")
                 }
+                // Dart: `usage` is nullable on a chunk and the list may be empty.
+                "dart" => format!("{chunks_var}.lastOrNull?.usage"),
                 _ => {
                     format!("({chunks_var}.length > 0 ? {chunks_var}[{chunks_var}.length - 1].usage : undefined)")
                 }
@@ -637,12 +641,51 @@ impl StreamingFieldResolver {
                             typeddict_map,
                         ));
                     }
+                    // `usage.<counter>` reads a counter off the last chunk's usage payload. Rust
+                    // and Go need their own root: Rust's base accessor yields an `Option`, and
+                    // Go's yields an untyped `interface{}` neither of which can take a field.
+                    if root == "usage" {
+                        return render_usage_deep(chunks_var, tail, lang);
+                    }
                     let root_expr = Self::accessor(root, lang, chunks_var)?;
                     Some(render_deep_tail(&root_expr, tail, lang))
                 } else {
                     None
                 }
             }
+        }
+    }
+}
+
+/// Render a path below the stream-level `usage` root, such as `usage.total_tokens`.
+///
+/// Every backend reads the counter off the LAST chunk of the collected list, which is where a
+/// stream carries its usage payload. The base `usage` accessor cannot take a field in Rust (an
+/// `Option`), Go (an untyped `interface{}`), Swift and Dart (an optional): those four build their
+/// own root. Zig never reaches this function: it parses the last chunk's JSON and asserts through
+/// its JSON-struct path (`zig/assertions.rs`).
+fn render_usage_deep(chunks_var: &str, tail: &str, lang: &str) -> Option<String> {
+    match lang {
+        "rust" => {
+            let root = format!(
+                "{chunks_var}.last().and_then(|c| c.usage.as_ref()).expect(\"expected usage on the last chunk\")"
+            );
+            Some(render_deep_tail(&root, tail, lang))
+        }
+        "go" => {
+            let root = format!("{chunks_var}[len({chunks_var})-1].Usage");
+            Some(render_deep_tail(&root, tail, lang))
+        }
+        // `Usage?` on the chunk: a missing chunk or a missing usage reads as `nil` and fails the
+        // comparison instead of trapping.
+        "swift" => Some(render_optional_chain_tail(&format!("{chunks_var}.last?.usage"), tail)),
+        "dart" => {
+            let root = StreamingFieldResolver::accessor("usage", lang, chunks_var)?;
+            Some(render_optional_chain_tail(&root, tail))
+        }
+        _ => {
+            let root = StreamingFieldResolver::accessor("usage", lang, chunks_var)?;
+            Some(render_deep_tail(&root, tail, lang))
         }
     }
 }

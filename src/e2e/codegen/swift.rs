@@ -281,6 +281,7 @@ mod stubs;
 mod test_file;
 mod test_method;
 mod text_projection;
+mod union_value_assertion;
 mod values;
 mod wildcard_assertion;
 
@@ -321,10 +322,16 @@ mod optional_parent_collection_tests;
 #[cfg(test)]
 mod promoted_result_type_root_tests;
 #[cfg(test)]
+mod reply_parts_accessor_tests;
+#[cfg(test)]
 mod runtime_compile_contract_tests;
 #[cfg(test)]
 mod self_referential_first_class_tests;
 #[cfg(test)]
+mod stream_usage_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod untagged_list_parts_tests;
 #[cfg(test)]
 mod void_not_error_call_tests;

@@ -23,6 +23,9 @@ pub(crate) mod enums;
 pub(crate) mod extern_block;
 pub(crate) mod feature_gate;
 mod json_bridge;
+pub(crate) mod owned_vec;
+#[cfg(test)]
+mod owned_vec_tests;
 pub(crate) mod plugin_inbound;
 pub(crate) mod service_app_wrappers;
 pub(crate) mod shims;
@@ -57,7 +60,8 @@ pub fn emit(api: &ApiSurface, config: &ResolvedCrateConfig) -> anyhow::Result<Ve
     // `[crates.output] swift` override moves the package root, and only this call site's own
     // literal used to stay behind. ~keep
     let base_dir = resolve_output_dir(config.output_paths.get("swift"), &config.name, "packages/swift");
-    let base = swift_package_root(&base_dir, config.explicit_output.swift.is_some()).join("rust");
+    let package_root = swift_package_root(&base_dir, config.explicit_output.swift.is_some());
+    let base = package_root.join("rust");
     let crate_name = &api.crate_name;
     let version = &api.version;
 
@@ -188,7 +192,7 @@ pub fn emit(api: &ApiSurface, config: &ResolvedCrateConfig) -> anyhow::Result<Ve
     // agreement. ~keep
     let method_filtered_api = feature_gate::with_cfg_filtered_methods(api, &configured_features);
     let api = &method_filtered_api;
-    let lib_rs = emit_lib_rs(
+    let (lib_rs, owned_vec_accessors) = emit_lib_rs(
         api,
         config,
         crate_name,
@@ -218,6 +222,10 @@ pub fn emit(api: &ApiSurface, config: &ResolvedCrateConfig) -> anyhow::Result<Ve
     ];
     if let Some(callback_file) = callback_files::emit_callback_registration_file(api, &base) {
         files.push(callback_file);
+    }
+    let rust_bridge_sources = package_root.join("Sources").join("RustBridge");
+    if let Some(accessors) = owned_vec::emit_swift_file(&owned_vec_accessors, &rust_bridge_sources) {
+        files.push(accessors);
     }
     Ok(files)
 }
@@ -254,7 +262,7 @@ fn emit_lib_rs(
     exclude_types: &HashSet<String>,
     exclude_fields: &HashSet<String>,
     configured_features: &HashSet<&str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<(String, owned_vec::OwnedVecAccessors)> {
     let source_crate = crate_name.replace('-', "_");
 
     // This binding's own configured feature set (already expanded through the core crate's
@@ -427,6 +435,7 @@ fn emit_lib_rs(
 
     let enum_names_owned: std::collections::HashSet<String> = enum_names.iter().map(|s| s.to_string()).collect();
     let mut extern_blocks: Vec<String> = Vec::new();
+    let mut owned_vec_accessors = owned_vec::OwnedVecAccessors::default();
     // `BTreeSet` so the paired `extern "Rust"` declaration (`extern_block::
     // emit_extern_block_for_functions`) and no-op shim (`deferred_noop::emit_shims`) are
     // emitted in the same deterministic order across runs. ~keep
@@ -471,6 +480,19 @@ fn emit_lib_rs(
             configured_features,
         );
         extern_blocks.push(format!("{cfg_open}{raw_block}"));
+        owned_vec_accessors.types.push((
+            ty.name.clone(),
+            owned_vec::owned_vec_getters(
+                ty,
+                exclude_fields,
+                &type_paths,
+                &no_serde_names,
+                &first_class_names,
+                enum_kinds,
+                &config.untagged_union_text_types.iter().map(String::as_str).collect(),
+                configured_features,
+            ),
+        ));
         if ty.is_opaque && !ty.methods.iter().all(|m| m.sanitized) && !ty.methods.is_empty() {
             let has_ctor_override = config
                 .swift
@@ -486,6 +508,13 @@ fn emit_lib_rs(
                 &unit_enum_names,
             ) {
                 extern_blocks.push(format!("{cfg_open}{method_block}"));
+            }
+            for method in ty.methods.iter().filter(|m| !m.sanitized && !m.is_static) {
+                let bridge_fn =
+                    extern_block::type_method_bridge_fn(ty, method, &handle_returned_types, &enum_names, &unit_enum_names);
+                owned_vec_accessors
+                    .functions
+                    .extend(owned_vec::owned_vec_function(&bridge_fn)?);
             }
         }
         if let Some(dto_method_block) =
@@ -510,6 +539,20 @@ fn emit_lib_rs(
         .as_ref()
         .map(|c| c.capsule_types.clone())
         .unwrap_or_default();
+
+    for f in &visible_functions {
+        let bridge_fn = extern_block::function_bridge_fn(
+            f,
+            &handle_returned_types,
+            &enum_names_owned,
+            &unit_enum_names,
+            &swift_capsule_types,
+            &opaque_type_names_ahash,
+        )?;
+        owned_vec_accessors
+            .functions
+            .extend(owned_vec::owned_vec_function(&bridge_fn)?);
+    }
 
     if !visible_functions.is_empty() {
         // cfg-gated functions are emitted into per-cfg `#[cfg(...)] extern "Rust" { }`
@@ -550,6 +593,12 @@ fn emit_lib_rs(
         }
     }
     for (_bridge_cfg, trait_def) in &active_bridges {
+        for method in trait_def.methods.iter().filter(|m| !m.has_default_impl) {
+            let bridge_fn = trait_bridge::trait_method_bridge_fn(trait_def, method, &visible_type_names);
+            owned_vec_accessors
+                .functions
+                .extend(owned_vec::owned_vec_function(&bridge_fn)?);
+        }
         extern_blocks.push(trait_bridge::emit_extern_block_for_trait_bridge(
             trait_def,
             &visible_type_names,
@@ -916,7 +965,7 @@ fn emit_lib_rs(
         json_bridge::emit_from_json_shim(&mut out, &enum_snake, enum_name, &source_path, &map_expr);
     }
 
-    Ok(out)
+    Ok((out, owned_vec_accessors))
 }
 
 #[cfg(test)]
