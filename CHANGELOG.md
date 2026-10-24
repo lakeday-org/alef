@@ -7,16 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Count skipped-assertion comments once when collecting strict coverage diagnostics, and emit unsupported Ruby error-field warnings inside regular and streaming error examples.
-- Reject compiler-incompatible cached libraries in generated enum producer probes before selecting a compatible dependency.
-- Refresh Swift integration snapshots for owned collection helpers and reserved bridge aliases; verify exact Go and WASM streaming counter comparisons without requiring lossy numeric conversions.
-
-### Changed
-
-- Update the pinned Ruby setup action and ZIP dependency, verifying complete multi-entry PHP archive payloads.
-
 ## [0.114.0] - 2026-10-24
 
 ### Added
@@ -30,10 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Update the pinned Ruby setup action and ZIP dependency, verifying complete multi-entry PHP archive payloads.
 - Extract Swift DTO reference aliases and the Rust assertion entry point into focused modules without changing generated output.
 
 ### Fixed
 
+- Count skipped-assertion comments once when collecting strict coverage diagnostics, and emit unsupported Ruby error-field warnings inside regular and streaming error examples.
+- Reject compiler-incompatible cached libraries in generated enum producer probes before selecting a compatible dependency.
+- Refresh Swift integration snapshots for owned collection helpers and reserved bridge aliases; verify exact Go and WASM streaming counter comparisons without requiring lossy numeric conversions.
 - Qualify shadowed Kotlin scalar payload types and dispatch untagged Boolean variants only from JSON booleans, preserving numeric variant order (#688).
 - Report full runtime causes for skipped assertions and emit partial-coverage warnings after executable checks across all supported test renderers; retain warnings in normal Go, C# and Kotlin runner output (#697, #698).
 - Preserve skipped-assertion diagnostics in Zig serde JSON tests and safely render control characters in runtime refusals (#698).
