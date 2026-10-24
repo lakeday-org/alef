@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reject compiler-incompatible cached libraries in generated enum producer probes before selecting a compatible dependency.
 - Refresh Swift integration snapshots for owned collection helpers and reserved bridge aliases; verify exact Go and WASM streaming counter comparisons without requiring lossy numeric conversions.
 
+### Changed
+
+- Update the pinned Ruby setup action and ZIP dependency, verifying complete multi-entry PHP archive payloads.
+
 ## [0.114.0] - 2026-10-24
 
 ### Added

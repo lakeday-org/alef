@@ -423,6 +423,37 @@ sources = ["src/lib.rs"]
     }
 
     #[test]
+    fn zip_archive_roundtrips_two_entries_with_validated_contents() {
+        let temporary = TempDir::new().unwrap();
+        let staging = temporary.path().join("staging");
+        fs::create_dir(&staging).unwrap();
+        let binary = (0..=u8::MAX).collect::<Vec<_>>();
+        let license = b"sample archive license\n".to_vec();
+        let expected = [("demo.dll", binary), ("LICENSE.txt", license)];
+        for (name, contents) in &expected {
+            fs::write(staging.join(name), contents).unwrap();
+        }
+        let archive_path = temporary.path().join("extension.zip");
+        create_zip(&staging, &archive_path).unwrap();
+        let file = fs::File::open(&archive_path).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        assert_eq!(archive.len(), expected.len());
+        let mut names = archive.file_names().collect::<Result<Vec<_>, _>>().unwrap();
+        names.sort_unstable();
+        assert_eq!(names, ["LICENSE.txt", "demo.dll"]);
+        for (name, contents) in &expected {
+            let mut entry = archive.by_name(name).unwrap();
+            assert_eq!(entry.compression(), zip::CompressionMethod::Deflated);
+            assert_eq!(entry.size(), u64::try_from(contents.len()).unwrap());
+            let mut actual = Vec::new();
+            entry
+                .read_to_end(&mut actual)
+                .expect("complete ZIP entry with valid CRC");
+            assert_eq!(&actual, contents, "ZIP payload for {name}");
+        }
+    }
+
+    #[test]
     fn pie_archive_contains_only_extension_at_root() {
         let tmp = TempDir::new().unwrap();
         let workspace = tmp.path().join("workspace");
