@@ -1,7 +1,7 @@
 use super::attributes::cfg_attr_walk_inner_metas;
 
 /// Read explicit constructor history without deriving it from current field order. ~keep
-pub(crate) fn extract_legacy_constructor_fields(attrs: &[syn::Attribute]) -> anyhow::Result<Vec<String>> {
+fn extract_legacy_constructor_fields(attrs: &[syn::Attribute]) -> anyhow::Result<Vec<String>> {
     let mut result: anyhow::Result<Option<Vec<String>>> = Ok(None);
     let mut visit = |meta: &syn::Meta| {
         let syn::Meta::List(list) = meta else { return };
@@ -51,6 +51,15 @@ pub(crate) fn extract_legacy_constructor_fields(attrs: &[syn::Attribute]) -> any
         }
     }
     Ok(result?.unwrap_or_default())
+}
+
+pub(crate) fn extract_constructor_metadata(
+    attrs: &[syn::Attribute],
+) -> anyhow::Result<(Vec<String>, Vec<Vec<String>>)> {
+    Ok((
+        extract_legacy_constructor_fields(attrs)?,
+        super::constructor_history::extract(attrs)?,
+    ))
 }
 
 /// Read the generated exception parent without evaluating cfg predicates. ~keep

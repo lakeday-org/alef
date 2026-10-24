@@ -296,8 +296,8 @@ fn extract_items(
                     continue;
                 }
                 if let Some((mut td, serde_defaults)) = extract_struct(item_struct, crate_name, module_path) {
-                    td.version.legacy_constructor_fields =
-                        helpers::extract_legacy_constructor_fields(&item_struct.attrs)?;
+                    (td.version.legacy_constructor_fields, td.version.constructor_history) =
+                        helpers::extract_constructor_metadata(&item_struct.attrs)?;
                     defaults::fold_constant_default_functions(
                         &mut td.fields,
                         &free_functions,

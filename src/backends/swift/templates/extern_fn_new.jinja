@@ -1,4 +1,7 @@
 {% if associated_type %}
-        #[swift_bridge(associated_to = {{ associated_type }})]
+        #[swift_bridge(associated_to = {{ associated_type }}
+        {%- if swift_name %}, swift_name = "{{ swift_name }}"{% endif %})]
+{% elif swift_name %}
+        #[swift_bridge(swift_name = "{{ swift_name }}")]
 {% endif %}
         fn {{ constructor_name }}({{ params }}) -> {{ return_type }};

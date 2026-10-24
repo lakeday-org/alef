@@ -1,0 +1,10 @@
+[package]
+name = "fixture"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(alef)'] }

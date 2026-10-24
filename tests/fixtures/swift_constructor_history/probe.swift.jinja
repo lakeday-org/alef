@@ -1,0 +1,66 @@
+import Fixture
+import RustBridge
+
+typealias Facade = Fixture.Options
+typealias Bridge = RustBridge.Options
+
+func checkFacade(_ value: Facade, _ count: UInt32, _ enabled: Bool,
+                 _ details: Bool = true, _ misc: Bool = false,
+                 _ marks: Bool = false, _ labels: Bool = true) -> Int {
+    precondition(value.count == count, "count")
+    precondition(value.enabled == enabled, "enabled")
+    precondition(value.includeDetails == details, "includeDetails")
+    precondition(value.escapeMisc == misc, "escapeMisc")
+    precondition(value.escapeMarks == marks, "escapeMarks")
+    precondition(value.includeLabels == labels, "includeLabels")
+    return 6
+}
+
+func checkBridge(_ value: Bridge, _ count: UInt32, _ enabled: Bool,
+                 _ details: Bool = true, _ misc: Bool = false,
+                 _ marks: Bool = false, _ labels: Bool = true) -> Int {
+    precondition(value.count() == count, "bridge count")
+    precondition(value.enabled() == enabled, "bridge enabled")
+    precondition(value.includeDetails() == details, "bridge includeDetails")
+    precondition(value.escapeMisc() == misc, "bridge escapeMisc")
+    precondition(value.escapeMarks() == marks, "bridge escapeMarks")
+    precondition(value.includeLabels() == labels, "bridge includeLabels")
+    return 6
+}
+
+let oldFacade: (UInt32) -> Facade = Facade.init(count:)
+let middleFacade: (UInt32, Bool) -> Facade = Facade.init(count:enabled:)
+let currentFacade: (UInt32, Bool, Bool, Bool, Bool, Bool) -> Facade =
+    Facade.init(count:enabled:includeDetails:escapeMisc:escapeMarks:includeLabels:)
+let oldBridge: (UInt32) -> Bridge = Bridge.init(_:)
+{% if zero %}
+let zeroFacade: () -> Facade = Facade.init
+let zeroBridge: () -> Bridge = Bridge.init
+{% endif %}
+{% if legacy %}
+let middleBridge: (UInt32, Bool) -> Bridge = Bridge.new_with_fields
+let currentBridge: (UInt32, Bool, Bool, Bool, Bool, Bool) -> Bridge = Bridge.new_with_fields
+{% else %}
+let middleBridge: (UInt32, Bool) -> Bridge = Bridge.init(_:_:)
+let currentBridge: (UInt32, Bool, Bool, Bool, Bool, Bool) -> Bridge = Bridge.init(_:_:_:_:_:_:)
+{% endif %}
+let expectedDetails = !CommandLine.arguments.contains("wrong-default")
+let checks = checkFacade(oldFacade(41), 41, true, expectedDetails)
+    + checkFacade(middleFacade(42, false), 42, false)
+    + checkFacade(currentFacade(43, false, false, true, true, false), 43, false, false, true, true, false)
+    + checkFacade(Facade(count: 44, enabled: false), 44, false)
+    + checkFacade(Facade(), 7, true)
+    + checkBridge(oldBridge(51), 51, true)
+    + checkBridge(middleBridge(52, false), 52, false)
+    + checkBridge(currentBridge(53, false, false, true, true, false), 53, false, false, true, true, false)
+{% if legacy %}
+    + checkBridge(Bridge.new_with_fields(54, false), 54, false)
+{% else %}
+    + checkBridge(Bridge(54, false), 54, false)
+{% endif %}
+{% if zero %}
+    + checkFacade(zeroFacade(), 7, true)
+    + checkBridge(zeroBridge(), 7, true)
+{% endif %}
+precondition(checks == {% if zero %}66{% else %}54{% endif %})
+print("constructor_history_checks=\(checks)")

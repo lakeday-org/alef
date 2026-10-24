@@ -61,27 +61,13 @@ pub(crate) fn emit_type_wrapper(
             },
         ));
 
-        let mut constructors = vec![("new", std::borrow::Cow::Borrowed(ty))];
-        if !ty.legacy_constructor_fields().is_empty() {
-            let mut legacy = ty.clone();
-            legacy.fields = ty
-                .legacy_constructor_fields()
-                .iter()
-                .map(|name| {
-                    ty.fields
-                        .iter()
-                        .find(|field| &field.name == name)
-                        .expect("validated constructor field")
-                        .clone()
-                })
-                .collect();
-            constructors[0].1 = std::borrow::Cow::Owned(legacy);
-            constructors.push(("new_with_fields", std::borrow::Cow::Borrowed(ty)));
-        }
-        for (constructor_name, constructor_type) in &constructors {
+        let fields = constructor_fields(ty, exclude_fields, configured_features);
+        for signature in super::super::constructor_history::signatures(ty, &fields) {
+            let mut constructor_type = ty.clone();
+            constructor_type.fields = signature.fields.iter().map(|field| (*field).clone()).collect();
             out.push_str(&emit_constructor(
-                constructor_type,
-                constructor_name,
+                &constructor_type,
+                &signature.rust_name,
                 &source_path,
                 type_paths,
                 enum_names,
@@ -129,7 +115,10 @@ fn emit_constructor(
     configured_features: &HashSet<&str>,
 ) -> String {
     let enum_kinds = EnumKinds::with_reconstructible(enum_names, unit_enum_names, reconstructible_enum_names);
-    if !has_constructor_extern(ty, exclude_fields, configured_features, enum_kinds, parent_first_class) {
+    let recorded_zero_arg = ty.fields.is_empty() && ty.has_default && ty.has_recorded_constructors();
+    if !recorded_zero_arg
+        && !has_constructor_extern(ty, exclude_fields, configured_features, enum_kinds, parent_first_class)
+    {
         return String::new();
     }
     let fields = constructor_fields(ty, exclude_fields, configured_features);

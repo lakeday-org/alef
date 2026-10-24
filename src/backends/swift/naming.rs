@@ -44,6 +44,11 @@ pub(crate) fn text_value_accessor_name(field: &str, renamed: Option<&str>) -> St
     )
 }
 
+/// Stable internal symbols follow the explicitly recorded constructor chronology. ~keep
+pub(crate) fn constructor_history_symbol(index: usize) -> String {
+    crate::codegen::naming::internal_rust_identifier(&format!("__alef_constructor_history_{index}"))
+}
+
 /// Get the swift-bridge version to pin in the generated `Cargo.toml`.
 ///
 /// Returns the per-crate override from `[crates.swift] swift_bridge_version` when set;
@@ -62,6 +67,13 @@ mod tests {
     use super::*;
     use crate::core::config::new_config::NewAlefConfig;
     use crate::core::template_versions;
+
+    #[test]
+    fn constructor_history_symbols_keep_their_reserved_internal_namespace() {
+        for (index, expected) in [(1, "__alef_constructor_history_1"), (2, "__alef_constructor_history_2")] {
+            assert_eq!(constructor_history_symbol(index), expected);
+        }
+    }
 
     fn resolved_one(toml: &str) -> ResolvedCrateConfig {
         let cfg: NewAlefConfig = toml::from_str(toml).unwrap();

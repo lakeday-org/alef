@@ -84,6 +84,7 @@ pub(crate) fn extract_alef_since(attrs: &[syn::Attribute]) -> Option<String> {
 /// Build a `VersionAnnotation` from the item's attributes.
 pub(crate) fn extract_version_annotation(attrs: &[syn::Attribute]) -> crate::core::ir::VersionAnnotation {
     crate::core::ir::VersionAnnotation {
+        constructor_history: Vec::new(),
         legacy_constructor_fields: Vec::new(),
         since: extract_alef_since(attrs),
         deprecated: extract_deprecation(attrs),

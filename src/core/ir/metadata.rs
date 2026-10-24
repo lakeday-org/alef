@@ -397,6 +397,9 @@ pub struct DeprecationInfo {
 /// Version annotation on an IR item.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct VersionAnnotation {
+    /// Additional ordered released signatures; omitted fields retain their resolved Rust defaults. ~keep
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub constructor_history: Vec<Vec<String>>,
     /// Explicit constructor history used to preserve compatibility while adding defaulted fields. ~keep
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub legacy_constructor_fields: Vec<String>,

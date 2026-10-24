@@ -18,6 +18,7 @@ mod cargo_sort_order_tests;
 #[cfg(test)]
 mod cfg_variant_e2e_tests;
 mod components;
+mod constructor_history;
 pub(crate) mod default_construction;
 mod deferred_noop;
 pub(crate) mod enums;

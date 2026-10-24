@@ -1,0 +1,43 @@
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+{% if legacy or history %}
+#[cfg_attr(alef, alef(
+{% if legacy %}
+    legacy_constructor_fields = ["count"],
+{% endif %}
+{% if history %}
+    constructor_history = [
+{% for signature in history %}
+        [{% for field in signature %}"{{ field }}"{% if not loop.last %}, {% endif %}{% endfor %}],
+{% endfor %}
+    ],
+{% endif %}
+))]
+{% endif %}
+pub struct Options {
+    pub count: u32,
+{% if arity >= 2 %}
+    pub enabled: bool,
+{% endif %}
+{% if arity >= 6 %}
+    pub include_details: bool,
+    pub escape_misc: bool,
+    pub escape_marks: bool,
+    pub include_labels: bool,
+{% endif %}
+}
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            count: 7,
+{% if arity >= 2 %}
+            enabled: true,
+{% endif %}
+{% if arity >= 6 %}
+            include_details: true,
+            escape_misc: false,
+            escape_marks: false,
+            include_labels: true,
+{% endif %}
+        }
+    }
+}

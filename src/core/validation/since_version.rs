@@ -271,6 +271,7 @@ mod tests {
         let api = api_with_function(
             "1.0.0",
             VersionAnnotation {
+                constructor_history: Vec::new(),
                 legacy_constructor_fields: Vec::new(),
                 since: Some("2.0.0".to_string()),
                 deprecated: None,
@@ -299,6 +300,7 @@ mod tests {
         let api = api_with_function(
             "1.0.0",
             VersionAnnotation {
+                constructor_history: Vec::new(),
                 legacy_constructor_fields: Vec::new(),
                 since: Some("1.0.0".to_string()),
                 deprecated: None,
@@ -316,6 +318,7 @@ mod tests {
         let api = api_with_function(
             "1.5.0",
             VersionAnnotation {
+                constructor_history: Vec::new(),
                 legacy_constructor_fields: Vec::new(),
                 since: Some("1.0.0".to_string()),
                 deprecated: None,
@@ -333,6 +336,7 @@ mod tests {
         let api = api_with_function(
             "1.0.0",
             VersionAnnotation {
+                constructor_history: Vec::new(),
                 legacy_constructor_fields: Vec::new(),
                 since: None,
                 deprecated: Some(DeprecationInfo {
@@ -364,6 +368,7 @@ mod tests {
         let api = api_with_function(
             "1.0.0",
             VersionAnnotation {
+                constructor_history: Vec::new(),
                 legacy_constructor_fields: Vec::new(),
                 since: Some("not-a-version".to_string()),
                 deprecated: None,
@@ -395,6 +400,7 @@ mod tests {
         let api = api_with_function(
             "1.2.0",
             VersionAnnotation {
+                constructor_history: Vec::new(),
                 legacy_constructor_fields: Vec::new(),
                 since: Some("1.3".to_string()),
                 deprecated: None,
@@ -419,6 +425,7 @@ mod tests {
                 function_with_version(
                     "before_release",
                     VersionAnnotation {
+                        constructor_history: Vec::new(),
                         legacy_constructor_fields: Vec::new(),
                         since: Some("1.2.0-rc.1".to_string()),
                         deprecated: None,
@@ -427,6 +434,7 @@ mod tests {
                 function_with_version(
                     "same_release_with_build",
                     VersionAnnotation {
+                        constructor_history: Vec::new(),
                         legacy_constructor_fields: Vec::new(),
                         since: Some("1.2.0+build".to_string()),
                         deprecated: None,
@@ -444,6 +452,7 @@ mod tests {
         let mut api = api_with_function(
             "1.0.0",
             VersionAnnotation {
+                constructor_history: Vec::new(),
                 legacy_constructor_fields: Vec::new(),
                 since: Some("9.0.0".to_string()),
                 deprecated: None,
@@ -462,6 +471,7 @@ mod tests {
         let api = api_with_function(
             "not-a-crate-version",
             VersionAnnotation {
+                constructor_history: Vec::new(),
                 legacy_constructor_fields: Vec::new(),
                 since: Some("9.0.0".to_string()),
                 deprecated: None,
@@ -483,6 +493,7 @@ mod tests {
         let api = api_with_function(
             "1.0.0",
             VersionAnnotation {
+                constructor_history: Vec::new(),
                 legacy_constructor_fields: Vec::new(),
                 since: Some("2.0.0".to_string()),
                 deprecated: None,

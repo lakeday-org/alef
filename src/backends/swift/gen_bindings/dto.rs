@@ -249,7 +249,7 @@ pub(super) fn emit_first_class_struct(
 
     let params = super::constructors::parameters(ty, mapper, &visible_fields);
     let init_params = params.join(", ");
-    let legacy_init = super::constructors::legacy_initializer(ty, &visible_fields, &params)?;
+    let legacy_init = super::constructors::recorded_initializers(ty, &visible_fields, &params)?;
     let mut init_assignments = String::new();
     for field in &visible_fields {
         let camel = swift_case_ident(&field.name.to_lower_camel_case());

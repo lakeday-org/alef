@@ -34,13 +34,26 @@ pub(super) struct LegacyInitializer {
     args: String,
 }
 
-pub(super) fn legacy_initializer(
+pub(super) fn recorded_initializers(
     owner: &TypeDef,
     fields: &[&FieldDef],
     parameters: &[String],
+) -> anyhow::Result<Vec<LegacyInitializer>> {
+    std::iter::once(owner.legacy_constructor_fields())
+        .filter(|signature| !signature.is_empty())
+        .chain(owner.constructor_history().iter().map(Vec::as_slice))
+        .map(|signature| recorded_initializer(owner, signature, fields, parameters))
+        .filter_map(Result::transpose)
+        .collect()
+}
+
+fn recorded_initializer(
+    owner: &TypeDef,
+    legacy: &[String],
+    fields: &[&FieldDef],
+    parameters: &[String],
 ) -> anyhow::Result<Option<LegacyInitializer>> {
-    let legacy = owner.legacy_constructor_fields();
-    if legacy.is_empty() || fields.iter().map(|field| &field.name).eq(legacy.iter()) {
+    if fields.iter().map(|field| &field.name).eq(legacy.iter()) {
         return Ok(None);
     }
     let params = legacy
@@ -94,7 +107,7 @@ mod tests {
             ..Default::default()
         };
         owner.version.legacy_constructor_fields = vec!["missing".into()];
-        let error = legacy_initializer(&owner, &[], &[]).unwrap_err().to_string();
+        let error = recorded_initializers(&owner, &[], &[]).unwrap_err().to_string();
         assert_eq!(
             error,
             "Swift DTO Options recorded initializer field `missing` is unavailable"

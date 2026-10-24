@@ -1,11 +1,11 @@
 public struct {{ type_name }}: Codable, Sendable, Hashable {
 {{ properties }}    public init({{ init_params }}) {
 {{ init_assignments }}    }
-{% if legacy_init %}
-    public init({{ legacy_init.params }}) {
-        self.init({{ legacy_init.args }})
+{% for initializer in legacy_init %}
+    public init({{ initializer.params }}) {
+        self.init({{ initializer.args }})
     }
-{% endif %}
+{% endfor %}
 {% if coding_keys %}
     private enum CodingKeys: String, CodingKey {
 {{ coding_keys }}    }

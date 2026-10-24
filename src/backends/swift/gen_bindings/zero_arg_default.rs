@@ -45,7 +45,7 @@ pub(crate) fn swift_memberwise_default_literal(field: &FieldDef) -> Option<Strin
 }
 
 pub(crate) fn swift_constructor_default_literal(owner: &TypeDef, field: &FieldDef) -> Option<String> {
-    swift_memberwise_default_literal(field).or_else(|| match owner.constructor_extension_value(field)? {
+    swift_memberwise_default_literal(field).or_else(|| match owner.recorded_constructor_extension_value(field)? {
         DefaultValue::Empty if !field.optional => swift_type_based_default(&field.ty),
         DefaultValue::EnumVariant(variant) => Some(format!(".{}", swift_variant_case(variant))),
         _ => None,
@@ -59,7 +59,7 @@ pub(super) fn validate_constructor_enum_defaults(
 ) -> anyhow::Result<()> {
     let source_crate = api.crate_name.replace('-', "_");
     for field in binding_fields(&owner.fields) {
-        let Some(DefaultValue::EnumVariant(variant)) = owner.constructor_extension_value(field) else {
+        let Some(DefaultValue::EnumVariant(variant)) = owner.recorded_constructor_extension_value(field) else {
             continue;
         };
         let declared_unit_case = api.enums.iter().any(|en| {
