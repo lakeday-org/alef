@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Project binding-visible errors consistently through e2e generators, direct error classifiers, Python introspection and snippet imports, while sharing the same visibility rule in Ruby, Go and Dart (#699).
 - Keep Swift collection elements alive after source containers leave scope, reserve internal owned-vector aliases, and convert owned handles and strings through facade methods, free functions, from-JSON helpers and generated indexed assertions (#693).
 - Execute scalar Swift text-enum variant assertions and compare finite JSON numeric and Boolean expectations without coercion, signed wrapping, truncation or floating-point rounding (#691).
 - Preserve structured Swift text-enum values through public `<field>Value()` accessors, DTO reconstruction and generated assertions, while keeping plain-text getters and propagating serialization errors with context (#691).

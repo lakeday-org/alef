@@ -42,8 +42,7 @@ pub(crate) fn introspection_method<'a>(
     errors: &'a [ErrorDef],
     sub_field: &str,
 ) -> Option<(&'a ErrorDef, &'a MethodDef)> {
-    errors
-        .iter()
+    crate::codegen::binding_projection::visible_errors(errors)
         .find_map(|error| error.methods.iter().find(|m| m.name == sub_field).map(|m| (error, m)))
 }
 

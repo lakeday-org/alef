@@ -143,8 +143,8 @@ pub(super) fn render_snippet_body(
     // receives (for `typed_branch` just below) is what keeps this import in sync with the
     // class pyo3 actually generates; falling back to the config-derived bare "Error" only when
     // the IR has no error type at all preserves the pre-existing no-error-type behavior. ~keep
-    let error_type = errors
-        .first()
+    let error_type = crate::codegen::binding_projection::visible_errors(errors)
+        .next()
         .map(|error| error.name.clone())
         .unwrap_or_else(|| config.error_type_name());
     let mut imports = imports.into_iter().map(str::to_string).collect::<Vec<_>>();

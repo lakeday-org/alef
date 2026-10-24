@@ -7,12 +7,9 @@ use super::values::qualify_ruby_type;
 
 /// Render the `raise_error` matcher for a fixture's `error` assertion.
 ///
-/// The extension defines no class for an error that is `binding_excluded`, and Ruby resolves a
-/// constant only when the matcher runs. The registry is narrowed to the errors the extension
-/// defines before any class name is derived from it.
+/// ~keep The shared binding projection also guards direct public generator calls whose registry
+/// has not passed through the e2e pipeline.
 pub(super) fn render_raise_error_clause(fixture: &Fixture, errors: &[ErrorDef], module_name: &str) -> String {
-    let errors: Vec<ErrorDef> = errors.iter().filter(|error| !error.binding_excluded).cloned().collect();
-    let errors = errors.as_slice();
     let declared = match classify("ruby", fixture, errors) {
         DeclaredErrorAssertion::Assert(value) => Some(value),
         DeclaredErrorAssertion::Undeclared => None,
@@ -25,8 +22,7 @@ pub(super) fn render_raise_error_clause(fixture: &Fixture, errors: &[ErrorDef], 
             &crate::codegen::error_gen::python_exception_name(&variant.name, &error.name),
         )
     });
-    let mut bases: Vec<_> = errors
-        .iter()
+    let mut bases: Vec<_> = crate::codegen::binding_projection::visible_errors(errors)
         .filter(|error| error.exception_base.is_none())
         .map(|error| qualify_ruby_type(module_name, &error.name))
         .collect();

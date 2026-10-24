@@ -59,7 +59,7 @@ pub(crate) enum DeclaredErrorAssertion<'a> {
 }
 
 /// Decide [`DeclaredErrorAssertion`] for `fixture` in `lang`, using `errors`
-/// (`ApiSurface::errors`, the crate's full error-type registry) to tell a fixture's
+/// (the binding-visible error-type registry) to tell a fixture's
 /// variant-name value apart from a message-style one.
 ///
 /// A value that does not match any known `ErrorVariant::name` is always message-style — the
@@ -87,7 +87,7 @@ pub(crate) fn declared_variant<'a>(
     errors: &'a [ErrorDef],
 ) -> Option<(&'a ErrorDef, &'a ErrorVariant)> {
     let declared = super::declared_error_value(fixture)?;
-    errors.iter().find_map(|error| {
+    crate::codegen::binding_projection::visible_errors(errors).find_map(|error| {
         error
             .variants
             .iter()

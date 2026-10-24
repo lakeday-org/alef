@@ -147,11 +147,12 @@ fn excluded_errors_report_unrendered_assertions_instead_of_assuming_a_typed_clas
     let output = render(&unauthorized_fixture(), &[error]);
     assert_eq!(
         output.matches("declared error variant 'Authentication'").count(),
-        1,
+        0,
         "{output}"
     );
-    assert!(output.contains("throwsA(anything)"), "{output}");
+    assert!(output.contains("e.toString().contains('Authentication')"), "{output}");
     assert!(!output.contains("ApiError.authentication"), "{output}");
     assert!(!output.contains("caughtError as ApiError"), "{output}");
-    assert_eq!(crate::e2e::codegen::take_skip_records().len(), 2);
+    assert_eq!(crate::e2e::codegen::take_skip_records().len(), 1);
+    assert_eq!(output, render(&unauthorized_fixture(), &[]));
 }

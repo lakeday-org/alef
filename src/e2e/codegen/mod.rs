@@ -40,6 +40,8 @@ mod derived_presentation_binding_tests;
 pub mod elixir;
 pub(crate) mod error_field_reachability;
 pub(crate) mod error_path_assertions;
+#[cfg(test)]
+mod error_projection_tests;
 mod field_resolution;
 pub(crate) mod field_skip;
 mod file_inputs;
@@ -737,7 +739,8 @@ pub trait E2eCodegen: Send + Sync {
             &self.supported_assertion_types(),
         )?;
         mock_assertions::ensure_capture_declared(groups, e2e_config, self.language_name())?;
-        let generated = self.generate(groups, e2e_config, config, type_defs, enums, functions, errors);
+        let errors = crate::codegen::binding_projection::project_errors(errors);
+        let generated = self.generate(groups, e2e_config, config, type_defs, enums, functions, &errors);
         // Drained unconditionally, on both the `Ok` and the `Err` path: a refusal recorded by an
         // expression builder too deep to return a `Result` (see `fixture_refusal`) must become
         // THIS backend's `Err` so `run_generators` isolates it, and must never survive into the

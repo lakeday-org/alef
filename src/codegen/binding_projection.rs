@@ -1,4 +1,21 @@
-use crate::core::ir::ApiSurface;
+use crate::core::ir::{ApiSurface, ErrorDef};
+use std::borrow::Cow;
+
+fn is_visible_error(error: &ErrorDef) -> bool {
+    !error.binding_excluded
+}
+
+pub(crate) fn visible_errors(errors: &[ErrorDef]) -> impl Iterator<Item = &ErrorDef> {
+    errors.iter().filter(|error| is_visible_error(error))
+}
+
+pub(crate) fn project_errors(errors: &[ErrorDef]) -> Cow<'_, [ErrorDef]> {
+    if visible_errors(errors).count() == errors.len() {
+        Cow::Borrowed(errors)
+    } else {
+        Cow::Owned(visible_errors(errors).cloned().collect())
+    }
+}
 
 pub(crate) fn project(api: &ApiSurface) -> ApiSurface {
     project_owned(api.clone())
@@ -15,7 +32,7 @@ pub(crate) fn project_owned(mut api: ApiSurface) -> ApiSurface {
     api.types
         .retain(|type_def| !type_def.binding_excluded || service_owners.contains(&type_def.name));
     api.enums.retain(|enum_def| !enum_def.binding_excluded);
-    api.errors.retain(|error_def| !error_def.binding_excluded);
+    api.errors.retain(is_visible_error);
     crate::cli::pipeline::sanitize_binding_projection(&mut api);
     normalize_tuple_param_metadata(&mut api);
     api

@@ -8,9 +8,6 @@ use std::fmt::Write as FmtWrite;
 
 pub(super) fn typed_matcher(fixture: &Fixture, errors: &[ErrorDef]) -> Option<String> {
     let (error, variant) = super::super::declared_error_variant::declared_variant(fixture, errors)?;
-    if error.binding_excluded {
-        return None;
-    }
     let type_name = crate::backends::dart::naming::dart_error_variant_class(&error.name, &variant.name);
     let enum_value = crate::backends::dart::naming::dart_error_is_simple(error)
         .then(|| crate::backends::dart::naming::dart_simple_error_value(&error.name, &variant.name));
@@ -64,9 +61,7 @@ fn resolved_field<'a>(assertion: &Assertion, variant: &'a ErrorVariant) -> Optio
 
 pub(super) fn pending_assertions(fixture: &Fixture, errors: &[ErrorDef]) -> Fixture {
     let mut pending = fixture.clone();
-    if let Some((error, variant)) = super::super::declared_error_variant::declared_variant(fixture, errors)
-        && !error.binding_excluded
-    {
+    if let Some((_, variant)) = super::super::declared_error_variant::declared_variant(fixture, errors) {
         pending
             .assertions
             .retain(|assertion| resolved_field(assertion, variant).is_none());
@@ -83,9 +78,7 @@ pub(super) const CAUGHT_ERROR: &str = "caughtError";
 /// its variant or fields. This list is the single input to the matcher, the field checks and
 /// the skip markers, so the three always agree on which assertions are rendered. ~keep
 pub(super) fn live_errors(errors: &[ErrorDef]) -> Vec<ErrorDef> {
-    errors
-        .iter()
-        .filter(|error| !error.binding_excluded)
+    crate::codegen::binding_projection::visible_errors(errors)
         .cloned()
         .map(|mut error| {
             error.methods.retain(|method| !method.sanitized);

@@ -28,11 +28,10 @@ use crate::e2e::fixture::Fixture;
 /// `string` only for a string return (`typeref_to_go_type` maps everything else it does not know
 /// to `string` as well, but a non-string return is not a variant name). ~keep
 fn carries_error_type_field(error: &ErrorDef) -> bool {
-    !error.binding_excluded
-        && error
-            .methods
-            .iter()
-            .any(|method| method.name == "error_type" && matches!(method.return_type, TypeRef::String))
+    error
+        .methods
+        .iter()
+        .any(|method| method.name == "error_type" && matches!(method.return_type, TypeRef::String))
 }
 
 /// Render the typed `ErrorType` comparison and return `true`, or return `false` and write

@@ -174,6 +174,8 @@ fn generate_e2e_with_extensions(
     extensions: &[Box<dyn crate::Extension>],
     log: &DiagnosticLog,
 ) -> Result<(Vec<GeneratedFile>, Option<anyhow::Error>)> {
+    let projected_errors = crate::codegen::binding_projection::project_errors(errors);
+    let errors = projected_errors.as_ref();
     let fixtures_dir = Path::new(&e2e_config.fixtures);
     let fixtures = load_fixtures(fixtures_dir)
         .with_context(|| format!("failed to load fixtures from {}", fixtures_dir.display()))?;

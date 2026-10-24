@@ -71,7 +71,8 @@ fn host_error_type(lang: &str, error_name: &str, variant: &ErrorVariant, errors:
             error_name,
         )),
         "dart" => {
-            let error = errors.iter().find(|error| error.name == error_name)?;
+            let error =
+                crate::codegen::binding_projection::visible_errors(errors).find(|error| error.name == error_name)?;
             Some(if crate::backends::dart::naming::dart_error_is_simple(error) {
                 crate::backends::dart::naming::dart_simple_error_value(error_name, &variant.name)
             } else {
@@ -81,7 +82,7 @@ fn host_error_type(lang: &str, error_name: &str, variant: &ErrorVariant, errors:
         // ~keep `backends/go/gen_bindings/types/helpers.rs::gen_last_error_helper` maps the FFI
         // taxonomy code to this sentinel.
         "go" => Some(crate::codegen::error_gen::go_error_sentinel_name(
-            errors,
+            &crate::codegen::binding_projection::project_errors(errors),
             error_name,
             &variant.name,
         )),
