@@ -9,6 +9,18 @@
 use super::super::super::types::{FieldResolver, SwiftFirstClassMap};
 
 impl FieldResolver {
+    pub(crate) fn swift_indexed_element_uses_bridge(&self, field: &str) -> Option<bool> {
+        let path = self.resolve(field);
+        let (collection, index) = path.strip_suffix(']')?.rsplit_once('[')?;
+        index.parse::<usize>().ok()?;
+        if !self.is_collection_root(collection) {
+            return None;
+        }
+        self.swift_leaf_fact(collection, |map, owner, leaf, opaque| {
+            map.json_bridged_getter(owner, leaf).map(|json| opaque && !json)
+        })
+    }
+
     pub(crate) fn swift_lossless_text_leaf_is_opaque(&self, field: &str) -> Option<bool> {
         self.swift_leaf_fact(field, |_, owner, leaf, opaque| {
             self.swift_lossless_text_fields

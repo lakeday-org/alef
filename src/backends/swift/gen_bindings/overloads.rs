@@ -224,10 +224,11 @@ pub(super) fn emit_from_json_forwarders(
     exclude_types: &std::collections::HashSet<String>,
     mapper: &SwiftMapper,
     exclude_fields: &std::collections::HashSet<String>,
-    known_dto_names: &std::collections::HashSet<String>,
+    return_types: super::client::ClientReturnTypes<'_>,
     out: &mut String,
 ) {
     use heck::AsSnakeCase;
+    let known_dto_names = return_types.dto_names;
 
     let visible_types: Vec<_> = api.types.iter().filter(|t| !exclude_types.contains(&t.name)).collect();
     let visible_functions: Vec<_> = api.functions.iter().collect();
@@ -286,6 +287,7 @@ pub(super) fn emit_from_json_forwarders(
                 crate::alef_context! {
                     function_name => &swift_name,
                     type_name => type_name,
+                    wrapped => return_types.class_names.contains(type_name),
                 },
             ));
         }
@@ -577,7 +579,7 @@ mod tests {
             &exclude_types,
             &mapper,
             &exclude_fields,
-            &known_dto_names,
+            super::super::client::ClientReturnTypes::new(&known_dto_names, &std::collections::HashSet::new()),
             &mut out,
         );
 
@@ -624,7 +626,10 @@ mod tests {
             &std::collections::HashSet::new(),
             &SwiftMapper,
             &std::collections::HashSet::new(),
-            &std::collections::HashSet::new(),
+            super::super::client::ClientReturnTypes::new(
+                &std::collections::HashSet::new(),
+                &std::collections::HashSet::new(),
+            ),
             &mut out,
         );
 

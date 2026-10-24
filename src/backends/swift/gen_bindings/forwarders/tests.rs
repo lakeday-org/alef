@@ -232,6 +232,7 @@ fn async_forwarder_decodes_unit_enum_return_via_raw_value_not_positional_init() 
         &enum_names,
         &unit_enum_names,
         AsyncForwarderContext {
+            client_class_names: &HashSet::new(),
             handle_returned_types: &HashSet::new(),
             error_type_name: "MyLibError",
         },
@@ -398,17 +399,11 @@ fn vec_dto_return_suffix_maps_with_try_and_has_no_leading_try() {
 }
 
 #[test]
-fn vec_opaque_return_suffix_uses_ptr_based_reconstruction_and_has_no_leading_try() {
-    let known_dto_names: HashSet<String> = HashSet::new();
+fn vec_opaque_return_suffix_preserves_owned_values() {
     let ty = TypeRef::Vec(Box::new(TypeRef::Named("Thing".to_string())));
-    let suffix = forwarder_return_conversion_suffix_with_throws(&ty, &known_dto_names, true);
     assert_eq!(
-        suffix, ".map { ref in var item = try RustBridge.Thing(ptr: ref.ptr); item.isOwned = false; return item }",
-        "Vec<opaque> suffix must reconstruct via ptr-based init. Got:\n{suffix}"
-    );
-    assert!(
-        !suffix.starts_with("try"),
-        "suffix must not start with a leading try. Got:\n{suffix}"
+        forwarder_return_conversion_suffix_with_throws(&ty, &HashSet::new(), true),
+        ""
     );
 }
 
@@ -470,6 +465,7 @@ fn async_forwarder_json_encodes_enum_param_and_wraps_in_rust_string() {
         &enum_names,
         &unit_enum_names,
         AsyncForwarderContext {
+            client_class_names: &HashSet::new(),
             handle_returned_types: &HashSet::new(),
             error_type_name: "MyLibError",
         },
@@ -515,6 +511,7 @@ fn async_forwarder_void_return_emits_no_result_binding_or_return() {
         &enum_names,
         &unit_enum_names,
         AsyncForwarderContext {
+            client_class_names: &HashSet::new(),
             handle_returned_types: &HashSet::new(),
             error_type_name: "MyLibError",
         },
@@ -560,6 +557,7 @@ fn async_forwarder_string_return_converts_via_to_string() {
         &enum_names,
         &unit_enum_names,
         AsyncForwarderContext {
+            client_class_names: &HashSet::new(),
             handle_returned_types: &HashSet::new(),
             error_type_name: "MyLibError",
         },
@@ -607,6 +605,7 @@ fn infallible_async_forwarders_always_try_the_result_bridge() {
             &HashSet::new(),
             &unit_enum_names,
             AsyncForwarderContext {
+                client_class_names: &HashSet::new(),
                 handle_returned_types: &HashSet::new(),
                 error_type_name: "MyLibError",
             },
@@ -723,6 +722,7 @@ fn infallible_async_json_result_payloads_agree_across_all_generated_surfaces() {
             &enum_names,
             &enum_names,
             AsyncForwarderContext {
+                client_class_names: &HashSet::new(),
                 handle_returned_types: &handle_returned_types,
                 error_type_name: "MyLibError",
             },
@@ -796,6 +796,7 @@ fn async_optional_handle_result_remains_native_in_all_generated_surfaces() {
         &enum_names,
         &enum_names,
         AsyncForwarderContext {
+            client_class_names: &HashSet::new(),
             handle_returned_types: &handle_returned_types,
             error_type_name: "MyLibError",
         },

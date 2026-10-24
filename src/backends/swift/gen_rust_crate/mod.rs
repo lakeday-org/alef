@@ -25,6 +25,8 @@ pub(crate) mod enums;
 pub(crate) mod extern_block;
 pub(crate) mod feature_gate;
 mod json_bridge;
+#[cfg(test)]
+mod owned_values_tests;
 pub(crate) mod owned_vec;
 #[cfg(test)]
 mod owned_vec_tests;
@@ -281,13 +283,15 @@ fn emit_lib_rs(
             ty.name.clone(),
             owned_vec::owned_vec_getters(
                 ty,
-                exclude_fields,
-                &type_paths,
-                &no_serde_names,
-                &first_class_names,
-                enum_kinds,
-                &config.untagged_union_text_types.iter().map(String::as_str).collect(),
-                configured_features,
+                &owned_vec::OwnedVecGetterFacts {
+                    exclude_fields,
+                    type_paths: &type_paths,
+                    no_serde_names: &no_serde_names,
+                    first_class_names: &first_class_names,
+                    enum_kinds,
+                    text_types: &config.untagged_union_text_types.iter().map(String::as_str).collect(),
+                    configured_features,
+                },
             ),
         ));
         if ty.is_opaque && !ty.methods.iter().all(|m| m.sanitized) && !ty.methods.is_empty() {
@@ -314,9 +318,7 @@ fn emit_lib_rs(
                     &enum_names,
                     &unit_enum_names,
                 );
-                owned_vec_accessors
-                    .functions
-                    .extend(owned_vec::owned_vec_function(&bridge_fn)?);
+                owned_vec_accessors.add_function(&bridge_fn)?;
             }
         }
         if let Some(dto_method_block) =
@@ -351,9 +353,7 @@ fn emit_lib_rs(
             &swift_capsule_types,
             &opaque_type_names_ahash,
         )?;
-        owned_vec_accessors
-            .functions
-            .extend(owned_vec::owned_vec_function(&bridge_fn)?);
+        owned_vec_accessors.add_function(&bridge_fn)?;
     }
 
     if !visible_functions.is_empty() {
@@ -397,9 +397,7 @@ fn emit_lib_rs(
     for (_bridge_cfg, trait_def) in &active_bridges {
         for method in trait_def.methods.iter().filter(|m| !m.has_default_impl) {
             let bridge_fn = trait_bridge::trait_method_bridge_fn(trait_def, method, &visible_type_names);
-            owned_vec_accessors
-                .functions
-                .extend(owned_vec::owned_vec_function(&bridge_fn)?);
+            owned_vec_accessors.add_function(&bridge_fn)?;
         }
         extern_blocks.push(trait_bridge::emit_extern_block_for_trait_bridge(
             trait_def,

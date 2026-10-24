@@ -26,6 +26,13 @@ pub(super) struct StringExpression<'a> {
 
 impl StringExpression<'_> {
     pub(super) fn render(self) -> String {
+        if self
+            .field
+            .and_then(|field| self.field_resolver.swift_indexed_element_uses_bridge(field))
+            == Some(true)
+        {
+            return self.bridge_string();
+        }
         if self.is_projected() && !self.leaf_is_property_access {
             return self.bridge_string();
         }

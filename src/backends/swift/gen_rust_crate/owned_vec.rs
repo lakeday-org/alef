@@ -5,7 +5,7 @@
 //! `result.items()[0].name()` reads freed memory once Swift releases the temporary vector.
 //! swift-bridge documents this as the caller's duty and offers no owning element form.
 //!
-//! The extern declaration of such a getter therefore gets the Swift name `<field>RustVec`, and a
+//! The extern declaration of such a getter therefore gets a reserved internal Swift name, and a
 //! Swift extension in the `RustBridge` target declares the original `<field>()` on top of it. The
 //! extension moves every element out of the vector with `pop()`, which yields owned values, and
 //! returns a Swift array.
@@ -19,8 +19,6 @@ use super::wrappers::is_unbridgeable_getter;
 use crate::backends::swift::gen_rust_crate::default_construction::EnumKinds;
 use crate::core::backend::GeneratedFile;
 use crate::core::ir::TypeDef;
-use crate::core::keywords::swift_ident;
-use heck::ToLowerCamelCase;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -43,12 +41,12 @@ pub(crate) struct OwnedVecGetter {
 
 /// The Swift name of the extern getter that returns the raw `RustVec`.
 pub(crate) fn bridge_getter_swift_name(field_name: &str) -> String {
-    format!("{}RustVec", field_name.to_lower_camel_case())
+    crate::backends::swift::naming::owned_vector_raw_name(field_name)
 }
 
 /// The Swift name of the extern function that returns the raw `RustVec`.
 pub(crate) fn raw_swift_name(public_name: &str) -> String {
-    format!("{public_name}RustVec")
+    crate::backends::swift::naming::owned_vector_raw_name(public_name)
 }
 
 /// Reads a swift-bridge return type and reports the element type when it is a `RustVec` whose
@@ -209,42 +207,52 @@ pub(crate) fn owned_vec_function(bridge_fn: &BridgeFn) -> anyhow::Result<Option<
     }))
 }
 
-/// The getters of `ty` that need an owned-array accessor, in field order.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn owned_vec_getters(
-    ty: &TypeDef,
-    exclude_fields: &HashSet<String>,
-    type_paths: &HashMap<String, String>,
-    no_serde_names: &HashSet<&str>,
-    first_class_names: &HashSet<&str>,
-    enum_kinds: EnumKinds<'_, '_>,
-    text_types: &HashSet<&str>,
-    configured_features: &HashSet<&str>,
-) -> Vec<OwnedVecGetter> {
-    let parent_first_class = first_class_names.contains(ty.name.as_str());
-    ty.fields
+pub(crate) struct OwnedVecGetterFacts<'sets, 'names> {
+    pub exclude_fields: &'sets HashSet<String>,
+    pub type_paths: &'sets HashMap<String, String>,
+    pub no_serde_names: &'sets HashSet<&'names str>,
+    pub first_class_names: &'sets HashSet<&'names str>,
+    pub enum_kinds: EnumKinds<'sets, 'names>,
+    pub text_types: &'sets HashSet<&'names str>,
+    pub configured_features: &'sets HashSet<&'names str>,
+}
+
+pub(crate) fn owned_vec_getters(ty: &TypeDef, facts: &OwnedVecGetterFacts<'_, '_>) -> Vec<OwnedVecGetter> {
+    let parent_first_class = facts.first_class_names.contains(ty.name.as_str());
+    let visible_fields: Vec<_> = ty
+        .fields
         .iter()
         .filter(|field| {
             !is_unbridgeable_getter(
                 ty,
                 field,
-                exclude_fields,
-                type_paths,
-                no_serde_names,
-                configured_features,
+                facts.exclude_fields,
+                facts.type_paths,
+                facts.no_serde_names,
+                facts.configured_features,
             )
         })
+        .collect();
+    let getters: Vec<_> = visible_fields
+        .iter()
         .filter_map(|field| {
-            let bridge_ty = getter_bridge_type(field, enum_kinds, no_serde_names, parent_first_class, text_types);
+            let bridge_ty = getter_bridge_type(
+                field,
+                facts.enum_kinds,
+                facts.no_serde_names,
+                parent_first_class,
+                facts.text_types,
+            );
             let element = owned_vec_element(&bridge_ty)?;
             Some(OwnedVecGetter {
-                swift_name: swift_ident(&field.name.to_lower_camel_case()),
+                swift_name: crate::backends::swift::naming::bridge_field_name(&field.name),
                 raw_name: bridge_getter_swift_name(&field.name),
                 element: element.swift_type,
                 optional: element.optional,
             })
         })
-        .collect()
+        .collect();
+    getters
 }
 
 /// A type name with the owned-array getters it needs.
@@ -255,6 +263,13 @@ pub(crate) type TypeOwnedVecGetters = (String, Vec<OwnedVecGetter>);
 pub(crate) struct OwnedVecAccessors {
     pub types: Vec<TypeOwnedVecGetters>,
     pub functions: Vec<OwnedVecFunction>,
+}
+
+impl OwnedVecAccessors {
+    pub(crate) fn add_function(&mut self, function: &BridgeFn) -> anyhow::Result<()> {
+        self.functions.extend(owned_vec_function(function)?);
+        Ok(())
+    }
 }
 
 #[derive(Serialize)]
@@ -332,7 +347,10 @@ mod tests {
     }
 
     #[test]
-    fn raw_getter_name_is_camel_case_with_suffix() {
-        assert_eq!(bridge_getter_swift_name("model_prefixes"), "modelPrefixesRustVec");
+    fn raw_getter_name_uses_reserved_internal_namespace() {
+        assert_eq!(
+            bridge_getter_swift_name("model_prefixes"),
+            "__alef_owned_vec_model_prefixes"
+        );
     }
 }

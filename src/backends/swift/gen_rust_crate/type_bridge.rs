@@ -256,7 +256,7 @@ pub(crate) fn is_enum_named(ty: &TypeRef, enum_names: &HashSet<&str>) -> bool {
 ///   opaque `RustBridge.{Elem}` accessors (`results()[0].mimeType()`). The getter must therefore
 ///   return a real `Vec<Opaque>`, matching the constructor param. swift-bridge supports this for
 ///   declared opaque `type T;`. The extern getter keeps its `RustVec` return but takes the Swift
-///   name `<field>RustVec`; the `owned_vec` module declares `<field>()` on top of it, returning
+///   reserved internal name; the `owned_vec` module declares `<field>()` on top of it, returning
 ///   an array of owned elements, because an element read from a `RustVec` by index does not
 ///   keep the vector alive.
 ///

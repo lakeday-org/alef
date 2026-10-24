@@ -1,5 +1,13 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
     (
+        "swift_owned_array_suffix.swift.jinja",
+        include_str!("../templates/swift_owned_array_suffix.swift.jinja"),
+    ),
+    (
+        "swift_forwarder_owned_array_body.swift.jinja",
+        include_str!("../templates/swift_forwarder_owned_array_body.swift.jinja"),
+    ),
+    (
         "swift_text_projected_read.swift.jinja",
         include_str!("../templates/swift_text_projected_read.swift.jinja"),
     ),

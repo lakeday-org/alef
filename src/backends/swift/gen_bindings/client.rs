@@ -87,15 +87,30 @@ pub(super) fn emit_convenience_wrappers(
 
 /// - Constructor bridge fn: `create_<snake_type_name>` → camelCase `create<PascalTypeName>`
 /// - Method bridge fn: `<snake_type_name>_<method_name>` → camelCase `<camelTypeName><PascalMethod>`
+pub(super) struct ClientReturnTypes<'a> {
+    pub dto_names: &'a std::collections::HashSet<String>,
+    pub class_names: &'a std::collections::HashSet<String>,
+}
+
+impl<'a> ClientReturnTypes<'a> {
+    pub(super) fn new(
+        dto_names: &'a std::collections::HashSet<String>,
+        class_names: &'a std::collections::HashSet<String>,
+    ) -> Self {
+        Self { dto_names, class_names }
+    }
+}
+
 pub(super) fn emit_client_class(
     type_name: &str,
     methods: &[MethodDef],
     mapper: &impl TypeMapper,
     config: &ResolvedCrateConfig,
-    first_class_types: &std::collections::HashSet<String>,
+    return_types: ClientReturnTypes<'_>,
     out: &mut String,
 ) {
     use heck::ToSnakeCase;
+    let first_class_types = return_types.dto_names;
 
     let snake_name = type_name.to_snake_case();
     let constructor_fn = swift_ident(&format!("create_{snake_name}").to_lower_camel_case());
@@ -157,7 +172,11 @@ pub(super) fn emit_client_class(
         // An async bridge function is always `async throws`: the Rust shim is forced fallible so a
         // spawned task's `JoinError` surfaces as an error instead of leaving the continuation
         // unresumed. ~keep
-        let needs_throws = method.error_type.is_some() || has_dto_param || needs_return_init || method.is_async;
+        let needs_throws = method.error_type.is_some()
+            || has_dto_param
+            || needs_return_init
+            || method.is_async
+            || super::forwarders::return_value_conversion_throws(&method.return_type, first_class_types);
         let throws_clause = if needs_throws { " throws" } else { "" };
         let async_clause = if method.is_async { " async" } else { "" };
         let return_clause = if matches!(method.return_type, TypeRef::Unit) {
@@ -174,7 +193,25 @@ pub(super) fn emit_client_class(
             method.error_type.is_some() || method.is_async,
             method.is_async,
         );
-        if matches!(method.return_type, TypeRef::Unit) {
+        let converted_call =
+            super::owned_returns::array_suffix(&method.return_type, first_class_types, return_types.class_names)
+                .map(|suffix| {
+                    let conversion_throws =
+                        super::forwarders::return_value_conversion_throws(&method.return_type, first_class_types);
+                    let prefix = if conversion_throws && !bridge_call.starts_with("try ") {
+                        "try "
+                    } else {
+                        ""
+                    };
+                    format!("{prefix}{bridge_call}{suffix}")
+                })
+                .or_else(|| matches!(method.return_type, TypeRef::String).then(|| format!("{bridge_call}.toString()")));
+        if let Some(expression) = converted_call {
+            method_body.push_str(&crate::backends::swift::template_env::render(
+                "swift_client_method_return_body.swift.jinja",
+                crate::alef_context! { bridge_call => expression },
+            ));
+        } else if matches!(method.return_type, TypeRef::Unit) {
             method_body.push_str(&crate::backends::swift::template_env::render(
                 "swift_client_method_unit_body.swift.jinja",
                 crate::alef_context! {
@@ -493,7 +530,7 @@ mod tests {
             methods,
             &SwiftMapper,
             &ResolvedCrateConfig::default(),
-            &HashSet::new(),
+            ClientReturnTypes::new(&HashSet::new(), &HashSet::new()),
             &mut out,
         );
         out

@@ -1,0 +1,20 @@
+version: "3"
+tasks:
+  rust:
+    cmds:
+      - cargo build --workspace
+  materialize:
+    cmds:
+      - '"{{.TEST_BINARY}}" --exact backends::swift::gen_rust_crate::owned_values_tests::native_owned_values_outlive_containers --ignored --nocapture'
+  swift:
+    cmds:
+      - swift run --package-path . Probe
+  swift-build:
+    cmds:
+      - swift build --package-path . --product Probe
+  suite:
+    cmds:
+      - swift test --package-path .
+  suite-replay:
+    cmds:
+      - swift test --package-path . --skip-build

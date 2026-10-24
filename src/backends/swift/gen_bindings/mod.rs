@@ -26,6 +26,7 @@ mod forwarders;
 mod module_imports;
 pub(crate) mod opaque_handles;
 mod overloads;
+mod owned_returns;
 pub mod plugin_marshal;
 pub mod service_api;
 mod streaming;
@@ -405,6 +406,8 @@ impl Backend for SwiftBackend {
             .filter(|t| dto::can_emit_first_class_struct(t, &mapper, &exclude_fields, &known_dto_names))
             .map(|t| t.name.clone())
             .collect();
+        let client_class_names: std::collections::HashSet<String> =
+            client_constructor_types.iter().map(|&s| s.to_string()).collect();
         let mut sendable_emitted: std::collections::HashSet<String> = std::collections::HashSet::new();
         for ty in api.types.iter().filter(|t| {
             !t.is_trait
@@ -418,7 +421,7 @@ impl Backend for SwiftBackend {
                 &ty.methods,
                 &mapper,
                 config,
-                &first_class_types,
+                client::ClientReturnTypes::new(&first_class_types, &client_class_names),
                 &mut body,
             );
             body.push('\n');
@@ -475,15 +478,12 @@ impl Backend for SwiftBackend {
             &exclude_types,
             &mapper,
             &exclude_fields,
-            &known_dto_names,
+            client::ClientReturnTypes::new(&known_dto_names, &client_class_names),
             &mut body,
         );
 
-        // NOTE: The `Swift{Trait}Box` class is emitted into Sources/RustBridge/ (separate file)
         bridge_artifacts::emit_inbound_protocols(api, config, &exclude_types, &mut body);
 
-        let client_class_names: std::collections::HashSet<String> =
-            client_constructor_types.iter().map(|&s| s.to_string()).collect();
         let all_enum_names: std::collections::HashSet<String> = unit_serde_enum_names
             .iter()
             .chain(untagged_enum_names.iter())

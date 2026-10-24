@@ -1,0 +1,2 @@
+        let result = {{ bridge_call }}
+        return {% if conversion_throws %}try {% endif %}result{{ suffix }}

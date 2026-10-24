@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Record multiple ordered Swift constructor signatures with `constructor_history`, preserving released public initializer and RustBridge factory function references and native symbols alongside the current full constructor. Existing `legacy_constructor_fields` behavior is retained. Rust callers constructing `VersionAnnotation` literals must add `constructor_history: vec![]` or use `..Default::default()`; old serialized IR remains readable.
+- Record multiple ordered Swift constructor signatures with `constructor_history`, preserving released public initializer and RustBridge factory function references and native symbols alongside the current full constructor. Existing `legacy_constructor_fields` behavior is retained; old serialized IR remains readable.
+
+### Changed (BREAKING)
+
+- Swift collection returns use owned arrays instead of borrowed `RustVec` elements. Update explicit return types, use `.count` and Swift array accessors, and preserve bounds checks where callers previously relied on optional indexed access.
+- Rust callers constructing `VersionAnnotation` literals must add `constructor_history: vec![]` or use `..Default::default()`.
 
 ### Changed
 
@@ -17,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep Swift collection elements alive after source containers leave scope, reserve internal owned-vector aliases, and convert owned handles and strings through facade methods, free functions, from-JSON helpers and generated indexed assertions (#693).
 - Execute scalar Swift text-enum variant assertions and compare finite JSON numeric and Boolean expectations without coercion, signed wrapping, truncation or floating-point rounding (#691).
 - Preserve structured Swift text-enum values through public `<field>Value()` accessors, DTO reconstruction and generated assertions, while keeping plain-text getters and propagating serialization errors with context (#691).
 - Verify Android structured-list assertions against the complete generated JNI producer and imported enum models (#688).

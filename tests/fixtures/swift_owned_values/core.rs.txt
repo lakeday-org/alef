@@ -1,0 +1,56 @@
+use serde::{Deserialize, Serialize};
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Entry { label: String }
+impl Entry { pub fn label(&self) -> String { self.label.clone() } }
+pub fn sample_entry() -> Entry { Entry { label: "first".into() } }
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Container {
+    pub entries: Vec<Entry>,
+    pub labels: Vec<String>,
+    pub labels_rust_vec: String,
+    pub maybe_entries: Option<Vec<Entry>>,
+    pub maybe_labels: Option<Vec<String>>,
+}
+pub fn sample_entries() -> Vec<Entry> {
+    let case = std::env::var("ALEF_OWNED_VALUES_CASE").unwrap_or_default();
+    let mut values = vec![Entry { label: if case == "first" { "wrong" } else { "first" }.into() },
+        Entry { label: if case == "second" { "wrong" } else { "second" }.into() }];
+    if case == "count" { values.pop(); }
+    values
+}
+pub fn sample_labels() -> Vec<String> {
+    let case = std::env::var("ALEF_OWNED_VALUES_CASE").unwrap_or_default();
+    let mut labels = vec![if case == "first" { "wrong" } else { "alpha" }.into(),
+        if case == "second" { "wrong" } else { "beta" }.into()];
+    if case == "label" { labels.pop(); }
+    labels
+}
+pub fn sample_container() -> Container {
+    Container { entries: sample_entries(), labels: sample_labels(), labels_rust_vec: "existing field".into(),
+        maybe_entries: Some(sample_entries()), maybe_labels: Some(sample_labels()) }
+}
+pub fn forward_strings(prefix: String, suffix: Option<String>, mut values: Vec<String>) -> Vec<String> {
+    values.insert(0, prefix);
+    values.extend(suffix);
+    values
+}
+pub fn fallible_entries(fail: bool) -> Result<Vec<Entry>, String> {
+    if fail { Err("entries unavailable".into()) } else { Ok(sample_entries()) }
+}
+pub async fn async_entries() -> Vec<Entry> { sample_entries() }
+#[derive(Clone, Default)]
+pub struct Factory { marker: () }
+impl Factory {
+    pub fn entries(&self) -> Vec<Entry> { sample_entries() }
+    pub fn labels(&self) -> Vec<String> { sample_labels() }
+}
+pub fn sample_factory() -> Factory { Factory::default() }
+pub trait Source: Send + Sync { fn labels(&self) -> Vec<String>; }
+struct BuiltInSource;
+impl Source for BuiltInSource { fn labels(&self) -> Vec<String> { sample_labels() } }
+pub fn sample_source_labels() -> Vec<String> {
+    let source: Box<dyn Source + Send + Sync> = Box::new(BuiltInSource);
+    source.labels()
+}
+
+pub fn sample_labels_rust_vec() -> String { "existing scalar".into() }

@@ -44,6 +44,22 @@ pub(crate) fn text_value_accessor_name(field: &str, renamed: Option<&str>) -> St
     )
 }
 
+pub(crate) fn bridge_field_name(field: &str) -> String {
+    let name = crate::codegen::naming::public_host_identifier(
+        crate::core::config::Language::Swift,
+        crate::codegen::naming::PublicIdentifierKind::Method,
+        field,
+    );
+    swift_rust_shim_ident(name.trim_matches('`'))
+}
+
+pub(crate) fn owned_vector_raw_name(public_name: &str) -> String {
+    crate::codegen::naming::internal_rust_identifier(&format!(
+        "__alef_owned_vec_{}",
+        crate::codegen::naming::pascal_to_snake(public_name.trim_matches('`')),
+    ))
+}
+
 /// Stable internal symbols follow the explicitly recorded constructor chronology. ~keep
 pub(crate) fn constructor_history_symbol(index: usize) -> String {
     crate::codegen::naming::internal_rust_identifier(&format!("__alef_constructor_history_{index}"))
@@ -72,6 +88,18 @@ mod tests {
     fn constructor_history_symbols_keep_their_reserved_internal_namespace() {
         for (index, expected) in [(1, "__alef_constructor_history_1"), (2, "__alef_constructor_history_2")] {
             assert_eq!(constructor_history_symbol(index), expected);
+        }
+    }
+
+    #[test]
+    fn owned_vector_aliases_use_canonical_member_policy() {
+        for (field, getter, raw) in [
+            ("items", "items", "__alef_owned_vec_items"),
+            ("URL_items", "urlItems", "__alef_owned_vec_url_items"),
+            ("class", "class_", "__alef_owned_vec_class"),
+        ] {
+            assert_eq!(bridge_field_name(field), getter);
+            assert_eq!(owned_vector_raw_name(field), raw);
         }
     }
 

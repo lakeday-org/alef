@@ -76,7 +76,7 @@ fn handle_and_string_vectors_are_read_as_owned_arrays() {
     assert!(swift.contains("extension ReplyRef {"), "{swift}");
     assert!(swift.contains("public func choices() -> [Choice] {"), "{swift}");
     assert!(
-        swift.contains("self.choicesRustVec().alefIntoOwnedArray()"),
+        swift.contains("self.__alef_owned_vec_choices().alefIntoOwnedArray()"),
         "the accessor must move the elements out of the vector: {swift}"
     );
     assert!(swift.contains("public func tags() -> [RustString] {"), "{swift}");
@@ -96,10 +96,10 @@ fn the_bridge_getter_gets_a_distinct_swift_name() {
     let lib_rs = &file_named(&files, "lib.rs").unwrap().content;
 
     assert!(
-        lib_rs.contains("swift_name = \"choicesRustVec\""),
+        lib_rs.contains("swift_name = \"__alef_owned_vec_choices\""),
         "the extern getter must not take the public name: {lib_rs}"
     );
-    assert!(!lib_rs.contains("scoresRustVec"), "{lib_rs}");
+    assert!(!lib_rs.contains("__alef_owned_vec_scores"), "{lib_rs}");
 }
 
 #[test]
@@ -135,7 +135,10 @@ fn a_free_function_returning_strings_is_wrapped_to_an_owned_array() {
     let files = emit(&api, &config()).unwrap();
 
     let lib_rs = &file_named(&files, "lib.rs").unwrap().content;
-    assert!(lib_rs.contains("swift_name = \"providerNamesRustVec\""), "{lib_rs}");
+    assert!(
+        lib_rs.contains("swift_name = \"__alef_owned_vec_provider_names\""),
+        "{lib_rs}"
+    );
     let swift = &file_named(&files, "ZSwiftOwnedVecAccessors.swift")
         .expect("a function returning a vector of strings needs a wrapper")
         .content;
@@ -144,7 +147,7 @@ fn a_free_function_returning_strings_is_wrapped_to_an_owned_array() {
         "{swift}"
     );
     assert!(
-        swift.contains("try providerNamesRustVec().alefIntoOwnedArray()"),
+        swift.contains("try __alef_owned_vec_provider_names().alefIntoOwnedArray()"),
         "the wrapper must move the elements out of the vector: {swift}"
     );
 }
@@ -170,7 +173,7 @@ fn an_async_method_returning_handles_keeps_its_parameters_in_the_wrapper() {
     };
     let bridge_fn =
         super::extern_block::type_method_bridge_fn(&ty, &ty.methods[0], &handles(), &HashSet::new(), &HashSet::new());
-    assert_eq!(bridge_fn.swift_name, "clientListModelsRustVec");
+    assert_eq!(bridge_fn.swift_name, "__alef_owned_vec_client_list_models");
 
     let wrapper = super::owned_vec::owned_vec_function(&bridge_fn)
         .unwrap()
@@ -185,7 +188,7 @@ fn an_async_method_returning_handles_keeps_its_parameters_in_the_wrapper() {
     assert_eq!(wrapper.return_type, "[Choice]");
     assert_eq!(
         wrapper.body,
-        "try await clientListModelsRustVec(client, provider, limit).alefIntoOwnedArray()"
+        "try await __alef_owned_vec_client_list_models(client, provider, limit).alefIntoOwnedArray()"
     );
 }
 
@@ -253,7 +256,7 @@ fn a_trait_trampoline_returning_strings_is_wrapped_to_an_owned_array() {
         ..TypeDef::default()
     };
     let bridge_fn = super::trait_bridge::trait_method_bridge_fn(&trait_def, &trait_def.methods[0], &HashSet::new());
-    assert_eq!(bridge_fn.swift_name, "backend_call_supported_formatsRustVec");
+    assert_eq!(bridge_fn.swift_name, "__alef_owned_vec_backend_call_supported_formats");
 
     let wrapper = super::owned_vec::owned_vec_function(&bridge_fn)
         .unwrap()
@@ -263,6 +266,27 @@ fn a_trait_trampoline_returning_strings_is_wrapped_to_an_owned_array() {
     assert_eq!(wrapper.return_type, "[RustString]");
     assert_eq!(
         wrapper.body,
-        "backend_call_supported_formatsRustVec(this).alefIntoOwnedArray()"
+        "__alef_owned_vec_backend_call_supported_formats(this).alefIntoOwnedArray()"
     );
+}
+
+#[test]
+fn distinct_global_overload_parameters_do_not_collide_with_raw_owned_alias() {
+    let mut api = api(vec![field("index", TypeRef::Primitive(PrimitiveType::U32))]);
+    api.functions = vec![
+        FunctionDef {
+            name: "names".into(),
+            rust_path: "test_lib::names".into(),
+            return_type: vec_of(TypeRef::String),
+            ..Default::default()
+        },
+        FunctionDef {
+            name: "names_rust_vec".into(),
+            rust_path: "test_lib::names_rust_vec".into(),
+            params: vec![param("index", TypeRef::Primitive(PrimitiveType::U32), false)],
+            return_type: TypeRef::String,
+            ..Default::default()
+        },
+    ];
+    assert!(emit(&api, &config()).is_ok());
 }

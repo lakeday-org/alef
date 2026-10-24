@@ -21,6 +21,7 @@ pub(super) struct ForwarderArg {
 pub(super) struct AsyncForwarderContext<'a> {
     handle_returned_types: &'a HashSet<String>,
     error_type_name: &'a str,
+    client_class_names: &'a HashSet<String>,
 }
 
 fn forwarder_param_signature(
@@ -332,6 +333,7 @@ pub(super) fn emit_free_function_forwarders(
                 AsyncForwarderContext {
                     handle_returned_types: &handle_returned_types,
                     error_type_name,
+                    client_class_names,
                 },
                 out,
             );
@@ -403,8 +405,14 @@ pub(super) fn emit_single_free_function_forwarder(
             crate::alef_context! { line => line, },
         ));
     }
-    let return_suffix =
-        forwarder_return_conversion_suffix_with_throws(&func.return_type, known_dto_names, func.error_type.is_some());
+    let return_suffix = super::owned_returns::array_suffix(&func.return_type, known_dto_names, client_class_names)
+        .unwrap_or_else(|| {
+            forwarder_return_conversion_suffix_with_throws(
+                &func.return_type,
+                known_dto_names,
+                func.error_type.is_some(),
+            )
+        });
     let effective_try = if func.error_type.is_some() || return_conversion_throws {
         "try "
     } else {
@@ -617,50 +625,14 @@ pub(super) fn emit_async_free_function_forwarder(
                 decode_type => &decode_ty,
             },
         ));
-    } else if matches!(&func.return_type, TypeRef::Vec(inner) if matches!(inner.as_ref(), TypeRef::Named(_))) {
+    } else if let Some(suffix) =
+        super::owned_returns::array_suffix(&func.return_type, known_dto_names, context.client_class_names)
+    {
         body.push_str(&crate::backends::swift::template_env::render(
-            "swift_forwarder_conversion_line.swift.jinja",
-            crate::alef_context! {
-                line => format!("let result = {bridge_call}"),
-            },
+            "swift_forwarder_owned_array_body.swift.jinja",
+            crate::alef_context! { bridge_call => &bridge_call, suffix => &suffix,
+            conversion_throws => return_value_conversion_throws(&func.return_type, known_dto_names) },
         ));
-        if func.error_type.is_some() {
-            if let TypeRef::Vec(inner) = &func.return_type {
-                if let TypeRef::Named(name) = inner.as_ref() {
-                    let struct_name = swift_ident(name);
-                    body.push_str("        var items: [");
-                    body.push_str(&struct_name);
-                    body.push_str("] = []\n");
-                    body.push_str("        for ref in result {\n");
-                    if known_dto_names.contains(name) {
-                        body.push_str("            items.append(try ");
-                        body.push_str(&struct_name);
-                        body.push_str("(ref))\n");
-                    } else {
-                        body.push_str("            var item = try RustBridge.");
-                        body.push_str(&struct_name);
-                        body.push_str("(ptr: ref.ptr)\n");
-                        body.push_str("            item.isOwned = false\n");
-                        body.push_str("            items.append(item)\n");
-                    }
-                    body.push_str("        }\n");
-                    body.push_str("        return items\n");
-                } else {
-                    let suffix =
-                        forwarder_return_conversion_suffix_with_throws(&func.return_type, known_dto_names, true);
-                    body.push_str(&crate::backends::swift::template_env::render(
-                        "swift_forwarder_result_return_body.swift.jinja",
-                        crate::alef_context! { suffix => &suffix, },
-                    ));
-                }
-            }
-        } else {
-            let suffix = forwarder_return_conversion_suffix_with_throws(&func.return_type, known_dto_names, false);
-            body.push_str(&crate::backends::swift::template_env::render(
-                "swift_forwarder_result_return_body.swift.jinja",
-                crate::alef_context! { suffix => &suffix, },
-            ));
-        }
     } else if matches!(&func.return_type, TypeRef::Unit) {
         body.push_str(&crate::backends::swift::template_env::render(
             "swift_forwarder_unit_body.swift.jinja",
@@ -825,9 +797,7 @@ fn forwarder_return_conversion_suffix_inner(ty: &TypeRef, known_dto_names: &Hash
                 if known_dto_names.contains(name) {
                     format!(".map {{ ref in try {struct_name}(ref) }}")
                 } else {
-                    format!(
-                        ".map {{ ref in var item = try RustBridge.{struct_name}(ptr: ref.ptr); item.isOwned = false; return item }}"
-                    )
+                    String::new()
                 }
             }
             _ => String::new(),
