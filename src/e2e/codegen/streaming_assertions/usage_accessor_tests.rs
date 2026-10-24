@@ -54,12 +54,16 @@ fn accessor_usage_total_tokens_chains_optionals_in_swift_and_dart() {
 #[test]
 fn optional_chain_tail_camel_cases_each_field_and_chains_indexes() {
     assert_eq!(
-        super::renderers::render_optional_chain_tail("root", ".prompt_tokens_details.cached_tokens"),
-        "root?.promptTokensDetails?.cachedTokens"
+        super::renderers::render_optional_chain_tail(
+            "root",
+            ".prompt_tokens_details.cached_tokens",
+            crate::core::config::Language::Swift
+        ),
+        "root?.promptTokensDetails.cachedTokens"
     );
     assert_eq!(
-        super::renderers::render_optional_chain_tail("root", "[0].id"),
-        "root?[0]?.id"
+        super::renderers::render_optional_chain_tail("root", "[0].id", crate::core::config::Language::Dart),
+        "root?[0].id"
     );
 }
 

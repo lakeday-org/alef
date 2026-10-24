@@ -50,6 +50,7 @@ pub use languages::{
 pub use surfaces::{
     IdentifierContext, NameCollision, NameError, NameSurface, PublicIdentifierKind, detect_name_collisions,
 };
+pub(crate) use symbols::ffi_field_accessor_symbol;
 pub use symbols::{
     abi_symbol, abi_symbol_from_components, ffi_builtin_error_code_prefix, ffi_error_code_variant_name,
     internal_rust_identifier, to_c_name,

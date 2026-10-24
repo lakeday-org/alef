@@ -13,6 +13,11 @@ pub fn internal_rust_identifier(name: &str) -> String {
     crate::core::keywords::rust_raw_ident(name)
 }
 
+/// Match FFI field getters, whose final component is the original Rust field. ~keep
+pub(crate) fn ffi_field_accessor_symbol(prefix: &str, type_name: &str, field: &str) -> String {
+    format!("{prefix}_{}_{field}", pascal_to_snake(type_name))
+}
+
 /// Resolve a C-style ABI symbol with an explicit prefix.
 pub fn abi_symbol(prefix: &str, name: &str) -> String {
     to_c_name(prefix, name)
@@ -134,4 +139,18 @@ pub fn ffi_error_code_variant_name(error_type: &str, variant: &str) -> String {
         .collect::<Vec<_>>()
         .join("_")
         .to_pascal_case()
+}
+
+#[cfg(test)]
+mod ffi_field_tests {
+    #[test]
+    fn ffi_getters_preserve_original_field_components() {
+        for (prefix, owner, field, expected) in [
+            ("sample", "Usage", "total_tokens", "sample_usage_total_tokens"),
+            ("sample", "HTTPUsage", "type", "sample_http_usage_type"),
+            ("sample", "Usage", "rawField", "sample_usage_rawField"),
+        ] {
+            assert_eq!(super::ffi_field_accessor_symbol(prefix, owner, field), expected);
+        }
+    }
 }

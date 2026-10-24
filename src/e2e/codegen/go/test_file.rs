@@ -269,7 +269,7 @@ pub(super) fn render_test_file(category: &str, fixtures: &[&Fixture], context: G
     let needs_http = needs_http || mock_helper_emitted;
     let needs_io = needs_io || mock_helper_emitted;
     // `strconv` has exactly one caller in this backend: the mock-request-count helper.
-    let needs_strconv = mock_helper_emitted;
+    let needs_strconv = mock_helper_emitted || body.contains("big.Rat");
 
     let _ = writeln!(out, "// E2e tests for category: {category}");
     let _ = writeln!(out, "package e2e_test");
@@ -288,6 +288,9 @@ pub(super) fn render_test_file(category: &str, fixtures: &[&Fixture], context: G
     if body.contains("errors.As(") {
         let _ = writeln!(out, "\t\"errors\"");
     }
+    if body.contains("big.Rat") {
+        out.push_str("\t\"math/big\"\n");
+    }
     if needs_fmt {
         let _ = writeln!(out, "\t\"fmt\"");
     }
@@ -301,7 +304,7 @@ pub(super) fn render_test_file(category: &str, fixtures: &[&Fixture], context: G
         let _ = writeln!(out, "\t\"os\"");
     }
     let _ = needs_filepath;
-    if needs_reflect {
+    if needs_reflect || body.contains("big.Rat") {
         let _ = writeln!(out, "\t\"reflect\"");
     }
     if needs_strconv {

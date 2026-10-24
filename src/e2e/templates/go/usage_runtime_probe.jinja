@@ -1,0 +1,12 @@
+package main
+import ("reflect"; "strconv"; "math/big")
+type numericAlias uint64
+func (numericAlias) String() string { return "masked" }
+type checker struct{}
+func (checker) True(_ int, value bool, _ ...string) { if !value { panic("counter mismatch") } }
+var assert checker
+func main() {
+    counter := {{ actual }}
+    t := 0
+{{ assertion }}
+}

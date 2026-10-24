@@ -33,9 +33,13 @@
 //! - `finish_reason`       → finish_reason string from the last chunk
 
 mod accessors;
+mod deep_paths;
 mod model;
 mod python_typeddict_accessor;
 mod renderers;
+mod usage_path;
+pub(crate) use usage_path::render_unavailable as render_usage_unavailable;
+pub(crate) use usage_path::{UsageAccessContext, UsagePathOverrides};
 mod snippets;
 
 pub use model::{
@@ -53,3 +57,6 @@ mod kotlin_android_accessor_tests;
 mod tests;
 #[cfg(test)]
 mod usage_accessor_tests;
+
+#[cfg(test)]
+pub(crate) mod probe_support;

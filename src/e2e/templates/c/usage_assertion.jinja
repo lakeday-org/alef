@@ -1,0 +1,1 @@
+    assert(usage_seen && {% if constant is not none %}{{ "1" if constant else "0" }}{% else %}{{ local }} {{ operator }} {{ literal }}{% endif %} && "equals assertion failed");

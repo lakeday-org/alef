@@ -1,0 +1,8 @@
+        {{ prefix_upper }}AlefHandle chunk_usage = {{ prefix }}_{{ item }}_usage({{ result }});
+        usage_seen = 0;
+{% for field in fields %}        {{ field.local }} = 0;
+{% endfor %}        if (chunk_usage != 0) {
+            usage_seen = 1;
+{% for field in fields %}            {{ field.local }} = {{ field.getter }}(chunk_usage);
+{% endfor %}            {{ prefix }}_{{ usage_type }}_free(chunk_usage);
+        }

@@ -1,0 +1,10 @@
+    expect((() => {
+        const actual = {{ expression }};
+        if (typeof actual !== "bigint" && (typeof actual !== "number" || !Number.isFinite(actual))) return false;
+        const [mantissa, exponent = "0"] = actual.toString().toLowerCase().split("e");
+        const fractional = (mantissa.split(".")[1] ?? "").length;
+        const scale = fractional - Number(exponent);
+        const numerator = BigInt(mantissa.replace(".", "")) * (scale < 0 ? 10n ** BigInt(-scale) : 1n);
+        const denominator = scale > 0 ? 10n ** BigInt(scale) : 1n;
+        return numerator * BigInt("{{ denominator }}") {{ operator }} BigInt("{{ numerator }}") * denominator;
+    })()).toBe(true);

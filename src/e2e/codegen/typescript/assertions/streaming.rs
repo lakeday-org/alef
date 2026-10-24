@@ -17,11 +17,6 @@ pub(super) fn render(
     let expression = event_expression.or_else(|| {
         crate::e2e::codegen::streaming_assertions::StreamingFieldResolver::accessor(field, "node", "chunks")
     });
-    // wasm-bindgen maps a Rust `u64` counter (`usage.total_tokens`) to a JS `BigInt`, which never
-    // compares equal to a numeric literal. A stream-scoped path with a tail reads such a counter.
-    let reads_counter = lang == "wasm"
-        && crate::e2e::codegen::streaming_assertions::is_stream_counter_assertion(field, assertion.value.as_ref());
-    let expression = expression.map(|e| if reads_counter { format!("Number({e})") } else { e });
     let Some(expression) = expression else {
         // ~keep An unsupported stream predicate must remain visible to the skip ledger.
         out.push_str(&format!(
@@ -30,6 +25,10 @@ pub(super) fn render(
         ));
         return true;
     };
+
+    if lang == "wasm" && render_exact_counter(out, assertion, field, &expression) {
+        return true;
+    }
 
     match assertion.assertion_type.as_str() {
         "count_min" => render_value(out, assertion, field, |value| {
@@ -115,3 +114,50 @@ fn event_variant_accessor(field: &str, chunks: &str, enum_def: &crate::core::ir:
         enum_def.name
     ))
 }
+
+fn render_exact_counter(out: &mut String, assertion: &Assertion, field: &str, expression: &str) -> bool {
+    if !crate::e2e::codegen::streaming_assertions::is_stream_counter_assertion(field, assertion.value.as_ref()) {
+        return false;
+    }
+    let Some(number) = assertion.value.as_ref().and_then(serde_json::Value::as_number) else {
+        return false;
+    };
+    let operator = match assertion.assertion_type.as_str() {
+        "equals" => "===",
+        "greater_than" => ">",
+        "greater_than_or_equal" => ">=",
+        "less_than" => "<",
+        "less_than_or_equal" => "<=",
+        _ => return false,
+    };
+    let (numerator, denominator) = decimal_ratio(&number.to_string());
+    out.push_str(&crate::e2e::template_env::render(
+        "typescript/stream_counter.jinja",
+        crate::alef_context! {
+            expression => expression, operator => operator, numerator => numerator, denominator => denominator,
+        },
+    ));
+    true
+}
+
+fn decimal_ratio(decimal: &str) -> (String, String) {
+    let (mantissa, exponent) = decimal
+        .split_once(['e', 'E'])
+        .map_or((decimal, 0), |(mantissa, exponent)| {
+            (mantissa, exponent.parse::<i32>().expect("JSON number exponent"))
+        });
+    let fractional = mantissa.split_once('.').map_or(0, |(_, digits)| digits.len() as i32);
+    let mut numerator = mantissa.replace('.', "");
+    let scale = fractional - exponent;
+    let mut denominator = "1".to_string();
+    if scale > 0 {
+        denominator.push_str(&"0".repeat(scale as usize));
+    } else {
+        numerator.push_str(&"0".repeat((-scale) as usize));
+    }
+    (numerator, denominator)
+}
+
+#[cfg(test)]
+#[path = "streaming/counter_tests.rs"]
+mod counter_tests;

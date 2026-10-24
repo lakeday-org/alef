@@ -17,6 +17,12 @@ use super::accessors::{
 use super::values::{escape_swift, json_to_swift, swift_numeric_literal_cast};
 use super::wildcard_assertion::render_wildcard_assertion;
 
+#[cfg(test)]
+#[path = "assertions/usage_accessors.rs"]
+mod usage_accessors;
+#[cfg(test)]
+pub(super) use usage_accessors::render_assertion;
+
 /// ~keep The token a skip marker names when the assertion has no field path at all (a bare-result
 /// assertion). Every registered wording quotes a token, and a marker that quotes nothing matches
 /// no shape — which is how `// skipped: field is a scalar String without meaningful .count` stayed
@@ -24,7 +30,7 @@ use super::wildcard_assertion::render_wildcard_assertion;
 pub(super) const BARE_RESULT_TOKEN: &str = "<bare result>";
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn render_assertion(
+pub(super) fn render_assertion_with_usage_accessors(
     out: &mut String,
     assertion: &Assertion,
     result_var: &str,
@@ -37,6 +43,7 @@ pub(super) fn render_assertion(
     is_streaming: bool,
     returns_void: bool,
     module_name: &str,
+    usage_accessors: Option<&HashMap<String, String>>,
 ) {
     // `mock.*` request-count virtual fields (alef issue #443): resolve against the mock server's
     // own request log via the once-per-suite helper, never a struct field -- intercept before
@@ -63,8 +70,12 @@ pub(super) fn render_assertion(
         // with `chunkMaxSize`) expose `chunks` as a real `ProcessResult` field, so
         // emit `result.chunks()` via the regular field-accessor path below.
         if is_streaming && !f.is_empty() && crate::e2e::codegen::streaming_assertions::is_streaming_call_field(f) {
-            if let Some(expr) =
-                crate::e2e::codegen::streaming_assertions::StreamingFieldResolver::accessor(f, "swift", "chunks")
+            if let Some(expr) = usage_accessors
+                .and_then(|accessors| accessors.get(f))
+                .cloned()
+                .or_else(|| {
+                    crate::e2e::codegen::streaming_assertions::StreamingFieldResolver::accessor(f, "swift", "chunks")
+                })
             {
                 let line = match assertion.assertion_type.as_str() {
                     "count_min" => {

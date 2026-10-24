@@ -1,0 +1,19 @@
+	assert.True(t, func() bool {
+		value := reflect.ValueOf({{ expression }})
+		var decimal string
+		switch value.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			decimal = strconv.FormatInt(value.Int(), 10)
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+			decimal = strconv.FormatUint(value.Uint(), 10)
+		case reflect.Float32:
+			decimal = strconv.FormatFloat(value.Float(), 'g', -1, 32)
+		case reflect.Float64:
+			decimal = strconv.FormatFloat(value.Float(), 'g', -1, 64)
+		default:
+			return false
+		}
+		actual, ok := new(big.Rat).SetString(decimal)
+		expected, _ := new(big.Rat).SetString("{{ value }}")
+		return ok && actual.Cmp(expected) {{ operator }} 0
+	}(), "stream usage counter comparison failed")

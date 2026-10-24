@@ -1,0 +1,19 @@
+#include <stdint.h>
+#include <assert.h>
+typedef uint64_t SampleAlefHandle;
+static SampleAlefHandle sample_chunk_usage(SampleAlefHandle chunk) { return chunk; }
+static {{ c_type }} sample_usage_total_tokens(SampleAlefHandle usage) { (void)usage; return {{ actual }}; }
+static void sample_usage_free(SampleAlefHandle usage) { (void)usage; }
+int main(void) {
+    SampleAlefHandle chunk = 1;
+{{ declarations }}
+    {
+{{ capture }}
+    }
+{% if absent %}    chunk = 0;
+    {
+{{ capture }}
+    }
+{% endif %}{{ assertion }}
+    return 0;
+}

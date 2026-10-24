@@ -1,0 +1,8 @@
+struct Details { let cachedTokens: UInt64 }
+struct Usage { let details: Details{{ optional }}; let totalTokens: UInt64 }
+struct Chunk { let usage: Usage? }
+let chunks = [Chunk(usage: Usage(details: Details(cachedTokens: 18), totalTokens: 18))]
+precondition({{ expression }} == 18)
+precondition({{ standard }} == 18)
+let absent = [Chunk(usage: nil)]
+precondition({{ absent }} == nil)

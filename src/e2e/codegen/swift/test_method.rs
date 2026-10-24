@@ -11,45 +11,13 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
 use super::args::build_args_and_setup;
-use super::assertions::render_assertion;
+use super::assertions::render_assertion_with_usage_accessors as render_assertion;
 use super::empty_field_accessor_map;
 use super::values::{escape_swift, resolve_streaming_adapter, swift_call_result_type, swift_client_factory_call};
 
-/// Emit the `catch` block for an `error`-asserting test, closing the `do { … }` it follows.
-///
-/// ~keep When the fixture declares an expected error value, the check must match either
-/// the caught error's description or its dynamic type name — never message-only — per the
-/// shared contract in `declared_error_value`. With no declared value, output is byte-identical
-/// to the old unconditional `// success` stub so untouched fixtures never see a diff. Which of
-/// those two conventions applies, and whether Swift can ever satisfy the second, is decided once
-/// by `declared_error_variant::classify` — see its doc for why Swift lands on "not yet" today
-/// (swift-bridge's per-variant enum is never constructed for a real business-call failure).
-fn render_error_catch_block(out: &mut String, fixture: &Fixture, errors: &[crate::core::ir::ErrorDef]) {
-    use crate::e2e::codegen::declared_error_variant::{DeclaredErrorAssertion, classify, skip_line};
-    let _ = writeln!(out, "        }} catch {{");
-    match classify("swift", fixture, errors) {
-        DeclaredErrorAssertion::Assert(declared) => {
-            let escaped = escape_swift(declared);
-            let _ = writeln!(out, "            let _errorMessage = String(describing: error)");
-            let _ = writeln!(out, "            let _errorType = String(describing: type(of: error))");
-            let _ = writeln!(
-                out,
-                "            XCTAssertTrue(_errorMessage.contains(\"{escaped}\") || _errorType.contains(\"{escaped}\"), \"expected error to mention \\\"{escaped}\\\", got message: \\(_errorMessage), type: \\(_errorType)\")"
-            );
-        }
-        DeclaredErrorAssertion::Unsubstantiable(variant) => {
-            let _ = writeln!(
-                out,
-                "{}",
-                skip_line("            ", "//", variant, &fixture.id, "swift")
-            );
-        }
-        DeclaredErrorAssertion::Undeclared => {
-            let _ = writeln!(out, "            // success");
-        }
-    }
-    let _ = writeln!(out, "        }}");
-}
+#[path = "test_method/error_catch.rs"]
+mod error_catch;
+use error_catch::render_error_catch_block;
 
 // ---------------------------------------------------------------------------
 // Function-call test rendering
@@ -176,6 +144,22 @@ pub(super) fn render_test_method(
         None
     };
     let chunk_item_type = streaming_adapter.and_then(|adapter| adapter.item_type.as_deref());
+    let usage_context =
+        chunk_item_type.map(
+            |item_type| crate::e2e::codegen::streaming_assertions::UsageAccessContext {
+                language: crate::core::config::Language::Swift,
+                item_type,
+                types: type_defs,
+                config,
+                swift_map: Some(swift_first_class_map),
+            },
+        );
+    let usage_paths = crate::e2e::codegen::streaming_assertions::UsagePathOverrides::prepare(
+        &HashMap::new(),
+        &fixture.assertions,
+        usage_context.as_ref(),
+        "chunks",
+    );
 
     let collect_snippet_opt = if is_streaming && !expects_error {
         crate::e2e::codegen::streaming_assertions::StreamingFieldResolver::collect_snippet_typed(
@@ -601,6 +585,9 @@ pub(super) fn render_test_method(
                 continue;
             }
         }
+        if usage_paths.render_unavailable(&mut body_buffer, assertion, "        ") {
+            continue;
+        }
         let mut assertion_out = String::new();
         render_assertion(
             &mut assertion_out,
@@ -615,6 +602,7 @@ pub(super) fn render_test_method(
             is_streaming,
             call_config.returns_void,
             module_name,
+            Some(&usage_paths.expressions),
         );
         // Module-qualify swift-bridge-ambiguous DTO type names that appear in
         // streaming-virtual assertion expressions (e.g. `[StreamToolCall]`,

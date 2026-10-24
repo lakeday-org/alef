@@ -1,5 +1,4 @@
 //! C e2e per-fixture test function rendering.
-
 use crate::core::config::ResolvedCrateConfig;
 use crate::e2e::codegen::mock_assertions::is_mock_virtual_field;
 use crate::e2e::codegen::transform_json_keys_for_language;

@@ -1,12 +1,7 @@
 use crate::e2e::field_access::PythonTypedDictMap;
 
-use super::model::{StreamingFieldResolver, split_streaming_deep_path};
-use super::python_typeddict_accessor::{
-    python_field_access, python_tool_call_element_type, render_python_tool_calls_deep,
-};
-use super::renderers::{
-    render_deep_tail, render_optional_chain_tail, render_rust_tool_calls_deep, render_swift_tool_calls_deep,
-};
+use super::model::StreamingFieldResolver;
+use super::python_typeddict_accessor::python_field_access;
 
 impl StreamingFieldResolver {
     /// Returns the language-specific expression for a streaming-virtual field,
@@ -121,7 +116,6 @@ impl StreamingFieldResolver {
                 // a member `List<T>` does not have -- a Kotlin compile error in the generated
                 // e2e file, not merely a skipped assertion. ~keep
                 "kotlin" | "kotlin_android" => format!("{chunks_var}.size"),
-                // zig: chunks_var is ArrayList([]u8); use .items.len
                 "zig" => format!("{chunks_var}.items.len"),
                 // Swift Array uses .count (Collection protocol)
                 "swift" => format!("{chunks_var}.count"),
@@ -236,7 +230,6 @@ impl StreamingFieldResolver {
                     format!("!empty(${chunks_var}) && isset(end(${chunks_var})->choices[0]->finishReason)")
                 }
                 "kotlin" => {
-                    // Kotlin: use isNotEmpty() + last() + safe-call chain
                     format!(
                         "{chunks_var}.isNotEmpty() && {chunks_var}.last().choices()?.firstOrNull()?.finishReason() != null"
                     )
@@ -591,101 +584,7 @@ impl StreamingFieldResolver {
                 }
             }),
 
-            _ => {
-                // Deep-path: e.g. `tool_calls[0].function.name`
-                // Split into root + tail, get the root's inline expression, then
-                // render the tail (index + fields) in a per-language style on top.
-                if let Some((root, tail)) = split_streaming_deep_path(field) {
-                    // Rust needs Option-aware chaining for the StreamToolCall fields
-                    // (function/id are Option<...>). The generic tail renderer can't
-                    // infer Option-wrapping, so we emit rust-specific idiom here.
-                    if lang == "rust" && root == "tool_calls" {
-                        return Some(render_rust_tool_calls_deep(chunks_var, tail));
-                    }
-                    // Swift: StreamToolCallRef fields are swift-bridge methods returning
-                    // Optional.  The generic render_deep_tail doesn't know to add `()`
-                    // or optional-chain with `?.`, so use a dedicated renderer.
-                    if lang == "swift" && root == "tool_calls" {
-                        let root_expr = Self::accessor(root, lang, chunks_var)?;
-                        return Some(render_swift_tool_calls_deep(&root_expr, tail));
-                    }
-                    // Zig stores stream chunks as JSON strings (`[]const u8`) in
-                    // `chunks: ArrayList([]u8)`, not typed stream item
-                    // records. A deep `tool_calls[N].function.name` access would
-                    // require parsing each chunk's JSON inline — rather than
-                    // emit code that won't compile, signal "unsupported" so the
-                    // assertion is skipped at the call site.
-                    if lang == "zig" && root == "tool_calls" {
-                        return None;
-                    }
-                    // Python: choose subscript vs. attribute access at every hop per the owning
-                    // type's `TypedDict` classification, mirroring `field_access::python_renderer`'s
-                    // per-segment dispatch for ordinary field paths. `root_expr` must itself be
-                    // built through `accessor_with_typeddict_map` (not the plain `accessor()`
-                    // shim used below), so its own `choices`/`delta`/`tool_calls` hops pick up
-                    // the same classification the deep tail continues from.
-                    if lang == "python" && root == "tool_calls" {
-                        let root_expr = Self::accessor_with_typeddict_map(
-                            root,
-                            lang,
-                            chunks_var,
-                            module_qualifier,
-                            item_type,
-                            typeddict_map,
-                        )?;
-                        let tool_call_type = python_tool_call_element_type(item_type, typeddict_map);
-                        return Some(render_python_tool_calls_deep(
-                            &root_expr,
-                            tail,
-                            tool_call_type.as_deref(),
-                            typeddict_map,
-                        ));
-                    }
-                    // `usage.<counter>` reads a counter off the last chunk's usage payload. Rust
-                    // and Go need their own root: Rust's base accessor yields an `Option`, and
-                    // Go's yields an untyped `interface{}` neither of which can take a field.
-                    if root == "usage" {
-                        return render_usage_deep(chunks_var, tail, lang);
-                    }
-                    let root_expr = Self::accessor(root, lang, chunks_var)?;
-                    Some(render_deep_tail(&root_expr, tail, lang))
-                } else {
-                    None
-                }
-            }
-        }
-    }
-}
-
-/// Render a path below the stream-level `usage` root, such as `usage.total_tokens`.
-///
-/// Every backend reads the counter off the LAST chunk of the collected list, which is where a
-/// stream carries its usage payload. The base `usage` accessor cannot take a field in Rust (an
-/// `Option`), Go (an untyped `interface{}`), Swift and Dart (an optional): those four build their
-/// own root. Zig never reaches this function: it parses the last chunk's JSON and asserts through
-/// its JSON-struct path (`zig/assertions.rs`).
-fn render_usage_deep(chunks_var: &str, tail: &str, lang: &str) -> Option<String> {
-    match lang {
-        "rust" => {
-            let root = format!(
-                "{chunks_var}.last().and_then(|c| c.usage.as_ref()).expect(\"expected usage on the last chunk\")"
-            );
-            Some(render_deep_tail(&root, tail, lang))
-        }
-        "go" => {
-            let root = format!("{chunks_var}[len({chunks_var})-1].Usage");
-            Some(render_deep_tail(&root, tail, lang))
-        }
-        // `Usage?` on the chunk: a missing chunk or a missing usage reads as `nil` and fails the
-        // comparison instead of trapping.
-        "swift" => Some(render_optional_chain_tail(&format!("{chunks_var}.last?.usage"), tail)),
-        "dart" => {
-            let root = StreamingFieldResolver::accessor("usage", lang, chunks_var)?;
-            Some(render_optional_chain_tail(&root, tail))
-        }
-        _ => {
-            let root = StreamingFieldResolver::accessor("usage", lang, chunks_var)?;
-            Some(render_deep_tail(&root, tail, lang))
+            _ => super::deep_paths::render(field, lang, chunks_var, module_qualifier, item_type, typeddict_map),
         }
     }
 }

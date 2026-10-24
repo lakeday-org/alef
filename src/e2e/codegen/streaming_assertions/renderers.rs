@@ -46,7 +46,6 @@ pub(super) fn render_swift_tool_calls_deep(root_expr: &str, tail: &str) -> Strin
 /// `as_ref().and_then(...)` so the final value is a `&str` (for name/id/arguments).
 pub(super) fn render_rust_tool_calls_deep(chunks_var: &str, tail: &str) -> String {
     let segs = parse_tail(tail);
-    // Locate index segment (rust uses .nth(n) on the iterator instead of [N] on a Vec)
     let idx = segs.iter().find_map(|s| match s {
         TailSeg::Index(n) => Some(*n),
         _ => None,
@@ -118,18 +117,22 @@ pub(super) fn parse_tail(tail: &str) -> Vec<TailSeg> {
     segs
 }
 
-/// Render the tail below an optional root with optional chaining (`?.`, `?[n]`) at every step,
-/// camel-casing each field. Swift and Dart share this syntax and this casing.
-pub(super) fn render_optional_chain_tail(root_expr: &str, tail: &str) -> String {
-    use heck::ToLowerCamelCase;
-
+/// Context-free usage access knows only that the root is optional. Typed paths use IR. ~keep
+pub(super) fn render_optional_chain_tail(
+    root_expr: &str,
+    tail: &str,
+    language: crate::core::config::Language,
+) -> String {
     let mut out = root_expr.to_string();
-    for seg in parse_tail(tail) {
-        match seg {
-            TailSeg::Index(n) => out.push_str(&format!("?[{n}]")),
-            TailSeg::Field(f) => {
-                out.push_str("?.");
-                out.push_str(&f.to_lower_camel_case());
+    for (index, segment) in parse_tail(tail).into_iter().enumerate() {
+        if index == 0 {
+            out.push('?');
+        }
+        match segment {
+            TailSeg::Index(n) => out.push_str(&format!("[{n}]")),
+            TailSeg::Field(name) => {
+                out.push('.');
+                out.push_str(&crate::codegen::naming::public_field_name(language, &name, None));
             }
         }
     }

@@ -6,7 +6,6 @@
 
 use crate::e2e::codegen::streaming_assertions::{StreamingFieldResolver, is_stream_scoped_field};
 use crate::e2e::fixture::Assertion;
-use std::fmt::Write as FmtWrite;
 
 use super::dart_format_value;
 
@@ -32,8 +31,53 @@ pub(super) fn try_render(out: &mut String, assertion: &Assertion, result_var: &s
     let Some(expr) = StreamingFieldResolver::accessor(field, "dart", result_var) else {
         return false;
     };
-    let _ = writeln!(out, "    expect({expr}, {matcher}({}));", dart_format_value(value));
+    render(out, &expr, matcher, value);
     true
+}
+
+pub(super) fn try_render_with_expression(out: &mut String, assertion: &Assertion, expression: &str) -> bool {
+    let Some(value) = assertion.value.as_ref() else {
+        return false;
+    };
+    let matcher = match (assertion.assertion_type.as_str(), value.is_number()) {
+        ("equals", _) => "equals",
+        ("greater_than", true) => "greaterThan",
+        ("greater_than_or_equal", true) => "greaterThanOrEqualTo",
+        ("less_than", true) => "lessThan",
+        ("less_than_or_equal", true) => "lessThanOrEqualTo",
+        _ => return false,
+    };
+    render(out, expression, matcher, value);
+    true
+}
+
+fn render(out: &mut String, expression: &str, matcher: &str, value: &serde_json::Value) {
+    out.push_str(&crate::e2e::template_env::render(
+        "dart/stream_counter.jinja",
+        crate::alef_context! {
+            expression => expression, matcher => matcher, value => dart_format_value(value),
+        },
+    ));
+}
+
+pub(in crate::e2e::codegen::dart) fn render_streaming_assertion_dart_with_usage_ir(
+    out: &mut String,
+    assertion: &Assertion,
+    result_var: &str,
+    context: Option<&crate::e2e::codegen::streaming_assertions::UsageAccessContext<'_>>,
+) {
+    if let Some(context) = context.filter(|context| context.has_declared_item())
+        && let Some(field) = assertion.field.as_deref().filter(|field| is_stream_scoped_field(field))
+    {
+        let Some(expression) = context.accessor(field, result_var) else {
+            crate::e2e::codegen::streaming_assertions::render_usage_unavailable(out, field, "    ");
+            return;
+        };
+        if try_render_with_expression(out, assertion, &expression) {
+            return;
+        }
+    }
+    super::render_streaming_assertion_dart(out, assertion, result_var);
 }
 
 #[cfg(test)]

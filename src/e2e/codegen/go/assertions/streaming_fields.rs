@@ -53,12 +53,10 @@ pub(super) fn render_streaming_field_assertion(
         // fixture's value did not survive `as_u64()` / the string pattern, so the assertion
         // disappeared with no line for any funnel to count.
         let value_skip = || streaming_assertion_value_skip_line("\t", "//", f, &assertion.assertion_type);
-        // A Go counter is a `uint64`, and testify compares numbers of different types as unequal.
-        // Widen the read to the `int` a fixture literal renders as, only for an assertion that
-        // compares the counter with a number.
-        let counter =
-            crate::e2e::codegen::streaming_assertions::is_stream_counter_assertion(f, assertion.value.as_ref());
-        let numeric_expr = if counter { format!("int({expr})") } else { expr.clone() };
+        if render_exact_counter(out, assertion, f, &expr) {
+            return true;
+        }
+        let numeric_expr = expr.clone();
         let is_stream_scoped = crate::e2e::codegen::streaming_assertions::is_stream_scoped_field(f);
         match assertion.assertion_type.as_str() {
             "count_min" => {
@@ -167,3 +165,31 @@ pub(super) fn render_streaming_field_assertion(
 
     true
 }
+
+fn render_exact_counter(out: &mut String, assertion: &Assertion, field: &str, expression: &str) -> bool {
+    if !crate::e2e::codegen::streaming_assertions::is_stream_counter_assertion(field, assertion.value.as_ref()) {
+        return false;
+    }
+    let Some(number) = assertion.value.as_ref().and_then(serde_json::Value::as_number) else {
+        return false;
+    };
+    let operator = match assertion.assertion_type.as_str() {
+        "equals" => "==",
+        "greater_than" => ">",
+        "greater_than_or_equal" => ">=",
+        "less_than" => "<",
+        "less_than_or_equal" => "<=",
+        _ => return false,
+    };
+    out.push_str(&crate::e2e::template_env::render(
+        "go/stream_counter.jinja",
+        crate::alef_context! {
+            expression => expression, operator => operator, value => number.to_string(),
+        },
+    ));
+    true
+}
+
+#[cfg(test)]
+#[path = "streaming_fields/counter_tests.rs"]
+mod counter_tests;

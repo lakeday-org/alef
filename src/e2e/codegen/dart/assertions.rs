@@ -11,6 +11,7 @@ use std::fmt::Write as FmtWrite;
 use super::values::escape_dart;
 
 mod stream_counter;
+pub(super) use stream_counter::render_streaming_assertion_dart_with_usage_ir;
 mod tagged_union;
 
 use tagged_union::try_render_tagged_union_assertion;

@@ -1,0 +1,9 @@
+class Details { final int cachedTokens; Details(this.cachedTokens); }
+class Usage { final Details{{ optional }} details; final int totalTokens; Usage(this.details,this.totalTokens); }
+class Chunk { final Usage? usage; Chunk(this.usage); }
+void main() {
+    final chunks = [Chunk(Usage(Details(18),18))];
+    if ({{ expression }} != 18 || {{ standard }} != 18) { throw StateError('counter mismatch'); }
+    final absent = [Chunk(null)];
+    if ({{ absent }} != null) { throw StateError('missing usage'); }
+}

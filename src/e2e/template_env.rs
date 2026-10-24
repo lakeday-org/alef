@@ -5,6 +5,51 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "streaming/usage_unavailable.jinja",
+        include_str!("templates/streaming/usage_unavailable.jinja"),
+    ),
+    (
+        "c/usage_runtime_probe.jinja",
+        include_str!("templates/c/usage_runtime_probe.jinja"),
+    ),
+    (
+        "go/usage_runtime_probe.jinja",
+        include_str!("templates/go/usage_runtime_probe.jinja"),
+    ),
+    (
+        "typescript/usage_runtime_probe.jinja",
+        include_str!("templates/typescript/usage_runtime_probe.jinja"),
+    ),
+    (
+        "swift/usage_runtime_probe.jinja",
+        include_str!("templates/swift/usage_runtime_probe.jinja"),
+    ),
+    (
+        "dart/usage_runtime_probe.jinja",
+        include_str!("templates/dart/usage_runtime_probe.jinja"),
+    ),
+    (
+        "c/usage_declarations.jinja",
+        include_str!("templates/c/usage_declarations.jinja"),
+    ),
+    ("c/usage_capture.jinja", include_str!("templates/c/usage_capture.jinja")),
+    (
+        "c/usage_assertion.jinja",
+        include_str!("templates/c/usage_assertion.jinja"),
+    ),
+    (
+        "dart/stream_counter.jinja",
+        include_str!("templates/dart/stream_counter.jinja"),
+    ),
+    (
+        "go/stream_counter.jinja",
+        include_str!("templates/go/stream_counter.jinja"),
+    ),
+    (
+        "typescript/stream_counter.jinja",
+        include_str!("templates/typescript/stream_counter.jinja"),
+    ),
+    (
         "typescript/nested_collection_probe.jinja",
         include_str!("templates/typescript/nested_collection_probe.jinja"),
     ),

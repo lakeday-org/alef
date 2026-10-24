@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve exact signed, unsigned, and fractional streaming usage comparisons in Go and WASM, preserve C integer width and sign, honor skipped C fields, and render usage probes through registered templates.
+- Resolve required and optional nested streaming usage fields from IR in Swift and Dart while preserving configured public names.
 - Render Java enum-list minimum-count and emptiness assertions against JSON, and fail unsupported union assertions explicitly instead of emitting missing variant accessors (#688).
 - Exercise nested Go and C enum-list assertions through full call generation and support Java root enum-list results without growing oversized generator modules (#688).
 - Exclude Rust-only skipped errors from generated Ruby error matchers while preserving visible typed errors, shared inheritance, and literal message assertions.

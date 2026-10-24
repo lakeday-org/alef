@@ -41,85 +41,8 @@ pub(super) fn resolve_c_streaming_adapter(
         })
 }
 
-/// The integer counters a streaming fixture reads off the stream's `usage` payload, with the
-/// snake-case name of the usage type that owns their accessors.
-///
-/// The driver loop reads each counter off the usage handle of every chunk and overwrites the
-/// previous value, so after the loop the locals hold the last chunk's counters: what
-/// `usage.<counter>` means on a stream in every backend.
-#[derive(Default)]
-pub(super) struct UsageProbe {
-    type_snake: String,
-    fields: Vec<String>,
-}
-
-impl UsageProbe {
-    fn local(field: &str) -> String {
-        format!("last_usage_{field}")
-    }
-
-    fn reads(&self, field: &str) -> bool {
-        self.fields.iter().any(|f| f == field)
-    }
-}
-
-/// Resolve the usage counters the fixture asserts on from the IR.
-///
-/// A counter qualifies when the chunk type has a `usage` field of a named type and that type has
-/// an integer field of the asserted name. Anything else stays unresolved, so its assertion
-/// renders the registered skip comment instead of calling an accessor the header lacks.
-fn resolve_usage_probe(fixture: &Fixture, type_defs: &[crate::core::ir::TypeDef], item_type: &str) -> UsageProbe {
-    use crate::core::ir::{PrimitiveType, TypeRef};
-    fn named(ty: &TypeRef) -> Option<&str> {
-        match ty {
-            TypeRef::Named(name) => Some(name.rsplit("::").next().unwrap_or(name)),
-            TypeRef::Optional(inner) => named(inner),
-            _ => None,
-        }
-    }
-    let find = |name: &str| type_defs.iter().find(|t| t.name == name);
-    let Some(usage_type) = find(item_type)
-        .and_then(|chunk| chunk.fields.iter().find(|f| f.name == "usage"))
-        .and_then(|f| named(&f.ty))
-        .and_then(find)
-    else {
-        return UsageProbe::default();
-    };
-    let mut fields: Vec<String> = Vec::new();
-    for assertion in &fixture.assertions {
-        let Some(counter) = assertion.field.as_deref().and_then(|f| f.strip_prefix("usage.")) else {
-            continue;
-        };
-        let is_integer = usage_type.fields.iter().any(|f| {
-            f.name == counter
-                && matches!(
-                    &f.ty,
-                    TypeRef::Primitive(
-                        PrimitiveType::U8
-                            | PrimitiveType::U16
-                            | PrimitiveType::U32
-                            | PrimitiveType::U64
-                            | PrimitiveType::I8
-                            | PrimitiveType::I16
-                            | PrimitiveType::I32
-                            | PrimitiveType::I64
-                            | PrimitiveType::Usize
-                            | PrimitiveType::Isize
-                    )
-                )
-        });
-        if is_integer && !fields.iter().any(|f| f == counter) {
-            fields.push(counter.to_string());
-        }
-    }
-    if fields.is_empty() {
-        return UsageProbe::default();
-    }
-    UsageProbe {
-        type_snake: usage_type.name.to_snake_case(),
-        fields,
-    }
-}
+mod usage;
+use usage::UsageProbe;
 
 pub(super) fn resolve_c_client_owner_type(
     config: &ResolvedCrateConfig,
@@ -219,7 +142,7 @@ pub(super) fn render_streaming_test_function(
     let stream_start = format!("{prefix}_{owner_snake}_{adapter_name}_start");
     let stream_next = format!("{prefix}_{owner_snake}_{adapter_name}_next");
     let stream_free = format!("{prefix}_{owner_snake}_{adapter_name}_free");
-    let usage = resolve_usage_probe(fixture, type_defs, item_type_pascal);
+    let usage = UsageProbe::resolve(fixture, type_defs, item_type_pascal);
 
     let mut request_var: Option<String> = None;
     for arg in args {
@@ -362,12 +285,7 @@ pub(super) fn render_streaming_test_function(
         out,
         "    int no_chunks_after_done = 1; /* true by construction: the loop below cannot call stream_next again once it observes done */"
     );
-    if !usage.fields.is_empty() {
-        let _ = writeln!(out, "    int usage_seen = 0;");
-        for field in &usage.fields {
-            let _ = writeln!(out, "    long long {} = 0;", UsageProbe::local(field));
-        }
-    }
+    usage.render_declarations(out);
     let _ = writeln!(out);
 
     let _ = writeln!(out, "    while (1) {{");
@@ -380,31 +298,7 @@ pub(super) fn render_streaming_test_function(
         crate::alef_context! { result_var => result_var, prefix => prefix },
     ));
     let _ = writeln!(out, "        chunks_count++;");
-    if !usage.fields.is_empty() {
-        // `usage.<counter>` is the LAST chunk's usage, as in every other backend: each chunk
-        // overwrites the locals, so a final chunk without a usage payload leaves `usage_seen` at
-        // zero and the assertion fails instead of passing on an earlier chunk's counters.
-        let usage_snake = &usage.type_snake;
-        let _ = writeln!(
-            out,
-            "        {prefix_upper}AlefHandle chunk_usage = {prefix}_{item_type_snake}_usage({result_var});"
-        );
-        let _ = writeln!(out, "        usage_seen = 0;");
-        for field in &usage.fields {
-            let _ = writeln!(out, "        {} = 0;", UsageProbe::local(field));
-        }
-        let _ = writeln!(out, "        if (chunk_usage != 0) {{");
-        let _ = writeln!(out, "            usage_seen = 1;");
-        for field in &usage.fields {
-            let _ = writeln!(
-                out,
-                "            {} = (long long){prefix}_{usage_snake}_{field}(chunk_usage);",
-                UsageProbe::local(field)
-            );
-        }
-        let _ = writeln!(out, "            {prefix}_{usage_snake}_free(chunk_usage);");
-        let _ = writeln!(out, "        }}");
-    }
+    usage.render_capture(out, prefix, &item_type_snake, result_var, &prefix_upper);
     let _ = writeln!(out, "        {prefix}_{item_type_snake}_free({result_var});");
     let _ = writeln!(out, "    }}");
     let _ = writeln!(out, "    {stream_free}(stream_handle);");
@@ -424,7 +318,7 @@ pub(super) fn render_streaming_test_function(
         "    /* suppress unused */ (void)no_chunks_after_done; \
          (void)chunks_count; (void)stream_content_len;"
     );
-    if !usage.fields.is_empty() {
+    if usage.has_fields() {
         let _ = writeln!(out, "    (void)usage_seen;");
     }
     let _ = writeln!(out, "}}");
@@ -449,16 +343,11 @@ fn emit_chat_stream_assertion(out: &mut String, assertion: &Assertion, usage: &U
         Unsupported,
     }
 
-    // `usage.<counter>` reads the local the driver loop fills from the last chunk's usage handle.
-    // It is a counter, so it takes the integer arms below like `chunks`; it additionally requires
-    // that a usage payload arrived, so a stream without one fails instead of comparing zero.
-    let usage_local = field
-        .strip_prefix("usage.")
-        .filter(|counter| usage.reads(counter))
-        .map(UsageProbe::local);
+    if usage.render_assertion(out, assertion) {
+        return;
+    }
 
     let (expr, kind) = match field {
-        _ if usage_local.is_some() => (usage_local.as_deref().unwrap_or(""), Kind::IntCount),
         "chunks" => ("chunks_count", Kind::IntCount),
         "no_chunks_after_done" => ("no_chunks_after_done", Kind::Bool),
         // `stream_complete` joins the unsupported set rather than keeping a local of its own.
@@ -496,7 +385,7 @@ fn emit_chat_stream_assertion(out: &mut String, assertion: &Assertion, usage: &U
     // `FieldSkip`'s nor `AssertionTypeSkip`'s registered wording, so it rendered a comment no
     // strict gate could see. Both are now routed through the same funnel every other backend
     // (dart/elixir/go/java/kotlin/php/swift/typescript/zig) already uses.
-    let seen = if usage_local.is_some() { "usage_seen && " } else { "" };
+    let seen = "";
     match (atype, &kind) {
         ("count_min", Kind::IntCount) => {
             if let Some(n) = assertion.value.as_ref().and_then(|v| v.as_u64()) {
@@ -844,11 +733,11 @@ mod stream_completion_signal_tests {
     fn a_usage_counter_is_read_off_the_chunk_usage_handle_and_asserted() {
         let body = usage_driver("usage.total_tokens", &usage_type_defs());
         for expected in [
-            "long long last_usage_total_tokens = 0;",
+            "uint64_t last_usage_total_tokens = 0;",
             "MYLIBAlefHandle chunk_usage = mylib_stream_chunk_usage(chunk);",
-            "last_usage_total_tokens = (long long)mylib_usage_total_tokens(chunk_usage);",
+            "last_usage_total_tokens = mylib_usage_total_tokens(chunk_usage);",
             "mylib_usage_free(chunk_usage);",
-            "assert(usage_seen && last_usage_total_tokens == 18 && \"equals assertion failed\");",
+            "assert(usage_seen && last_usage_total_tokens == 18ULL && \"equals assertion failed\");",
         ] {
             assert!(body.contains(expected), "missing `{expected}`. Emitted:\n{body}");
         }

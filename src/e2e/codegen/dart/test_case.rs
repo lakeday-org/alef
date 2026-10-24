@@ -6,7 +6,7 @@ use crate::e2e::config::E2eConfig;
 use crate::e2e::fixture::Fixture;
 use std::fmt::Write as FmtWrite;
 
-use super::assertions::{render_assertion_dart, render_streaming_assertion_dart};
+use super::assertions::{render_assertion_dart, render_streaming_assertion_dart_with_usage_ir};
 use super::error_assertions::CAUGHT_ERROR;
 use super::values::{escape_dart, mime_from_extension, type_name_to_create_from_json_dart};
 
@@ -493,6 +493,17 @@ pub(super) fn render_test_case(out: &mut String, fixture: &Fixture, context: Dar
     // Extracted to `emit_call_and_assertions` below; no emitted string, whitespace, or branch
     // condition changed by the move.
     let emission_ctx = CallEmissionContext {
+        usage_context: adapter
+            .and_then(|adapter| adapter.item_type.as_deref())
+            .map(
+                |item_type| crate::e2e::codegen::streaming_assertions::UsageAccessContext {
+                    language: crate::core::config::Language::Dart,
+                    item_type,
+                    types: type_defs,
+                    config,
+                    swift_map: None,
+                },
+            ),
         setup_lines: &setup_lines,
         extra_setup: &extra_setup,
         is_streaming,
@@ -517,6 +528,7 @@ pub(super) fn render_test_case(out: &mut String, fixture: &Fixture, context: Dar
 /// assertions. Extracted verbatim from `render_test_case`; no emitted string, whitespace, or
 /// branch condition changed. ~keep
 struct CallEmissionContext<'a> {
+    usage_context: Option<crate::e2e::codegen::streaming_assertions::UsageAccessContext<'a>>,
     setup_lines: &'a [String],
     extra_setup: &'a Option<String>,
     is_streaming: bool,
@@ -672,7 +684,7 @@ fn emit_call_and_assertions(out: &mut String, ctx: &CallEmissionContext<'_>) {
         let assertions_start = out.len();
         for assertion in &fixture.assertions {
             if is_streaming {
-                render_streaming_assertion_dart(out, assertion, result_var);
+                render_streaming_assertion_dart_with_usage_ir(out, assertion, result_var, ctx.usage_context.as_ref());
             } else {
                 render_assertion_dart(out, assertion, result_var, result_is_simple, field_resolver);
             }

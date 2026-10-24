@@ -34,8 +34,7 @@ pub(super) fn try_render_streaming_virtual_field_assertion(
     let Some(f) = &assertion.field else { return false };
     // A stream-scoped field (`usage.total_tokens`) is an ordinary response field on a call that
     // does not stream, so only a streaming call may claim it.
-    let claimed = crate::e2e::codegen::streaming_assertions::is_streaming_virtual_field(f)
-        || (is_streaming && crate::e2e::codegen::streaming_assertions::is_stream_scoped_field(f));
+    let claimed = claims_streaming_field(f, is_streaming);
     if f.is_empty() || !claimed {
         return false;
     }
@@ -178,4 +177,12 @@ pub(super) fn try_render_streaming_virtual_field_assertion(
         );
     }
     true
+}
+
+fn claims_streaming_field(field: &str, is_streaming: bool) -> bool {
+    if is_streaming {
+        crate::e2e::codegen::streaming_assertions::is_streaming_call_field(field)
+    } else {
+        crate::e2e::codegen::streaming_assertions::is_streaming_virtual_field(field)
+    }
 }
