@@ -1,0 +1,28 @@
+#[derive(Clone)]
+#[alef(
+{% if legacy %}
+    legacy_constructor_fields = [{% for index in range(first) %}"field{{ index }}"{% if not loop.last %}, {% endif %}{% endfor %}],
+{% endif %}
+{% if history %}
+    constructor_history = [
+{% if not legacy %}
+        [{% for index in range(first) %}"field{{ index }}"{% if not loop.last %}, {% endif %}{% endfor %}],
+{% endif %}
+        [{% for index in range(middle) %}"field{{ index }}"{% if not loop.last %}, {% endif %}{% endfor %}],
+    ],
+{% endif %}
+)]
+pub struct Options {
+{% for index in range(last) %}
+    pub field{{ index }}: bool,
+{% endfor %}
+}
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+{% for index in range(last) %}
+            field{{ index }}: false,
+{% endfor %}
+        }
+    }
+}

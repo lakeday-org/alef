@@ -145,23 +145,19 @@ fn ordinary_fields_cannot_collide_with_reserved_constructor_shims() {
 }
 
 #[test]
-fn swift_only_history_leaves_other_backend_constructors_unchanged() {
+fn recorded_history_leaves_python_constructor_policy_unchanged() {
     let (mut api, _) = api_and_files(&fixture_source(false, 6, &history(false)));
-    for backend in [
-        &alef::backends::pyo3::Pyo3Backend as &dyn Backend,
-        &alef::backends::java::JavaBackend as &dyn Backend,
-    ] {
-        let recorded = backend.generate_bindings(&api, &config()).unwrap();
-        let history = std::mem::take(&mut api.types[0].version.constructor_history);
-        let unrecorded = backend.generate_bindings(&api, &config()).unwrap();
-        api.types[0].version.constructor_history = history;
-        assert!(!recorded.is_empty());
-        let contents = |files: Vec<GeneratedFile>| {
-            files
-                .into_iter()
-                .map(|file| (file.path, file.content))
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(contents(recorded), contents(unrecorded));
-    }
+    let backend = &alef::backends::pyo3::Pyo3Backend as &dyn Backend;
+    let recorded = backend.generate_bindings(&api, &config()).unwrap();
+    let history = std::mem::take(&mut api.types[0].version.constructor_history);
+    let unrecorded = backend.generate_bindings(&api, &config()).unwrap();
+    api.types[0].version.constructor_history = history;
+    assert!(!recorded.is_empty());
+    let contents = |files: Vec<GeneratedFile>| {
+        files
+            .into_iter()
+            .map(|file| (file.path, file.content))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(contents(recorded), contents(unrecorded));
 }

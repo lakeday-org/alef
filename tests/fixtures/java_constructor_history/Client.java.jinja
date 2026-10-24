@@ -1,0 +1,29 @@
+package fixture;
+
+public final class Client {
+{% for arity in arities %}
+    interface Factory{{ arity }} {
+        Options create({% for index in range(arity) %}boolean field{{ index }}{% if not loop.last %}, {% endif %}{% endfor %});
+    }
+{% endfor %}
+
+    public static void main(String[] arguments) {
+        int checks = 0;
+{% for arity in arities %}
+        Factory{{ arity }} factory{{ arity }} = Options::new;
+        Options direct{{ arity }} = new Options({% for index in range(arity) %}true{% if not loop.last %}, {% endif %}{% endfor %});
+        Options referenced{{ arity }} = factory{{ arity }}.create({% for index in range(arity) %}true{% if not loop.last %}, {% endif %}{% endfor %});
+{% for index in range(last) %}
+        if (direct{{ arity }}.field{{ index }}() != {{ "true" if index < arity else "false" }}
+                || referenced{{ arity }}.field{{ index }}() != {{ "true" if index < arity else "false" }}) {
+            throw new AssertionError("arity {{ arity }}, field {{ index }}");
+        }
+        checks += 2;
+{% endfor %}
+{% endfor %}
+        if (checks != {{ last * 6 }}) {
+            throw new AssertionError("wrong assertion count: " + checks);
+        }
+        System.out.println("checked=" + checks);
+    }
+}

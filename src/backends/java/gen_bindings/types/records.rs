@@ -258,26 +258,11 @@ pub(crate) fn gen_record_type(
         ));
     }
 
-    if let Some(parameters) = legacy_constructor_parameters(typ, &visible_fields, &parameter_decls)? {
-        let arguments: Vec<_> = visible_fields
-            .iter()
-            .map(|field| {
-                Ok(if typ.constructor_extension_value(field).is_some() {
-                    super::constructor_defaults::java_constructor_default(field)?
-                } else {
-                    safe_java_field_name(&field.name)
-                })
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        record_block.push_str(&crate::backends::java::template_env::render(
-            "record_legacy_constructor.jinja",
-            crate::alef_context! {
-                type_name => &typ.name,
-                parameters => parameters.join(", "),
-                arguments => arguments.join(", "),
-            },
-        ));
-    }
+    record_block.push_str(&super::recorded_constructors::render_recorded_constructors(
+        typ,
+        &visible_fields,
+        &parameter_decls,
+    )?);
 
     if will_emit_builder {
         record_block.push_str(&crate::backends::java::template_env::render(
@@ -409,115 +394,4 @@ pub(crate) fn gen_record_type(
     out.push('\n');
     out.push_str(&record_block);
     Ok(out)
-}
-
-fn legacy_constructor_parameters(
-    typ: &TypeDef,
-    fields: &[&crate::core::ir::FieldDef],
-    declarations: &[String],
-) -> anyhow::Result<Option<Vec<String>>> {
-    if typ.legacy_constructor_fields().is_empty() {
-        return Ok(None);
-    }
-    let parameters =
-        typ.legacy_constructor_fields()
-            .iter()
-            .map(|name| {
-                let index = fields.iter().position(|field| &field.name == name).ok_or_else(|| {
-                    anyhow::anyhow!("Java legacy constructor field {}.{name} is not exposed", typ.name)
-                })?;
-                Ok(declarations[index].clone())
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-    let types = |values: &[String]| {
-        values
-            .iter()
-            .map(|value| {
-                let (ty, _) = value.rsplit_once(' ').ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Java legacy constructor for {} has invalid parameter declaration {value:?}",
-                        typ.name
-                    )
-                })?;
-                Ok(ty.to_string())
-            })
-            .collect::<anyhow::Result<Vec<_>>>()
-    };
-    if types(&parameters)? == types(declarations)? {
-        anyhow::ensure!(
-            typ.legacy_constructor_fields()
-                .iter()
-                .map(String::as_str)
-                .eq(fields.iter().map(|field| field.name.as_str())),
-            "Java legacy constructor order for {} collides with the canonical record signature",
-            typ.name
-        );
-        return Ok(None);
-    }
-    Ok(Some(parameters))
-}
-
-#[cfg(test)]
-mod legacy_constructor_parameter_tests {
-    use super::legacy_constructor_parameters;
-    use crate::core::ir::{FieldDef, TypeDef, VersionAnnotation};
-
-    fn options() -> TypeDef {
-        TypeDef {
-            name: "Options".into(),
-            fields: vec![
-                FieldDef {
-                    name: "enabled".into(),
-                    ..FieldDef::default()
-                },
-                FieldDef {
-                    name: "label".into(),
-                    ..FieldDef::default()
-                },
-            ],
-            version: VersionAnnotation {
-                legacy_constructor_fields: vec!["enabled".into()],
-                ..VersionAnnotation::default()
-            },
-            ..TypeDef::default()
-        }
-    }
-
-    #[test]
-    fn should_reject_malformed_java_legacy_constructor_declarations_with_type_context() {
-        let typ = options();
-        let fields = typ.fields.iter().collect::<Vec<_>>();
-        for declarations in [
-            vec!["boolean".into(), "String label".into()],
-            vec!["boolean enabled".into(), "String".into()],
-        ] {
-            let malformed = declarations
-                .iter()
-                .find(|value: &&String| !value.contains(' '))
-                .unwrap();
-            let error = legacy_constructor_parameters(&typ, &fields, &declarations)
-                .expect_err("malformed declaration returns an error rather than panicking");
-            assert_eq!(
-                error.to_string(),
-                format!("Java legacy constructor for Options has invalid parameter declaration {malformed:?}")
-            );
-        }
-    }
-
-    #[test]
-    fn should_keep_valid_java_legacy_constructor_parameters_unchanged() {
-        let typ = options();
-        let fields = typ.fields.iter().collect::<Vec<_>>();
-        let declarations = vec!["boolean enabled".into(), "@Nullable String label".into()];
-        assert_eq!(
-            legacy_constructor_parameters(&typ, &fields, &declarations).unwrap(),
-            Some(vec!["boolean enabled".into()])
-        );
-        let mut complete = typ.clone();
-        complete.version.legacy_constructor_fields.push("label".into());
-        assert_eq!(
-            legacy_constructor_parameters(&complete, &fields, &declarations).unwrap(),
-            None
-        );
-    }
 }

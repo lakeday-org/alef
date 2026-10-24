@@ -2,6 +2,7 @@ mod builders;
 mod constructor_defaults;
 mod enums;
 mod opaque;
+mod recorded_constructors;
 mod records;
 mod serializers;
 mod shared;
