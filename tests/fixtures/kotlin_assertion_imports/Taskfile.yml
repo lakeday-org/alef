@@ -1,0 +1,5 @@
+version: "3"
+tasks:
+  lint:
+    cmds:
+      - ktlint --log-level=none --reporter=json GeneratedTest.kt

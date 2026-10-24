@@ -74,7 +74,7 @@ fn import_lines(rendered: &str) -> Vec<&str> {
 
 /// The bug: the binding package was concatenated onto a name that already carried it.
 #[test]
-fn fully_qualified_call_class_is_never_double_qualified() {
+fn fully_qualified_call_class_does_not_add_an_unused_import() {
     let fully_qualified = format!("{BINDING_PACKAGE}.{SIMPLE_CLASS}");
     let rendered = render(&fully_qualified);
     let doubled = format!("import {BINDING_PACKAGE}.{fully_qualified}");
@@ -83,17 +83,19 @@ fn fully_qualified_call_class_is_never_double_qualified() {
         "the binding package must not be prefixed onto an already-qualified class; got:\n{rendered}"
     );
     assert!(
-        import_lines(&rendered).contains(&format!("import {fully_qualified}").as_str()),
-        "the class must still be imported at its own package; got:\n{rendered}"
+        !import_lines(&rendered).contains(&format!("import {fully_qualified}").as_str()),
+        "a fully qualified call does not need an import; got:\n{rendered}"
     );
+    assert!(rendered.contains(&format!("{fully_qualified}.convert()")), "{rendered}");
 }
 
 /// The correct import was emitted alongside the bogus one, so an assertion that only checks for
 /// the correct spelling would pass over the bug. Every import must be spelled exactly once.
 #[test]
 fn call_class_is_imported_exactly_once() {
-    let fully_qualified = format!("{BINDING_PACKAGE}.{SIMPLE_CLASS}");
-    let rendered = render(&fully_qualified);
+    let rendered = render(SIMPLE_CLASS);
+    let expected_import = format!("import {BINDING_PACKAGE}.{SIMPLE_CLASS}");
+    assert_eq!(rendered.lines().filter(|line| *line == expected_import).count(), 1);
     let imports = import_lines(&rendered);
     let mut sorted = imports.clone();
     sorted.sort_unstable();

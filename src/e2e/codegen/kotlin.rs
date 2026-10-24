@@ -17,6 +17,7 @@ use super::E2eCodegen;
 
 mod args;
 mod assertion_field_gates;
+mod assertion_imports;
 mod assertion_mock_capture;
 mod assertion_scalar_context;
 mod assertion_scalar_dispatch;

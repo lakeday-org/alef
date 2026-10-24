@@ -106,8 +106,8 @@ fn kotlin_android_streaming_fixture_emits_flow_to_list_import() {
         "kotlin_android streaming file must import flow.toList, got:\n{out_android}"
     );
     assert!(
-        out_android.contains("import dev.sample_crate.sampleapp.android.StreamRequest"),
-        "streaming request DTO must be imported, got:\n{out_android}"
+        !out_android.contains("import dev.sample_crate.sampleapp.android.StreamRequest"),
+        "a streaming request DTO unused by the rendered call must not be imported, got:\n{out_android}"
     );
 
     // kotlin_android_style=false must NOT emit the import.

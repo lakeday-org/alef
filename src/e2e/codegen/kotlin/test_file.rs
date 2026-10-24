@@ -545,7 +545,7 @@ pub(super) fn render_test_file_inner(
     // `Flow<T>.toList()` is only available via this import — it is not part of the
     // standard Flow API in Kotlin 1.x/2.x without the explicit import.
     if has_streaming_fixtures {
-        imports.push("kotlinx.coroutines.flow.toList");
+        imports.push_extension("kotlinx.coroutines.flow.toList");
     }
     // Only import the binding class when there are non-HTTP fixtures that call it.
     let has_call_fixtures = fixtures.iter().any(|f| !f.is_http_test());
@@ -576,7 +576,7 @@ pub(super) fn render_test_file_inner(
         // Jackson can deserialise Kotlin data classes (which have no default
         // constructor). The extension function lives in jackson-module-kotlin.
         if kotlin_android_style {
-            imports.push("com.fasterxml.jackson.module.kotlin.registerKotlinModule");
+            imports.push_extension("com.fasterxml.jackson.module.kotlin.registerKotlinModule");
             // `kotlin.time.Duration` is a value class with no natural JSON shape: Jackson has
             // no built-in codec for it, and a fixture literal always spells a duration-typed
             // field as a plain millisecond number (the wire shape `render_kotlin_default`
@@ -585,7 +585,7 @@ pub(super) fn render_test_file_inner(
             // that touches a `Duration` field throws trying to bind a JSON number onto a type
             // it cannot construct. `Duration.Companion.milliseconds` is the extension the
             // registered deserializer below uses to build one back from that number. ~keep
-            imports.push("kotlin.time.Duration.Companion.milliseconds");
+            imports.push_extension("kotlin.time.Duration.Companion.milliseconds");
         }
     }
     // Import every options type referenced by per-call kotlin overrides in this file.
@@ -631,24 +631,6 @@ pub(super) fn render_test_file_inner(
             "kotlin"
         };
         let recipe = crate::e2e::codegen::recipe::ResolvedE2eCallRecipe::resolve(lang_for_recipe, f, cc, type_defs);
-        if kotlin_android_style {
-            let resolver = super::call_field_resolver::build_call_field_resolver(
-                super::call_field_resolver::CallFieldResolverInputs {
-                    e2e_config,
-                    call_config: cc,
-                    fixture: f,
-                    lang: lang_for_recipe,
-                    type_defs,
-                    enums,
-                    functions,
-                },
-            );
-            for field in f.assertions.iter().filter_map(|a| a.field.as_deref()) {
-                for type_name in super::discriminated::android_imports(&resolver, resolver.resolve(field)) {
-                    imports.push_binding_type(&type_name);
-                }
-            }
-        }
         for arg in recipe.args.iter().filter(|arg| arg.arg_type == "handle") {
             let value = crate::e2e::codegen::resolve_field(&f.input, &arg.field);
             if value.is_null() || value.is_object() && value.as_object().is_some_and(|o| o.is_empty()) {
@@ -662,7 +644,9 @@ pub(super) fn render_test_file_inner(
     for config_type in handle_config_types {
         imports.push_binding_type(&config_type);
     }
+    let imports_start = out.len();
     out.push_str(&imports.render());
+    let imports_end = out.len();
     let _ = writeln!(out);
 
     let _ = writeln!(out, "/** E2e tests for category: {category}. */");
@@ -811,6 +795,14 @@ pub(super) fn render_test_file_inner(
     {
         out.push('\n');
         out.push_str(&rendered);
+    }
+
+    if kotlin_android_style {
+        for type_name in super::assertion_imports::candidates(fixtures, e2e_config, type_defs, enums, functions) {
+            imports.push_binding_type(&type_name);
+        }
+        imports.retain_referenced(&out[imports_end..]);
+        out.replace_range(imports_start..imports_end, &imports.render());
     }
 
     let _ = writeln!(out, "}}");

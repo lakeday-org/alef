@@ -14,6 +14,7 @@ pub(super) struct ImportBlock {
     /// explicit import.
     binding_package: String,
     paths: Vec<String>,
+    extension_imports: std::collections::HashSet<String>,
 }
 
 impl ImportBlock {
@@ -21,6 +22,7 @@ impl ImportBlock {
         Self {
             binding_package,
             paths: Vec::new(),
+            extension_imports: std::collections::HashSet::new(),
         }
     }
 
@@ -35,6 +37,28 @@ impl ImportBlock {
     pub(super) fn push_binding_type(&mut self, type_name: &str) {
         let path = crate::codegen::naming::qualified_type_path(&self.binding_package, type_name);
         self.push(&path);
+    }
+
+    pub(super) fn push_extension(&mut self, path: &str) {
+        self.push(path);
+        self.extension_imports.insert(path.to_string());
+    }
+
+    pub(super) fn retain_referenced(&mut self, source: &str) {
+        let unqualified = super::assertion_imports::code_identifiers(source, false);
+        let members = super::assertion_imports::code_identifiers(source, true);
+        self.paths.retain(|path| {
+            let name = path.rsplit('.').next().unwrap_or(path);
+            if name == "*" {
+                return true;
+            }
+            let identifiers = if self.extension_imports.contains(path) {
+                &members
+            } else {
+                &unqualified
+            };
+            identifiers.contains(name)
+        });
     }
 
     /// Render the block. Empty when nothing was added.
@@ -97,5 +121,22 @@ mod tests {
     #[test]
     fn an_empty_block_renders_nothing() {
         assert_eq!(block().render(), "");
+    }
+
+    #[test]
+    fn prune_imports_against_code_and_preserve_used_extension_functions() {
+        let mut imports = block();
+        imports.push("kotlin.test.assertEquals");
+        imports.push("kotlin.test.assertFalse");
+        imports.push_extension("kotlinx.coroutines.flow.toList");
+        imports.push_binding_type("Piece");
+        imports.push_binding_type("Payload");
+        imports.retain_referenced(
+            "// assertFalse Piece\nval reason = \"assertFalse Piece\"\nassertEquals(1, flow.toList().size)\nval value = result as Payload.List\nval qualified = sample.Piece.Text\n",
+        );
+        assert_eq!(
+            imports.render(),
+            "import kotlin.test.assertEquals\nimport kotlinx.coroutines.flow.toList\nimport dev.sample.bindings.Payload\n"
+        );
     }
 }
