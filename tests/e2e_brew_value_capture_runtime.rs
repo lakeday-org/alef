@@ -159,7 +159,7 @@ fn other_string_assertions_use_the_same_lossless_capture() {
             &generate(kind, "value", expected),
             &json!({"value": payload}).to_string(),
             success,
-            0,
+            usize::from(kind == "contains"),
         );
     }
 }
@@ -193,4 +193,78 @@ fn first_equals_failure_cannot_be_masked_by_a_later_success() {
     let unguarded = script.replace(" || return \"$?\"", "");
     assert_ne!(unguarded, script);
     assert_status(&unguarded, &payload, true, 2);
+}
+
+#[test]
+fn projected_stream_preserves_separators_and_data_newlines() {
+    let cases = [
+        (json!([]), ""),
+        (json!(["single"]), "single"),
+        (json!(["ru", "st"]), "ru\nst"),
+        (json!(["ru\n", "st\n\n"]), "ru\n\nst\n\n"),
+        (json!(["", ""]), "\n"),
+        (json!([".", "\n."]), ".\n\n."),
+        (json!(["", "last\n"]), "\nlast\n"),
+    ];
+    assert_eq!(cases.len(), 7);
+    for (values, expected) in cases {
+        let pages: Vec<Value> = values
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| json!({"html": value}))
+            .collect();
+        assert_status(
+            &generate("equals", "pages[].html", json!(expected)),
+            &json!({"pages": pages}).to_string(),
+            true,
+            1,
+        );
+    }
+}
+
+#[test]
+fn projected_contains_cannot_match_across_removed_separators() {
+    let split = json!({"pages": [{"html": "ru"}, {"html": "st"}]}).to_string();
+    for (expected, success) in [("rust", false), ("ru\nst", true), ("\n", true)] {
+        assert_status(
+            &generate("contains", "pages[].html", json!(expected)),
+            &split,
+            success,
+            1,
+        );
+    }
+    assert_status(
+        &generate("contains", "pages[].html", json!("rust")),
+        &json!({"pages": [{"html": "rust"}]}).to_string(),
+        true,
+        1,
+    );
+    assert_status(
+        &generate("is_empty", "pages[].html", json!(null)),
+        &json!({"pages": []}).to_string(),
+        true,
+        0,
+    );
+}
+
+#[test]
+fn jq_join_negative_control_proves_the_false_contains_pass() {
+    let script = generate("contains", "pages[].html", json!("rust"));
+    let payload = json!({"pages": [{"html": "ru"}, {"html": "st"}]}).to_string();
+    let (output, assertions) = execute(&script, &payload);
+    assert!(!output.status.success());
+    assert_eq!(assertions, 1);
+    assert_eq!(String::from_utf8_lossy(&output.stderr).trim(), "contains mismatch");
+    let joined = script
+        .replace("jq -r -s", "jq -j -s")
+        .lines()
+        .filter(|line| !line.contains("%$'\\n'}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_ne!(joined, script);
+    let (output, assertions) = execute(&joined, &payload);
+    assert!(output.status.success());
+    assert_eq!(assertions, 1);
+    assert!(output.stderr.is_empty());
 }

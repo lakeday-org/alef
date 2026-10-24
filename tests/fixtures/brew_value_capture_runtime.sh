@@ -11,7 +11,13 @@ assert_equals() {
 }
 assert_is_empty() { [[ -z "$1" ]]; }
 assert_not_empty() { [[ -n "$1" && "$1" != null ]]; }
-assert_contains() { [[ "$1" == *"$2"* ]]; }
+assert_contains() {
+  printf 'assertion\n' >>"$ASSERTION_LOG"
+  [[ "$1" == *"$2"* ]] || {
+    printf 'contains mismatch\n' >&2
+    return 1
+  }
+}
 if test_capture; then
   exit 0
 else

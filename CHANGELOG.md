@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve separators between projected JSON values in Brew assertions to prevent false matches.
 - Allow AI-Rulez validation to run manually against the current release commit.
 
 ## [0.114.2] - 2026-10-24

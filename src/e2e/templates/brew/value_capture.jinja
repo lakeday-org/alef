@@ -1,6 +1,6 @@
   local val_{{ identifier }}
   if ! val_{{ identifier }}=$(
-    jq -j -s '
+    jq -r -s '
       if length == 1 then .[0] | ({{ jq_path }}) else error("expected one JSON result") end
     ' <<<"$output" || exit "$?"
     printf '.'
@@ -9,3 +9,4 @@
     return 1
   fi
   val_{{ identifier }}=${val_{{ identifier }}%.}
+  val_{{ identifier }}=${val_{{ identifier }}%$'\n'}
