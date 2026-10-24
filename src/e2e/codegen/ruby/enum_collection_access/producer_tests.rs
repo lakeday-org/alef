@@ -157,7 +157,7 @@ fn run_producer(declaration: &syn::ItemEnum, wire_key: &str, success: bool) -> O
     let binary = directory.path().join(if cfg!(windows) { "probe.exe" } else { "probe" });
     std::fs::write(&path, source).unwrap();
     let compiler = which::which_in("rustc", std::env::var_os("PATH"), directory.path()).unwrap();
-    let mut command = std::process::Command::new(compiler);
+    let mut command = std::process::Command::new(&compiler);
     command
         .arg("--edition=2024")
         .arg(path)
@@ -165,7 +165,7 @@ fn run_producer(declaration: &syn::ItemEnum, wire_key: &str, success: bool) -> O
         .arg(&binary)
         .current_dir(directory.path());
     for name in ["serde", "serde_json"] {
-        let library = library(name);
+        let library = library(name, &compiler, directory.path());
         command.arg("--extern").arg(format!("{name}={}", library.display()));
         command
             .arg("-L")
@@ -194,14 +194,72 @@ fn run_producer(declaration: &syn::ItemEnum, wire_key: &str, success: bool) -> O
     Some(serde_json::from_slice(&output.stdout).unwrap())
 }
 
-fn library(name: &str) -> PathBuf {
+fn library(name: &str, compiler: &Path, directory: &Path) -> PathBuf {
     let executable = std::env::current_exe().unwrap();
-    std::fs::read_dir(executable.parent().unwrap())
+    let mut candidates = std::fs::read_dir(executable.parent().unwrap())
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| is_library(path, name))
-        .max_by_key(|path| path.metadata().unwrap().modified().unwrap())
-        .expect("serde libraries linked by test executable")
+        .collect::<Vec<_>>();
+    candidates.sort_by_key(|path| std::cmp::Reverse(path.metadata().unwrap().modified().unwrap()));
+    select_library(&candidates, compiler, directory)
+}
+
+fn select_library(candidates: &[PathBuf], compiler: &Path, directory: &Path) -> PathBuf {
+    assert!(!candidates.is_empty(), "no dependency libraries found");
+    let mut failures = Vec::new();
+    for candidate in candidates {
+        let output = dependency_probe(candidate, compiler, directory);
+        if output.status.success() {
+            return candidate.clone();
+        }
+        failures.push(format!(
+            "{}: {}",
+            candidate.display(),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    panic!("no compiler-compatible dependency library: {}", failures.join("\n"));
+}
+
+fn dependency_probe(library: &Path, compiler: &Path, directory: &Path) -> std::process::Output {
+    let source = directory.join("dependency_probe.rs");
+    std::fs::write(&source, "extern crate probe_dependency;\n").unwrap();
+    std::process::Command::new(compiler)
+        .args([
+            "--edition=2024",
+            "--crate-type=lib",
+            "--crate-name=alef_dependency_probe",
+            "--emit=metadata",
+        ])
+        .arg(source)
+        .arg("--extern")
+        .arg(format!("probe_dependency={}", library.display()))
+        .arg("-L")
+        .arg(format!("dependency={}", library.parent().unwrap().display()))
+        .arg("-o")
+        .arg(directory.join("dependency_probe.rmeta"))
+        .current_dir(directory)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn dependency_probe_rejects_invalid_candidates_before_selecting_a_library() {
+    let directory = tempfile::tempdir().unwrap();
+    let compiler = which::which_in("rustc", std::env::var_os("PATH"), directory.path()).unwrap();
+    let valid = library("serde_json", &compiler, directory.path());
+    let invalid = directory.path().join("libserde_json-invalid.rlib");
+    std::fs::write(&invalid, "invalid Rust library metadata").unwrap();
+    let rejection = dependency_probe(&invalid, &compiler, directory.path());
+    assert!(
+        !rejection.status.success(),
+        "invalid dependency metadata must fail compilation"
+    );
+    assert!(String::from_utf8_lossy(&rejection.stderr).contains("libserde_json-invalid.rlib"));
+    let candidates = [invalid, valid.clone()];
+    assert_eq!(candidates.len(), 2);
+    assert_eq!(select_library(&candidates, &compiler, directory.path()), valid);
 }
 
 fn is_library(path: &Path, name: &str) -> bool {
