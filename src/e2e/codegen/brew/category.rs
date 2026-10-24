@@ -1,3 +1,5 @@
+mod value_capture;
+
 use crate::core::hash::{self, CommentStyle};
 use crate::e2e::codegen::field_skip::FieldSkip;
 use crate::e2e::config::E2eConfig;
@@ -417,19 +419,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
     }
 
     match assertion.assertion_type.as_str() {
-        "equals" => {
-            if let Some(field) = &assertion.field
-                && let Some(expected) = &assertion.value
-            {
-                let resolved = field_resolver.result_relative_path(field);
-                let jq_path = field_to_jq_path(&resolved);
-                let expected_str = json_value_to_shell_string(expected);
-                let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
-                let _ = writeln!(out, "  assert_equals \"$val_{safe_field}\" '{expected_str}' '{field}'");
-            }
-        }
+        "equals" => value_capture::render_equals(out, assertion, field_resolver),
         "contains" => {
             if let Some(field) = &assertion.field
                 && let Some(expected) = &assertion.value
@@ -438,8 +428,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let expected_str = json_value_to_shell_string(expected);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(
                     out,
                     "  assert_contains \"$val_{safe_field}\" '{expected_str}' '{field}'"
@@ -451,8 +440,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let resolved = field_resolver.result_relative_path(field);
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(out, "  assert_not_empty \"$val_{safe_field}\" '{field}'");
             }
         }
@@ -480,8 +468,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let threshold = json_value_to_shell_string(val);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(
                     out,
                     "  assert_greater_than \"$val_{safe_field}\" '{threshold}' '{field}'"
@@ -496,8 +483,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let threshold = json_value_to_shell_string(val);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(
                     out,
                     "  assert_greater_than_or_equal \"$val_{safe_field}\" '{threshold}' '{field}'"
@@ -511,8 +497,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let resolved = field_resolver.result_relative_path(field);
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 for (index, item) in items.iter().enumerate() {
                     let item_str = json_value_to_shell_string(item);
                     let _ = writeln!(
@@ -527,12 +512,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let resolved = field_resolver.result_relative_path(field);
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                // Use `// empty` so JSON null becomes an empty string rather than the literal "null".
-                let _ = writeln!(
-                    out,
-                    "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path} // empty')"
-                );
+                value_capture::render(out, &safe_field, &format!("{jq_path} // empty"), field);
                 let _ = writeln!(out, "  assert_is_empty \"$val_{safe_field}\" '{field}'");
             }
         }
@@ -544,8 +524,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let threshold = json_value_to_shell_string(val);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(out, "  assert_less_than \"$val_{safe_field}\" '{threshold}' '{field}'");
             }
         }
@@ -557,8 +536,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let expected_str = json_value_to_shell_string(expected);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(
                     out,
                     "  assert_not_contains \"$val_{safe_field}\" '{expected_str}' '{field}'"
@@ -586,8 +564,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let resolved = field_resolver.result_relative_path(field);
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(out, "  [ \"$val_{safe_field}\" = \"true\" ] || exit 1");
             }
         }
@@ -596,8 +573,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let resolved = field_resolver.result_relative_path(field);
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(out, "  [ \"$val_{safe_field}\" = \"false\" ] || exit 1");
             }
         }
@@ -609,8 +585,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let threshold = json_value_to_shell_string(val);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(
                     out,
                     "  assert_less_than_or_equal \"$val_{safe_field}\" '{threshold}' '{field}'"
@@ -689,8 +664,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let resolved = field_resolver.result_relative_path(field);
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(
                     out,
                     "  [ \"${{#val_{safe_field}}}\" -ge {n} ] || {{ echo \"FAIL [{field}]: expected length >= {n}\" >&2; return 1; }}"
@@ -705,8 +679,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let resolved = field_resolver.result_relative_path(field);
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(
                     out,
                     "  [ \"${{#val_{safe_field}}}\" -le {n} ] || {{ echo \"FAIL [{field}]: expected length <= {n}\" >&2; return 1; }}"
@@ -721,8 +694,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let expected_str = json_value_to_shell_string(expected);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(
                     out,
                     "  [[ \"$val_{safe_field}\" == *'{expected_str}' ]] || {{ echo \"FAIL [{field}]: expected to end with '{expected_str}'\" >&2; return 1; }}"
@@ -737,8 +709,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let resolved = field_resolver.result_relative_path(field);
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
-                let _ = writeln!(out, "  local val_{safe_field}");
-                let _ = writeln!(out, "  val_{safe_field}=$(echo \"$output\" | jq -r '{jq_path}')");
+                value_capture::render(out, &safe_field, &jq_path, field);
                 let _ = writeln!(
                     out,
                     "  [[ \"$val_{safe_field}\" =~ {pattern} ]] || {{ echo \"FAIL [{field}]: expected to match /{pattern}/\" >&2; return 1; }}"

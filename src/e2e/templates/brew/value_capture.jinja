@@ -1,0 +1,11 @@
+  local val_{{ identifier }}
+  if ! val_{{ identifier }}=$(
+    jq -j -s '
+      if length == 1 then .[0] | ({{ jq_path }}) else error("expected one JSON result") end
+    ' <<<"$output" || exit "$?"
+    printf '.'
+  ); then
+    printf '%s\n' 'FAIL [{{ field }}]: cannot extract JSON value' >&2
+    return 1
+  fi
+  val_{{ identifier }}=${val_{{ identifier }}%.}

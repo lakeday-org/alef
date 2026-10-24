@@ -6,6 +6,14 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "brew/value_capture.jinja",
+        include_str!("templates/brew/value_capture.jinja"),
+    ),
+    (
+        "brew/equals_assertion.jinja",
+        include_str!("templates/brew/equals_assertion.jinja"),
+    ),
+    (
         "elixir/collection_payload.jinja",
         include_str!("templates/elixir/collection_payload.jinja"),
     ),

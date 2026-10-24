@@ -102,8 +102,8 @@ fn extracted_jq_paths(script: &str) -> Vec<String> {
     script
         .lines()
         .filter_map(|line| {
-            let rest = line.split_once("| jq -r '")?.1;
-            let path = rest.split_once('\'')?.0;
+            let rest = line.split_once("then .[0] | (")?.1;
+            let path = rest.split_once(") else error(")?.0;
             Some(path.to_string())
         })
         .collect()
