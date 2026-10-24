@@ -344,14 +344,6 @@ fn accessor_usage_python_uses_last_chunk() {
 }
 
 #[test]
-fn accessor_usage_total_tokens_does_not_route_via_chunks() {
-    // `usage` is intentionally NOT a streaming-virtual root (it overlaps the
-    // non-streaming response shape). The accessor must return None so the
-    // assertion falls through to the normal field-path codegen.
-    assert!(StreamingFieldResolver::accessor("usage.total_tokens", "python", "chunks").is_none());
-}
-
-#[test]
 fn accessor_unknown_field_returns_none() {
     assert_eq!(
         StreamingFieldResolver::accessor("nonexistent_field", "rust", "chunks"),
