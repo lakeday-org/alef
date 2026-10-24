@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Align constructor compatibility regression assertions with the contextual diagnostics for recorded Java signatures.
+
 ## [0.114.1] - 2026-10-24
 
 ### Fixed

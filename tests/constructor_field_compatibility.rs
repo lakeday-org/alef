@@ -169,7 +169,8 @@ fn reordered_legacy_fields_that_collide_with_the_java_canonical_signature_are_re
         .expect_err("canonical signature cannot preserve a different parameter order")
         .to_string();
     assert!(
-        error.contains("legacy constructor order") && error.contains("Options"),
+        error.contains("Java recorded constructor for Options")
+            && error.contains("collides with another constructor after type erasure"),
         "{error}"
     );
 }
@@ -183,7 +184,7 @@ fn a_hidden_java_legacy_parameter_returns_a_contextual_generation_error() {
         .expect_err("hidden ABI argument must be rejected")
         .to_string();
     assert!(
-        error.contains("legacy constructor") && error.contains("Options.max_depth"),
+        error.contains("Java recorded constructor field Options.max_depth is not exposed"),
         "{error}"
     );
 }
