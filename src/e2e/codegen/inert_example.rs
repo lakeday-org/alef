@@ -33,7 +33,7 @@ mod runtime_diagnostics;
 #[cfg(test)]
 mod runtime_diagnostics_tests;
 pub(crate) use runtime_diagnostics::{
-    completed_body, coverage_warning, coverage_warning_for_path, warn_completed_test,
+    completed_body, coverage_warning, coverage_warning_for_path, is_skip_marker_line, warn_completed_test,
 };
 
 use crate::e2e::fixture::Assertion;

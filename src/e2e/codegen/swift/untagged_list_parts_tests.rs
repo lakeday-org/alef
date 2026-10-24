@@ -171,10 +171,17 @@ fn should_skip_a_path_into_the_list_variant_of_a_display_text_union() {
         "the union getter is a RustString with no `parts()` member, got:\n{out}"
     );
     assert_eq!(
-        out.matches("flattens to text (xberg-io/alef#691)").count(),
+        out.lines()
+            .filter(|line| line.trim_start().starts_with("// skipped:"))
+            .filter(|line| line.contains("flattens to text (xberg-io/alef#691)"))
+            .count(),
         2,
         "each path into the list variant must render a skip, got:\n{out}"
     );
+    let refusal = out.lines().find(|line| line.contains("try XCTSkipIf(true,")).unwrap();
+    assert!(refusal.contains("choices[0].message.content.parts"));
+    assert!(refusal.contains("choices[0].message.content.parts[0].text"));
+    assert!(refusal.contains("xberg-io/alef#691"));
 }
 
 #[test]

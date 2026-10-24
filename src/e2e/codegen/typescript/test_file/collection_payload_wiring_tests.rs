@@ -50,13 +50,21 @@ fn full_test(assertions: Vec<crate::e2e::fixture::Assertion>) -> String {
 fn configured_wasm_text_projection_is_wired_through_full_test_case() {
     let output = full_test(support::assertions());
     assert_eq!(
-        output.matches("untagged_union_text_types text projection").count(),
+        output
+            .lines()
+            .filter(|line| line.trim_start().starts_with("// skipped:"))
+            .filter(|line| line.contains("untagged_union_text_types text projection"))
+            .count(),
         3,
         "{output}"
     );
     assert!(!output.contains(".length"), "{output}");
     assert!(!output.contains("expect(result"), "{output}");
     assert!(output.contains("it.skip("), "{output}");
+    assert!(
+        output.contains("parts_reply:  (alef rendered no runnable expectation"),
+        "{output}"
+    );
     assert!(
         support::resolver(true)
             .text_projected_crossing("content.parts")
@@ -139,12 +147,20 @@ fn mixed_projected_fixture_keeps_real_sibling_assertion() {
     });
     let output = full_test(assertions);
     assert_eq!(
-        output.matches("untagged_union_text_types text projection").count(),
+        output
+            .lines()
+            .filter(|line| line.trim_start().starts_with("// skipped:"))
+            .filter(|line| line.contains("untagged_union_text_types text projection"))
+            .count(),
         3,
         "{output}"
     );
     assert!(!output.contains("it.skip("), "{output}");
     assert!(output.contains("expect(result.summary)"), "{output}");
+    assert!(
+        output.contains("console.warn(\"alef missing assertion coverage"),
+        "{output}"
+    );
     assert_projected_test_compiles(&output);
 }
 

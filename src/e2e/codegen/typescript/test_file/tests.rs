@@ -2224,7 +2224,7 @@ fn a_streaming_example_whose_every_assertion_skips_is_refused_as_a_skipped_test(
     );
 
     assert!(
-        output.contains("it.skip(\"ts_stream_all_skipped: test\""),
+        output.contains("it.skip(\"ts_stream_all_skipped: test ("),
         "the refusal must be vitest's own skip, got:\n{output}"
     );
     assert!(

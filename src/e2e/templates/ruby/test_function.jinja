@@ -55,6 +55,9 @@
 {% endfor %}
       {{ call_expr }}
     }.to {{ raise_error_clause }}
+{% if error_path_assertions %}
+{{ error_path_assertions }}
+{% endif %}
 {% else %}
 {% for line in setup_lines %}
     {{ line }}

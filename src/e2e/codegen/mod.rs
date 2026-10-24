@@ -556,7 +556,7 @@ pub(crate) fn fail_on_unavailable_field_markers(
     assertions: &[crate::e2e::fixture::Assertion],
 ) {
     let coarse_oracle = COARSE_FIELD_ORACLE_LANGUAGES.contains(&language);
-    for line in body.lines() {
+    for line in body.lines().filter(|line| inert_example::is_skip_marker_line(line)) {
         let Some((field, skip)) = field_skip::FieldSkip::extract_classified(line) else {
             continue;
         };
@@ -595,7 +595,7 @@ pub(crate) fn fail_on_unavailable_field_markers(
 /// below (mapped defensively to `Limitation`) so the match stays exhaustive if that invariant is
 /// ever violated by a future variant, without panicking mid-generation.
 pub(crate) fn fail_on_unsupported_assertion_type_markers(body: &str, language: &str, fixture_id: &str) {
-    for line in body.lines() {
+    for line in body.lines().filter(|line| inert_example::is_skip_marker_line(line)) {
         let Some((token, skip)) = assertion_type_skip::AssertionTypeSkip::extract_classified(line) else {
             continue;
         };

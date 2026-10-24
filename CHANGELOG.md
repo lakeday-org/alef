@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Count skipped-assertion comments once when collecting strict coverage diagnostics, and emit unsupported Ruby error-field warnings inside regular and streaming error examples.
+
 ## [0.114.0] - 2026-10-24
 
 ### Added

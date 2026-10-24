@@ -165,10 +165,10 @@ pub(super) fn render_chat_stream_example(
     } else {
         format!("{call_receiver}.{function_name}({final_args})")
     };
-
     if expects_error {
         let clause = render_raise_error_clause(fixture, errors, module_name);
         out.push_str(&format!("    expect {{ {call_expr} {{ |_chunk| }} }}.to {clause}\n"));
+        crate::e2e::codegen::error_path_assertions::emit_runtime(&mut out, fixture, "    # ", "ruby");
         out.push_str("  end\n");
         return out;
     }
@@ -515,6 +515,7 @@ pub(super) fn render_example(
     let has_mock_and_key = has_mock && api_key_var.is_some();
 
     let raise_error_clause = render_raise_error_clause(fixture, errors, module_name);
+    let error_path_assertions = crate::e2e::codegen::error_path_assertions::render(fixture, "    # ", "ruby");
 
     // Emit the post-clear list assertion for clear operations.
     let post_clear_list_call = if is_clear_op {
@@ -531,11 +532,12 @@ pub(super) fn render_example(
             description => description_literal,
             expects_error => expects_error,
             raise_error_clause => raise_error_clause,
+            error_path_assertions => error_path_assertions,
             setup_lines => setup_lines,
             call_expr => call_expr,
             result_var => result_var,
             assertions_rendered => assertions_rendered,
-            coverage_warning => inert_example::coverage_warning_for_path(&assertions_rendered, expects_error, &[&crate::e2e::codegen::error_path_assertions::render(fixture, "    # ", "ruby")], "ruby", &fixture.id),
+            coverage_warning => inert_example::coverage_warning_for_path(&assertions_rendered, expects_error, &[&error_path_assertions], "ruby", &fixture.id),
             has_usable => has_usable,
             returns_void => returns_void,
             client_factory => client_factory,

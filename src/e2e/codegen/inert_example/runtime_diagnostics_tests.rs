@@ -155,3 +155,25 @@ fn diagnostic_control_characters_are_visible_text_in_every_target() {
     }
     assert_eq!(checked, 18);
 }
+
+#[test]
+fn runtime_cause_copies_are_not_counted_as_skip_markers() {
+    let body = "    # skipped: assertion type 'equals' has no accessor for error field error.code in this backend\n";
+    let warning = coverage_warning(body, "python", "probe");
+    let _ = crate::e2e::codegen::take_skip_records();
+    crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&format!("{body}{warning}"), "python", "probe");
+    assert_eq!(crate::e2e::codegen::take_skip_records().len(), 1);
+    crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&warning, "python", "probe");
+    assert!(crate::e2e::codegen::take_skip_records().is_empty());
+    let field_body = "// skipped: field 'missing' not available on result type\n";
+    let field_warning = coverage_warning(field_body, "rust", "probe");
+    crate::e2e::codegen::fail_on_unavailable_field_markers(
+        &format!("{field_body}{field_warning}"),
+        "rust",
+        "probe",
+        &[],
+    );
+    assert_eq!(crate::e2e::codegen::take_skip_records().len(), 1);
+    crate::e2e::codegen::fail_on_unavailable_field_markers(&field_warning, "rust", "probe", &[]);
+    assert!(crate::e2e::codegen::take_skip_records().is_empty());
+}

@@ -1,3 +1,12 @@
+/// ~keep Legacy markers lack `skipped:`; diagnostic copies start with `alef` and are not ledger entries.
+pub(crate) fn is_skip_marker_line(line: &str) -> bool {
+    super::COMMENT_OPENERS.iter().any(|opener| {
+        line.trim_start()
+            .strip_prefix(opener)
+            .is_some_and(|body| !body.trim_start().starts_with("alef "))
+    })
+}
+
 pub(super) fn visible_control_text(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for character in text.chars() {

@@ -47,6 +47,20 @@ fn streaming_errors_require_runtime_error_even_without_a_declared_value() {
         source.contains("has no accessor for error field error.status_code"),
         "{source}"
     );
+    let records = crate::e2e::codegen::take_skip_records();
+    assert_eq!(records.len(), 1, "{records:?}");
+    assert_eq!(records[0].field, "equals");
+    let assertion = source.find("}.to raise_error(RuntimeError)").unwrap();
+    let marker = source.find("# skipped: assertion type 'equals'").unwrap();
+    let warning = source.find("warn 'alef missing assertion coverage").unwrap();
+    assert!(assertion < marker && marker < warning, "{source}");
+    assert!(source[warning..].contains("\n  end"), "{source}");
+    assert_eq!(source.matches("# skipped: assertion type 'equals'").count(), 1);
+    if let Ok(proof_root) = std::env::var("ALEF_RUNTIME_DIAGNOSTIC_PROOF_DIR") {
+        let path = std::path::Path::new(&proof_root).join("ruby-stream-error");
+        std::fs::create_dir_all(&path).unwrap();
+        std::fs::write(path.join("fixture_spec.rb"), &source).unwrap();
+    }
 }
 
 #[test]
@@ -77,6 +91,9 @@ fn streaming_known_variants_preserve_identity_and_record_only_status_gaps() {
     assert!(source.contains("raise_error(Sample::AuthenticationError)"), "{source}");
     assert!(!source.contains("declared error variant 'Authentication'"), "{source}");
     assert!(!source.contains("/Authentication/"), "{source}");
+    let assertion = source.find("raise_error(Sample::AuthenticationError)").unwrap();
+    let warning = source.find("warn 'alef missing assertion coverage").unwrap();
+    assert!(assertion < warning && source[warning..].contains("\n  end"), "{source}");
     let records = crate::e2e::codegen::take_skip_records();
     assert_eq!(records.len(), 1, "{records:?}");
 }
