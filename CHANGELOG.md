@@ -7,15 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Align constructor compatibility regression assertions with the contextual diagnostics for recorded Java signatures.
-
 ## [0.114.1] - 2026-10-24
 
 ### Fixed
 
-- Java records preserve every explicitly recorded constructor signature alongside legacy and current constructors. Historical arguments retain their supplied values, and only omitted fields receive defaults.
+- Java records preserve every explicitly recorded constructor signature alongside legacy and current constructors. Historical arguments retain their supplied values, and only omitted fields receive defaults. Invalid historical fields and colliding signatures return contextual errors.
 
 ## [0.114.0] - 2026-10-24
 
