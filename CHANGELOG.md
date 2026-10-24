@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.114.1] - 2026-10-24
+
 ### Fixed
 
 - Java records preserve every explicitly recorded constructor signature alongside legacy and current constructors. Historical arguments retain their supplied values, and only omitted fields receive defaults.
