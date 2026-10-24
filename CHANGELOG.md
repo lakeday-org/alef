@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.114.2] - 2026-10-24
+
 ### Fixed
 
 - Preserve trailing newlines when generated Brew assertions extract JSON string values, and report JSON extraction failures without masking them.
