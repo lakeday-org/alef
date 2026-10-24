@@ -2,6 +2,10 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "untagged_primitive_variant.jinja",
+        include_str!("templates/untagged_primitive_variant.jinja"),
+    ),
+    (
         "package_declaration.jinja",
         include_str!("templates/package_declaration.jinja"),
     ),

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Qualify shadowed Kotlin scalar payload types and dispatch untagged Boolean variants only from JSON booleans, preserving numeric variant order (#688).
 - Report full runtime causes for skipped assertions and emit partial-coverage warnings after executable checks across all supported test renderers; retain warnings in normal Go, C# and Kotlin runner output (#697, #698).
 - Preserve skipped-assertion diagnostics in Zig serde JSON tests and safely render control characters in runtime refusals (#698).
 - Import Kotlin Android test types and assertions only when generated executable code references them, preserving required extension imports and mixed-fixture union imports (#700).

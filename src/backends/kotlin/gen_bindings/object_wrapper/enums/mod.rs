@@ -10,6 +10,7 @@ use crate::codegen::serde_enum_repr::SerdeEnumRepr;
 
 mod heterogeneous;
 mod runtime_typed;
+mod scalar;
 mod tagged;
 mod untagged;
 

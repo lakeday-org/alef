@@ -325,10 +325,8 @@ pub(super) fn escape_kotlin_string(s: &str) -> String {
     out
 }
 
-/// Like the basic kotlin_type helper but fully-qualifies `Named` type references whose
-/// simple name clashes with a sibling variant name in the enclosing sealed
-/// class.  This prevents the Kotlin compiler from resolving the type to the
-/// nested variant class instead of the outer same-named top-level class (Bug E).
+/// Kotlin resolves payload names inside the sealed class before builtins or package types;
+/// qualify references shadowed by sibling variants. ~keep
 pub(super) fn kotlin_type_disambiguated(
     ty: &TypeRef,
     optional: bool,
@@ -355,6 +353,10 @@ fn render_type_ref_disambiguated(
         "Map"
     };
     match ty {
+        TypeRef::Primitive(primitive) if variant_names.contains(primitive_type_name(primitive)) => {
+            format!("kotlin.{}", primitive_type_name(primitive))
+        }
+        TypeRef::String if variant_names.contains("String") => "kotlin.String".to_string(),
         TypeRef::Named(n) if !package.is_empty() && variant_names.contains(n.as_str()) => {
             format!("{package}.{n}")
         }

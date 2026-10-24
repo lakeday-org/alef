@@ -166,15 +166,9 @@ fn emit_untagged_deserialize_arm(out: &mut String, name: &str, variant: &EnumVar
                 );
                 ("node.isArray", expr)
             }
-            TypeRef::Primitive(_) => {
-                let class_name = super::kotlin_class_name_for_type(ty);
-                (
-                    "node.isNumber",
-                    format!(
-                        "{name}.{}(ctx.readTreeAsValue(node, {class_name}::class.java))",
-                        variant.name
-                    ),
-                )
+            TypeRef::Primitive(primitive) => {
+                super::scalar::emit_deserialize_arm(out, name, variant, primitive);
+                return;
             }
             TypeRef::Named(n) => (
                 "true",

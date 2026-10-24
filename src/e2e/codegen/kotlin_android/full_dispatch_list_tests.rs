@@ -8,6 +8,8 @@ use crate::e2e::config::{CallConfig, E2eConfig};
 use crate::e2e::fixture::{Assertion, Fixture, FixtureGroup};
 use std::path::Path;
 
+mod scalar_controls;
+
 fn fixture(root: &Path) -> (ApiSurface, ResolvedCrateConfig) {
     let source = root.join("src/lib.rs");
     std::fs::create_dir_all(source.parent().unwrap()).unwrap();
@@ -250,6 +252,7 @@ fn native_full_android_dispatch_preserves_projected_parts() {
         );
     }
     missing_import_control(&root, &source, &classpath);
+    scalar_controls::run(&root, &classpath);
     println!(
         "android_full_dispatch_cases=6 old_import_negative=1 artifacts={}",
         root.display()
