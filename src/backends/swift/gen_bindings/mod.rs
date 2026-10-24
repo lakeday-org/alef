@@ -380,7 +380,7 @@ impl Backend for SwiftBackend {
 
         text_value_accessors::emit(
             api,
-            &config.untagged_union_text_types,
+            text_value_accessors::config(config),
             &exclude_types,
             &exclude_fields,
             &configured_features,

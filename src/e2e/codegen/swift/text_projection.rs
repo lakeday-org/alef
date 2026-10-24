@@ -1,4 +1,4 @@
-use crate::core::ir::{TypeDef, TypeRef};
+use crate::core::ir::{EnumDef, TypeDef, TypeRef};
 use crate::e2e::field_access::SwiftFirstClassMap;
 use std::collections::HashSet;
 
@@ -44,4 +44,44 @@ pub(super) fn apply(mut map: SwiftFirstClassMap, types: &[TypeDef], configured: 
         })
         .collect();
     map
+}
+
+pub(super) fn lossless_fields(
+    types: &[TypeDef],
+    enums: &[EnumDef],
+    configured: &[String],
+) -> std::collections::HashMap<String, HashSet<String>> {
+    let serde_text_types = enums
+        .iter()
+        .filter(|definition| definition.has_serde && configured.contains(&definition.name))
+        .map(|definition| definition.name.as_str())
+        .collect();
+    let mut fields = std::collections::HashMap::<String, HashSet<String>>::new();
+    for definition in types {
+        for field in &definition.fields {
+            if definition.has_serde
+                && !field.serde_skip
+                && crate::backends::swift::gen_rust_crate::type_bridge::text_projected_getter_type(
+                    field,
+                    &serde_text_types,
+                )
+                .is_some()
+            {
+                fields
+                    .entry(definition.name.clone())
+                    .or_default()
+                    .insert(field.name.clone());
+            }
+        }
+    }
+    fields
+}
+
+pub(super) fn resolver(
+    resolver: crate::e2e::field_access::FieldResolver,
+    types: &[TypeDef],
+    enums: &[EnumDef],
+    config: &crate::core::config::ResolvedCrateConfig,
+) -> crate::e2e::field_access::FieldResolver {
+    resolver.with_swift_lossless_text_fields(lossless_fields(types, enums, &config.untagged_union_text_types))
 }

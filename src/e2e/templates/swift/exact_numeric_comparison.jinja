@@ -1,0 +1,39 @@
+            typealias NumberParts = (negative: Bool, digits: String, order: Int)
+            func numberParts(_ text: String) throws -> NumberParts {
+                _ = try XCTUnwrap(
+                    text.range(of: #"^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$"#, options: .regularExpression),
+                    "expected a JSON number"
+                )
+                let negative = text.hasPrefix("-")
+                let unsigned = negative ? String(text.dropFirst()) : text
+                let components = unsigned.lowercased().split(separator: "e", omittingEmptySubsequences: false)
+                let exponent = components.count == 2 ? try XCTUnwrap(Int(components[1])) : 0
+                let mantissa = components[0].split(separator: ".", omittingEmptySubsequences: false)
+                let rawDigits = mantissa.joined()
+                let leadingZeros = rawDigits.prefix { $0 == "0" }.count
+                let digits = String(rawDigits.dropFirst(leadingZeros))
+                if digits.isEmpty { return (false, "0", 0) }
+                return (negative, digits, mantissa[0].count + exponent - leadingZeros)
+            }
+            func magnitude(_ lhs: NumberParts, _ rhs: NumberParts) -> ComparisonResult {
+                if lhs.digits == "0" && rhs.digits == "0" { return .orderedSame }
+                if lhs.digits == "0" { return .orderedAscending }
+                if rhs.digits == "0" { return .orderedDescending }
+                if lhs.order != rhs.order { return lhs.order < rhs.order ? .orderedAscending : .orderedDescending }
+                let width = max(lhs.digits.count, rhs.digits.count)
+                return lhs.digits.padding(toLength: width, withPad: "0", startingAt: 0)
+                    .compare(rhs.digits.padding(toLength: width, withPad: "0", startingAt: 0))
+            }
+            let actual = try JSONSerialization.data(withJSONObject: try XCTUnwrap(value), options: [.fragmentsAllowed])
+            _ = try numberParts(String(decoding: actual, as: UTF8.self))
+            let lhs = try numberParts(try XCTUnwrap(value as? NSNumber).stringValue)
+            let rhs = try numberParts({{ predicate.expected }})
+            let comparison: ComparisonResult
+            if lhs.negative != rhs.negative { comparison = lhs.negative ? .orderedAscending : .orderedDescending }
+            else {
+                let absolute = magnitude(lhs, rhs)
+                if !lhs.negative { comparison = absolute }
+                else if absolute == .orderedAscending { comparison = .orderedDescending }
+                else if absolute == .orderedDescending { comparison = .orderedAscending }
+                else { comparison = .orderedSame }
+            }

@@ -277,11 +277,11 @@ mod leaf_shape;
 mod not_error_assertion;
 mod project;
 mod snippet;
+mod structured_text;
 mod stubs;
 mod test_file;
 mod test_method;
 mod text_projection;
-mod union_value_assertion;
 mod values;
 mod wildcard_assertion;
 

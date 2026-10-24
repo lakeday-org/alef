@@ -1,0 +1,8 @@
+[package]
+name = "sample_core"
+version = "0.0.0"
+edition = "2024"
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+[workspace]
+members = ["packages/swift/rust", "crates/sample_core-ffi"]

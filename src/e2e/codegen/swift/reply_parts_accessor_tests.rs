@@ -2,7 +2,7 @@
 //! (`choices[0].message.content.parts[0].text`).
 //!
 //! The union getter returns the plain text of the reply. The assertions read the whole value
-//! through the typed accessor that the bridge emits for the same field, then navigate the
+//! through the lossless companion that the bridge emits for the same field, then navigate the
 //! encoded value with the wire path of the variant.
 //!
 //! These tests drive the real entry point, `render_test_method`, against an IR with the shape of a
@@ -155,7 +155,7 @@ fn assertion(assertion_type: &str, field_path: &str, value: serde_json::Value) -
 }
 
 #[test]
-fn should_count_the_parts_through_the_typed_accessor() {
+fn should_count_the_parts_through_the_lossless_companion() {
     let out = render(
         true,
         vec![assertion(
@@ -165,11 +165,11 @@ fn should_count_the_parts_through_the_typed_accessor() {
         )],
     );
     assert!(
-        out.contains(".message().contentValue()"),
+        out.contains(".message().__alef_json_content()"),
         "the parts must come from the typed accessor of the union field, got:\n{out}"
     );
     assert!(
-        out.contains("JSONEncoder().encode(") && out.contains("as? [Any])?.count"),
+        out.contains("JSONSerialization.jsonObject(") && out.contains("as? [Any]).count"),
         "the count must read the encoded list, got:\n{out}"
     );
     assert!(
@@ -179,7 +179,7 @@ fn should_count_the_parts_through_the_typed_accessor() {
 }
 
 #[test]
-fn should_read_the_text_of_one_part_through_the_typed_accessor() {
+fn should_read_the_text_of_one_part_through_the_lossless_companion() {
     let out = render(
         true,
         vec![
@@ -196,7 +196,7 @@ fn should_read_the_text_of_one_part_through_the_typed_accessor() {
         ],
     );
     assert_eq!(
-        out.matches(".message().contentValue()").count(),
+        out.matches(".message().__alef_json_content()").count(),
         2,
         "each part assertion must read the typed accessor, got:\n{out}"
     );
@@ -230,7 +230,7 @@ fn should_render_the_renderer_before_the_skip_for_a_parts_path() {
         "a parts path of a configured text type must not render the skip, got:\n{out}"
     );
     assert_eq!(
-        out.matches(".message().contentValue()").count(),
+        out.matches(".message().__alef_json_content()").count(),
         2,
         "each parts path must render an assertion, got:\n{out}"
     );
@@ -253,7 +253,7 @@ fn should_still_read_the_display_text_of_the_union_itself() {
 }
 
 #[test]
-fn should_leave_a_union_that_is_not_untagged_to_the_existing_path() {
+fn tagged_union_companion_uses_its_canonical_wire_wrapper() {
     let out = render(
         false,
         vec![assertion(
@@ -267,7 +267,7 @@ fn should_leave_a_union_that_is_not_untagged_to_the_existing_path() {
         "a union with a wrapper in its wire form does not encode as its payload, got:\n{out}"
     );
     assert!(
-        out.contains("flattens to text (xberg-io/alef#691)"),
-        "the path the renderer cannot read keeps the skip, got:\n{out}"
+        out.contains("[\"Parts\"]") && !out.contains("// skipped"),
+        "the tagged union must navigate the real wire wrapper, got:\n{out}"
     );
 }

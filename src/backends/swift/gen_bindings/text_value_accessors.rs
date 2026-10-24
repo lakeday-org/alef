@@ -5,26 +5,37 @@
 //! returns the value as JSON. This module emits an extension of the bridge type that decodes that
 //! JSON into the Swift union type.
 
-use crate::backends::swift::gen_rust_crate::type_bridge::{text_projected_getter_type, text_projected_value_names};
+use crate::backends::swift::gen_rust_crate::type_bridge::text_projected_getter_type;
 use crate::backends::swift::gen_rust_crate::wrappers::is_unbridgeable_getter;
 use crate::backends::swift::naming::swift_source_ident;
 use crate::codegen::generators::type_paths::build_type_path_lookup;
 use crate::core::ir::{ApiSurface, FieldDef, TypeRef};
-use heck::{ToLowerCamelCase, ToSnakeCase};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+
+pub(super) struct AccessorConfig<'a> {
+    pub text_types: &'a [String],
+    pub rename_fields: Option<&'a HashMap<String, String>>,
+}
+
+pub(super) fn config(config: &crate::core::config::ResolvedCrateConfig) -> AccessorConfig<'_> {
+    AccessorConfig {
+        text_types: &config.untagged_union_text_types,
+        rename_fields: config.swift.as_ref().map(|swift| &swift.rename_fields),
+    }
+}
 
 pub(super) fn emit(
     api: &ApiSurface,
-    text_types: &[String],
+    config: AccessorConfig<'_>,
     exclude_types: &HashSet<String>,
     exclude_fields: &HashSet<String>,
     configured_features: &HashSet<&str>,
     out: &mut String,
 ) -> anyhow::Result<()> {
-    if text_types.is_empty() {
+    if config.text_types.is_empty() {
         return Ok(());
     }
-    let configured: HashSet<&str> = text_types.iter().map(String::as_str).collect();
+    let configured = super::super::gen_rust_crate::text_projection::serde_text_types(api, config.text_types);
     let type_paths = build_type_path_lookup(api);
     let no_serde_names: HashSet<&str> = api
         .types
@@ -35,7 +46,7 @@ pub(super) fn emit(
     for ty in api
         .types
         .iter()
-        .filter(|t| !t.is_trait && !exclude_types.contains(&t.name))
+        .filter(|t| !t.is_trait && t.has_serde && !exclude_types.contains(&t.name))
     {
         let bridged: Vec<_> = ty
             .fields
@@ -51,33 +62,7 @@ pub(super) fn emit(
                 )
             })
             .collect();
-        for field in &bridged {
-            if text_projected_getter_type(field, &configured).is_some() {
-                reject_name_collision(&ty.name, &field.name, &bridged)?;
-            }
-        }
-        let accessors: Vec<_> = bridged
-            .iter()
-            .filter_map(|field| {
-                text_projected_getter_type(field, &configured)?;
-                let named = match &field.ty {
-                    TypeRef::Optional(inner) => inner.as_ref(),
-                    other => other,
-                };
-                let TypeRef::Named(enum_name) = named else { return None };
-                let optional = field.optional || matches!(field.ty, TypeRef::Optional(_));
-                let names = text_projected_value_names(&field.name);
-                let enum_name = swift_source_ident(enum_name);
-                Some(crate::alef_context! {
-                    field => swift_source_ident(&field.name.to_lower_camel_case()),
-                    name => names.accessor,
-                    json_getter => names.json_getter_swift,
-                    value_type => if optional { format!("{enum_name}?") } else { enum_name.clone() },
-                    enum_name => enum_name,
-                    optional => optional,
-                })
-            })
-            .collect();
+        let accessors = type_accessors(ty, &bridged, &configured, config.rename_fields)?;
         if accessors.is_empty() {
             continue;
         }
@@ -90,23 +75,63 @@ pub(super) fn emit(
     Ok(())
 }
 
-/// Fail generation when a getter added for a text field would share a name with another field of
-/// the same type. The bridge declares `<field>_json` in Rust and the Swift facade declares
-/// `<field>Value()` on the same bridge type, so a field with either name would produce a duplicate
-/// function or an ambiguous Swift overload.
-fn reject_name_collision(type_name: &str, field: &str, bridged: &[&FieldDef]) -> anyhow::Result<()> {
-    let names = text_projected_value_names(field);
-    for other in bridged.iter().filter(|other| other.name != field) {
-        let snake = other.name.to_snake_case();
-        let camel = other.name.to_lower_camel_case();
-        if snake == names.json_getter || camel == names.json_getter_swift || camel == names.accessor {
-            anyhow::bail!(
-                "Swift: field `{}` of `{type_name}` has the name of a getter that alef adds for the text field `{field}` (`{}` and `{}()`). Rename the field or remove `{type_name}` from `untagged_union_text_types`.",
-                other.name,
-                names.json_getter,
-                names.accessor
-            );
+fn type_accessors(
+    ty: &crate::core::ir::TypeDef,
+    bridged: &[&FieldDef],
+    configured: &HashSet<&str>,
+    rename_fields: Option<&HashMap<String, String>>,
+) -> anyhow::Result<Vec<minijinja::Value>> {
+    for field in bridged {
+        if !field.serde_skip && text_projected_getter_type(field, configured).is_some() {
+            reject_name_collision(ty, field, bridged, rename_fields)?;
         }
+    }
+    let accessors: Vec<_> = bridged
+            .iter()
+            .filter_map(|field| {
+                if field.serde_skip { return None; }
+                text_projected_getter_type(field, configured)?;
+                let named = match &field.ty {
+                    TypeRef::Optional(inner) => inner.as_ref(),
+                    other => other,
+                };
+                let TypeRef::Named(enum_name) = named else { return None };
+                let optional = field.optional || matches!(field.ty, TypeRef::Optional(_));
+                let json_getter = crate::backends::swift::gen_rust_crate::text_projection::json_getter_name(&field.name);
+                let renamed = rename_fields.and_then(|renames| renames.get(&format!("{}.{}", ty.name, field.name))).map(String::as_str);
+                let enum_name = swift_source_ident(enum_name);
+                Some(crate::alef_context! {
+                    field => crate::codegen::naming::public_field_name(crate::core::config::Language::Swift, &field.name, renamed),
+                    name => crate::backends::swift::naming::text_value_accessor_name(&field.name, renamed),
+                    json_getter => json_getter,
+                    value_type => if optional { format!("{enum_name}?") } else { enum_name.clone() },
+                    enum_name => enum_name,
+                    optional => optional,
+                })
+            })
+            .collect();
+    Ok(accessors)
+}
+
+fn reject_name_collision(
+    ty: &crate::core::ir::TypeDef,
+    field: &FieldDef,
+    bridged: &[&FieldDef],
+    renames: Option<&HashMap<String, String>>,
+) -> anyhow::Result<()> {
+    let renamed = renames
+        .and_then(|renames| renames.get(&format!("{}.{}", ty.name, field.name)))
+        .map(String::as_str);
+    let accessor = crate::backends::swift::naming::text_value_accessor_name(&field.name, renamed);
+    let collision = bridged.iter().filter(|other| other.name != field.name).any(|other| {
+        crate::codegen::naming::public_field_name(crate::core::config::Language::Swift, &other.name, None) == accessor
+    });
+    if collision {
+        anyhow::bail!(
+            "Swift typed accessor `{accessor}()` for `{}.{}` collides with an existing public member",
+            ty.name,
+            field.name
+        );
     }
     Ok(())
 }

@@ -36,6 +36,14 @@ pub(crate) fn swift_rust_shim_ident(name: &str) -> String {
     )
 }
 
+pub(crate) fn text_value_accessor_name(field: &str, renamed: Option<&str>) -> String {
+    crate::codegen::naming::public_host_identifier(
+        crate::core::config::Language::Swift,
+        crate::codegen::naming::PublicIdentifierKind::Method,
+        &format!("{}_value", renamed.unwrap_or(field)),
+    )
+}
+
 /// Get the swift-bridge version to pin in the generated `Cargo.toml`.
 ///
 /// Returns the per-crate override from `[crates.swift] swift_bridge_version` when set;

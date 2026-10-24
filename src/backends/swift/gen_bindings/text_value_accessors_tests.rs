@@ -40,17 +40,27 @@ fn reply_api() -> ApiSurface {
     }
 }
 
-fn emitted(api: &ApiSurface, text_types: &[&str], exclude_fields: &[&str]) -> String {
-    try_emit(api, text_types, exclude_fields).expect("accessors are emitted")
+fn emitted(api: &ApiSurface, text_types: &[&str], excluded: &[&str]) -> String {
+    render(api, text_types, excluded, &HashMap::new()).unwrap()
 }
 
-fn try_emit(api: &ApiSurface, text_types: &[&str], exclude_fields: &[&str]) -> anyhow::Result<String> {
+fn render(
+    api: &ApiSurface,
+    configured: &[&str],
+    excluded: &[&str],
+    renames: &HashMap<String, String>,
+) -> anyhow::Result<String> {
+    let configured = configured.iter().map(|name| name.to_string()).collect::<Vec<_>>();
+    let excluded = excluded.iter().map(|field| field.to_string()).collect();
     let mut out = String::new();
     emit(
         api,
-        &text_types.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
+        AccessorConfig {
+            text_types: &configured,
+            rename_fields: Some(renames),
+        },
         &HashSet::new(),
-        &exclude_fields.iter().map(|f| f.to_string()).collect(),
+        &excluded,
         &HashSet::new(),
         &mut out,
     )?;
@@ -58,14 +68,12 @@ fn try_emit(api: &ApiSurface, text_types: &[&str], exclude_fields: &[&str]) -> a
 }
 
 #[test]
-fn each_text_field_gets_an_accessor_that_decodes_its_json_getter() {
+fn text_fields_decode_the_fallible_lossless_companion() {
     let out = emitted(&reply_api(), &["Content"], &[]);
     assert!(out.starts_with("extension RustBridge.MessageRef {"), "{out}");
     assert!(out.contains("public func contentValue() throws -> Content? {"), "{out}");
     assert!(
-        out.contains(
-            "try contentJson().map { try JSONDecoder().decode(Content.self, from: Data($0.toString().utf8)) }"
-        ),
+        out.contains("try JSONDecoder().decode(Content?.self, from: Data(__alef_json_content().toString().utf8))"),
         "{out}"
     );
     assert!(
@@ -73,35 +81,32 @@ fn each_text_field_gets_an_accessor_that_decodes_its_json_getter() {
         "{out}"
     );
     assert!(
-        out.contains("try JSONDecoder().decode(Content.self, from: Data(summaryTextJson().toString().utf8))"),
+        out.contains("try JSONDecoder().decode(Content.self, from: Data(__alef_json_summary_text().toString().utf8))"),
         "{out}"
     );
-    assert!(
-        !out.contains("labelValue"),
-        "a field outside the text types gets no accessor:\n{out}"
-    );
+    assert!(!out.contains("labelValue"), "{out}");
 }
 
 #[test]
-fn no_accessor_is_emitted_without_configured_text_types() {
+fn unconfigured_text_types_do_not_add_accessors() {
     assert_eq!(emitted(&reply_api(), &[], &[]), "");
 }
 
 #[test]
-fn an_excluded_field_gets_no_accessor_because_the_bridge_has_no_getter_for_it() {
+fn excluded_field_has_no_accessor() {
     let out = emitted(&reply_api(), &["Content"], &["Message.content"]);
     assert!(!out.contains("contentValue"), "{out}");
     assert!(out.contains("summaryTextValue"), "{out}");
 }
 
 #[test]
-fn a_type_without_a_text_field_gets_no_extension() {
+fn unrelated_fields_do_not_add_an_extension() {
     let mut api = reply_api();
     api.types[0].fields.retain(|field| field.name == "label");
     assert_eq!(emitted(&api, &["Content"], &[]), "");
 }
 
-fn api_with_extra_field(name: &str) -> ApiSurface {
+fn extra_field(name: &str) -> ApiSurface {
     let mut api = reply_api();
     api.types[0].fields.push(FieldDef {
         name: name.into(),
@@ -112,30 +117,83 @@ fn api_with_extra_field(name: &str) -> ApiSurface {
 }
 
 #[test]
-fn a_field_named_like_the_json_getter_fails_generation() {
+fn former_public_json_suffix_is_not_the_internal_companion() {
     for name in ["content_json", "contentJson"] {
-        let error = try_emit(&api_with_extra_field(name), &["Content"], &[]).expect_err(name);
-        assert!(error.to_string().contains("`content_json`"), "{error}");
+        assert!(render(&extra_field(name), &["Content"], &[], &HashMap::new()).is_ok());
     }
 }
 
 #[test]
-fn a_field_named_like_the_accessor_fails_generation() {
+fn actual_bridge_getter_collision_is_rejected() {
     for name in ["content_value", "contentValue"] {
-        let error = try_emit(&api_with_extra_field(name), &["Content"], &[]).expect_err(name);
-        assert!(error.to_string().contains("`contentValue()`"), "{error}");
+        let error = render(&extra_field(name), &["Content"], &[], &HashMap::new()).unwrap_err();
+        assert!(error.to_string().contains("contentValue()"), "{error}");
     }
 }
 
 #[test]
-fn a_colliding_field_that_the_bridge_excludes_does_not_fail_generation() {
-    let api = api_with_extra_field("content_json");
-    let out = try_emit(&api, &["Content"], &["Message.content_json"]).expect("excluded field has no getter");
-    assert!(out.contains("contentValue"), "{out}");
+fn excluded_bridge_getter_does_not_collide() {
+    let out = emitted(&extra_field("content_value"), &["Content"], &["Message.content_value"]);
+    assert!(out.contains("contentValue()"), "{out}");
 }
 
 #[test]
-fn a_similar_name_that_is_not_a_collision_is_accepted() {
-    let out = try_emit(&api_with_extra_field("content_values"), &["Content"], &[]).expect("no collision");
-    assert!(out.contains("contentValue"), "{out}");
+fn similarly_named_getter_does_not_collide() {
+    assert!(emitted(&extra_field("content_values"), &["Content"], &[]).contains("contentValue()"));
+}
+
+#[test]
+fn serde_capability_controls_public_typed_accessor() {
+    for parent in [false, true] {
+        for enumeration in [false, true] {
+            for skipped in [false, true] {
+                let mut api = reply_api();
+                api.types[0].has_serde = parent;
+                api.enums[0].has_serde = enumeration;
+                api.types[0].fields[0].serde_skip = skipped;
+                assert_eq!(
+                    emitted(&api, &["Content"], &[]).contains("func contentValue()"),
+                    parent && enumeration && !skipped
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn global_method_shim_does_not_share_bridge_getter_scope() {
+    let mut api = reply_api();
+    api.types[0].methods.push(crate::core::ir::MethodDef {
+        name: "content_value".into(),
+        ..Default::default()
+    });
+    assert!(emitted(&api, &["Content"], &[]).contains("contentValue()"));
+}
+
+#[test]
+fn dto_property_rename_does_not_share_bridge_getter_scope() {
+    let renames = HashMap::from([("Message.other".into(), "content_value".into())]);
+    let out = render(&extra_field("other"), &["Content"], &[], &renames).unwrap();
+    assert!(out.contains("contentValue()"), "{out}");
+}
+
+#[test]
+fn own_accessor_rename_uses_canonical_public_policy() {
+    for (rename, expected) in [
+        ("body_payload", "bodyPayloadValue"),
+        ("URL", "urlValue"),
+        ("class", "classValue"),
+    ] {
+        let renames = HashMap::from([("Message.content".into(), rename.into())]);
+        let out = render(&reply_api(), &["Content"], &[], &renames).unwrap();
+        assert!(out.contains(&format!("func {expected}()")), "{rename}: {out}");
+        assert!(out.contains("__alef_json_content()"), "{out}");
+    }
+}
+
+#[test]
+fn configured_dto_rename_does_not_hide_actual_raw_getter_collision() {
+    let renames = HashMap::from([("Message.content_value".into(), "other".into())]);
+    let error = render(&extra_field("content_value"), &["Content"], &[], &renames).unwrap_err();
+    assert!(error.to_string().contains("contentValue"), "{error}");
 }

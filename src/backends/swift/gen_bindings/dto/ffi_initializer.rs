@@ -2,7 +2,7 @@ use super::*;
 use crate::core::config::ResolvedCrateConfig;
 use std::collections::HashMap;
 
-pub(crate) type TextVariants = HashMap<String, (String, String)>;
+pub(crate) type TextVariants = HashMap<String, (String, String, bool)>;
 
 pub(crate) fn text_variants(api: &ApiSurface, configured: &[String]) -> anyhow::Result<TextVariants> {
     api.enums
@@ -21,6 +21,7 @@ pub(crate) fn text_variants(api: &ApiSurface, configured: &[String]) -> anyhow::
                 (
                     super::super::enums::swift_variant_case(&variant.name),
                     super::super::enums::swift_associated_label(&variant.fields[0].name, 0),
+                    definition.has_serde,
                 ),
             ))
         })
@@ -40,7 +41,7 @@ pub(crate) fn error_type_name(api: &ApiSurface, config: &ResolvedCrateConfig, mo
     }
 }
 
-fn projected_read_expression(field: &FieldDef, variants: &TextVariants) -> Option<String> {
+fn projected_read_expression(field: &FieldDef, accessor: &str, variants: &TextVariants) -> Option<String> {
     let configured = variants.keys().map(String::as_str).collect();
     crate::backends::swift::gen_rust_crate::type_bridge::text_projected_getter_type(field, &configured)?;
     let named = match &field.ty {
@@ -48,9 +49,16 @@ fn projected_read_expression(field: &FieldDef, variants: &TextVariants) -> Optio
         other => other,
     };
     let TypeRef::Named(name) = named else { return None };
-    variants.get(name)?;
-    let names = crate::backends::swift::gen_rust_crate::type_bridge::text_projected_value_names(&field.name);
-    Some(format!("try rb.{}()", names.accessor))
+    let (variant, label, _) = variants.get(name)?;
+    Some(
+        crate::backends::swift::template_env::render(
+            "swift_text_projected_read.swift.jinja",
+            crate::alef_context! { name => name, variant => variant, label => label, accessor => accessor,
+            optional => field.optional || matches!(field.ty, TypeRef::Optional(_)) },
+        )
+        .trim_end()
+        .to_string(),
+    )
 }
 
 pub(super) fn assignments(context: Initializer<'_>) -> String {
@@ -97,7 +105,7 @@ impl Initializer<'_> {
         if is_vec_of_serde_struct(&field.ty, self.serde_struct_names) {
             return self.serde_vector(field, &accessor, optional);
         }
-        if let Some(expression) = projected_read_expression(field, self.text_variants) {
+        if let Some(expression) = self.projected_text(field, &accessor) {
             return expression;
         }
         if is_untagged_enum_type(&field.ty, self.untagged_enum_names) {
@@ -127,6 +135,27 @@ impl Initializer<'_> {
             self.untagged_enum_names,
             self.error_type_name,
         )
+    }
+
+    fn projected_text(&self, field: &FieldDef, accessor: &str) -> Option<String> {
+        let fallback = projected_read_expression(field, accessor, self.text_variants)?;
+        let named = match &field.ty {
+            TypeRef::Optional(inner) => inner.as_ref(),
+            other => other,
+        };
+        if self.ty.has_serde
+            && !field.serde_skip
+            && let TypeRef::Named(name) = named
+            && self.text_variants.get(name).is_some_and(|(_, _, serde)| *serde)
+        {
+            let getter = crate::backends::swift::gen_rust_crate::text_projection::json_getter_name(&field.name);
+            return Some(json_read(
+                &getter,
+                &optional_type(self.mapper.map_type(&field.ty), field),
+                false,
+            ));
+        }
+        Some(fallback)
     }
 
     fn serde_vector(&self, field: &FieldDef, accessor: &str, optional: bool) -> String {

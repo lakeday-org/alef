@@ -1,0 +1,43 @@
+        do {
+{% for line in setup %}
+            {{ line }}
+{% endfor %}
+            let payload: Any = try JSONSerialization.jsonObject(with: {{ source }}, options: [.fragmentsAllowed])
+            let value: Any? = {{ expression }}
+{% if predicate.kind == "count_equals" %}
+            XCTAssertEqual(try XCTUnwrap(value as? [Any]).count, {{ predicate.expected }})
+{% elif predicate.kind == "count_min" %}
+            XCTAssertGreaterThanOrEqual(try XCTUnwrap(value as? [Any]).count, {{ predicate.expected }})
+{% elif predicate.kind == "not_empty" or predicate.kind == "is_empty" %}
+            let size: Int
+            if let array = value as? [Any] { size = array.count }
+            else { size = try XCTUnwrap(value as? String).count }
+{% if predicate.kind == "not_empty" %}
+            XCTAssertGreaterThan(size, 0)
+{% else %}
+            XCTAssertEqual(size, 0)
+{% endif %}
+{% elif predicate.kind == "contains" %}
+            XCTAssertTrue(try XCTUnwrap(value as? String).contains({{ predicate.expected }}))
+{% elif predicate.kind == "contains_all" %}
+            let items = try XCTUnwrap(value as? [Any])
+            let expected: [String] = [{{ predicate.values | join(", ") }}]
+            XCTAssertTrue(expected.allSatisfy { expected in items.contains { ($0 as? String) == expected } })
+{% elif predicate.kind == "min_length" %}
+            XCTAssertGreaterThanOrEqual(try XCTUnwrap(value as? String).count, {{ predicate.expected }})
+{% elif predicate.value_type == "NSNumber" %}
+{% include "swift/exact_numeric_comparison.jinja" %}
+{% if predicate.kind == "greater_than" %}
+            XCTAssertEqual(comparison, .orderedDescending)
+{% elif predicate.kind == "greater_than_or_equal" %}
+            XCTAssertNotEqual(comparison, .orderedAscending)
+{% else %}
+            XCTAssertEqual(comparison, .orderedSame)
+{% endif %}
+{% elif predicate.value_type == "Bool" %}
+            let actual = try JSONSerialization.data(withJSONObject: try XCTUnwrap(value), options: [.fragmentsAllowed])
+            XCTAssertEqual(String(decoding: actual, as: UTF8.self), "{{ predicate.expected }}")
+{% else %}
+            XCTAssertEqual(try XCTUnwrap(value as? {{ predicate.value_type }}), {{ predicate.expected }})
+{% endif %}
+        }

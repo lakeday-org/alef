@@ -65,6 +65,7 @@ pub struct FieldResolver {
     /// types (property access) into opaque typealias types (method-call access)
     /// pick the correct syntax at each segment.
     pub(super) swift_first_class_map: SwiftFirstClassMap,
+    pub(super) swift_lossless_text_fields: HashMap<String, HashSet<String>>,
     /// Per-type Dart stringy field classification, populated by the Dart e2e
     /// codegen. Used to aggregate every readable text accessor on a `Vec<T>`
     /// element type for `contains` assertions.

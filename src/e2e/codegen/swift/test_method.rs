@@ -89,7 +89,7 @@ pub(super) fn render_test_method(
     // this fixture's assertion paths via the IR's real per-type walk instead, matching
     // `presentation.rs`'s existing `with_anchored_optional_paths` use. ~keep
     .with_anchored_optional_paths(fixture.assertions.iter().filter_map(|a| a.field.as_deref()));
-    let field_resolver = &call_field_resolver;
+    let field_resolver = &super::text_projection::resolver(call_field_resolver, type_defs, enums, config);
     let function_name = call_overrides
         .and_then(|o| o.function.as_ref())
         .cloned()

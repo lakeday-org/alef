@@ -267,7 +267,10 @@ pub struct RawCrateConfig {
     ///
     /// The Swift binding also gives each such field a public accessor named `<field>Value()` on
     /// the bridge type. It returns the whole union as a Swift value, so the parts of a list stay
-    /// readable. The type must implement `Serialize`.
+    /// readable when both the containing struct and enum have extracted `Serialize` and
+    /// `Deserialize` support and the field is not serde-skipped. The ordinary getter keeps its
+    /// `Display` text behavior for every configured type, including Display-only types; no
+    /// serialization requirement is added when a lossless typed accessor is unavailable. ~keep
     ///
     /// The list is matched against the Rust type name exactly (e.g. `"RichTextContent"`).
     /// When the list is empty (the default) no text accessor is emitted and the generated

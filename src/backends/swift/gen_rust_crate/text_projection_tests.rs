@@ -67,25 +67,24 @@ fn reply_extern_block(optional: bool, configured: &HashSet<&str>) -> String {
         &HashSet::new(),
         crate::backends::swift::gen_rust_crate::default_construction::EnumKinds::new(&all, &unit),
         configured,
+        configured,
         &HashSet::new(),
     )
 }
 
 #[test]
-fn json_getter_is_declared_beside_the_text_getter_with_the_same_optionality() {
+fn json_getter_retains_optional_null_in_a_lossless_string() {
     let configured = HashSet::from(["BodyValue"]);
     let optional = reply_extern_block(true, &configured);
     assert!(optional.contains("fn content(&self) -> Option<String>;"), "{optional}");
     assert!(
-        optional.contains(
-            "#[swift_bridge(swift_name = \"contentJson\")]\n        fn content_json(&self) -> Option<String>;"
-        ),
+        optional.contains("fn __alef_json_content(&self) -> Result<String, AlefBridgeError>;"),
         "{optional}"
     );
     let required = reply_extern_block(false, &configured);
     assert!(required.contains("fn content(&self) -> String;"), "{required}");
     assert!(
-        required.contains("#[swift_bridge(swift_name = \"contentJson\")]\n        fn content_json(&self) -> String;"),
+        required.contains("fn __alef_json_content(&self) -> Result<String, AlefBridgeError>;"),
         "{required}"
     );
 }

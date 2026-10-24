@@ -13,9 +13,12 @@ enum RustBridge {
         func required() -> NativeString { NativeString(value: value) }
         func nullable() -> NativeString? { absent ? nil : NativeString(value: value) }
         func legacy() -> NativeString? { absent ? nil : NativeString(value: value) }
-        func requiredValue() throws -> BodyValue { .plainValue(field0: value) }
-        func nullableValue() throws -> BodyValue? { absent ? nil : .plainValue(field0: value) }
-        func legacyValue() throws -> BodyValue? { absent ? nil : .plainValue(field0: value) }
+        private func json(_ value: String?) -> NativeString {
+            NativeString(value: String(data: try! JSONEncoder().encode(value), encoding: .utf8)!)
+        }
+        func __alef_json_required() -> NativeString { json(value) }
+        func __alef_json_nullable() -> NativeString { json(absent ? nil : value) }
+        func __alef_json_legacy() -> NativeString { json(absent ? nil : value) }
     }
     struct StructuralPacketRef {
         let value: String

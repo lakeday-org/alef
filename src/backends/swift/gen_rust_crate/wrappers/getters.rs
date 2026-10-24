@@ -9,7 +9,7 @@
 
 use crate::backends::swift::gen_rust_crate::type_bridge::{
     bridge_type_enum_aware_ref, field_needs_json_bridge, is_enum_named, is_vec_of_enum, needs_json_bridge,
-    text_projected_getter_type, text_projected_value_names,
+    text_projected_getter_type,
 };
 use crate::codegen::conversions::helpers::{apply_explicit_field_newtype_from_core, is_explicit_newtype};
 use crate::core::ir::{CoreWrapper, FieldDef, TypeDef, TypeRef};
@@ -95,6 +95,7 @@ pub(super) fn emit_getters(
     exclude_fields: &HashSet<String>,
     configured_features: &std::collections::HashSet<&str>,
     text_types: &HashSet<&str>,
+    serde_text_types: &HashSet<&str>,
     out: &mut String,
 ) {
     let parent_first_class = first_class_names.contains(ty.name.as_str());
@@ -140,7 +141,14 @@ pub(super) fn emit_getters(
             bridge_ty_owned,
         };
         if text_projected_getter_type(field, text_types).is_some() {
-            emit_text_type_getter(field, &ctx, out);
+            super::super::text_projection::emit_getters(
+                field,
+                &ctx.getter_name,
+                &ctx.name,
+                &ctx.bridge_ty_owned,
+                ty.has_serde && !field.serde_skip && text_projected_getter_type(field, serde_text_types).is_some(),
+                out,
+            );
         } else if field.newtype_wrapper.as_deref().is_some_and(is_explicit_newtype) {
             let core_expr = format!("self.0.{}.clone()", ctx.name);
             let converted = apply_explicit_field_newtype_from_core(&core_expr, field)
@@ -225,30 +233,6 @@ fn emit_remaining_getter(ty: &TypeDef, field: &crate::core::ir::FieldDef, ctx: &
             return_type => &ctx.bridge_ty_owned,
             name => &ctx.name,
         },
-    ));
-}
-
-/// Emit the getter for a field whose enum is listed in `untagged_union_text_types`.
-///
-/// The value converts through the core type's `Display` impl, the same conversion the WASM
-/// backend uses for these fields. A `Text` value gives its string without JSON quotes, and a
-/// list of parts gives the joined text of its text parts.
-///
-/// A second getter returns the whole value as JSON, because the text of a list of parts does not
-/// hold the parts. The Swift facade decodes it into the union type. A value that fails to
-/// serialise gives the JSON text `null`, which the Swift decode rejects, so the failure reaches the
-/// caller as a thrown error and never as a panic across the bridge.
-fn emit_text_type_getter(field: &FieldDef, ctx: &GetterCtx, out: &mut String) {
-    let optional = field.optional || matches!(field.ty, TypeRef::Optional(_));
-    out.push_str(&crate::backends::swift::template_env::render(
-        "getter_display_text.rs.jinja",
-        crate::alef_context! { getter_name => &ctx.getter_name, return_type => &ctx.bridge_ty_owned,
-        name => &ctx.name, optional => optional },
-    ));
-    out.push_str(&crate::backends::swift::template_env::render(
-        "getter_display_text_json.rs.jinja",
-        crate::alef_context! { json_name => text_projected_value_names(&ctx.name).json_getter,
-        return_type => &ctx.bridge_ty_owned, name => &ctx.name, optional => optional },
     ));
 }
 
@@ -765,6 +749,7 @@ mod tests {
             &HashSet::new(),
             &HashSet::new(),
             &HashSet::new(),
+            &HashSet::new(),
             &mut out,
         );
 
@@ -795,6 +780,7 @@ mod tests {
             &HashSet::new(),
             &HashSet::new(),
             &HashSet::new(),
+            &HashSet::new(),
             &mut out,
         );
 
@@ -812,12 +798,12 @@ mod tests {
     fn emit_message_getters(optional: bool, text_types: &HashSet<&str>) -> String {
         let field = FieldDef {
             name: "content".to_string(),
-            ty: TypeRef::Named("AssistantContent".to_string()),
+            ty: TypeRef::Named("BodyValue".to_string()),
             optional,
             ..Default::default()
         };
-        let ty = serde_struct("AssistantMessage", vec![field]);
-        let enum_names: HashSet<&str> = ["AssistantContent"].into_iter().collect();
+        let ty = serde_struct("Message", vec![field]);
+        let enum_names: HashSet<&str> = ["BodyValue"].into_iter().collect();
         let mut out = String::new();
         emit_getters(
             &ty,
@@ -829,6 +815,7 @@ mod tests {
             &HashSet::new(),
             &HashSet::new(),
             text_types,
+            text_types,
             &mut out,
         );
         out
@@ -839,7 +826,7 @@ mod tests {
     /// parts came back as the JSON array.
     #[test]
     fn should_return_plain_text_for_an_optional_text_type_field() {
-        let text_types: HashSet<&str> = ["AssistantContent"].into_iter().collect();
+        let text_types: HashSet<&str> = ["BodyValue"].into_iter().collect();
         let out = emit_message_getters(true, &text_types);
 
         assert!(
@@ -856,7 +843,7 @@ mod tests {
 
     #[test]
     fn should_return_plain_text_for_a_required_text_type_field() {
-        let text_types: HashSet<&str> = ["AssistantContent"].into_iter().collect();
+        let text_types: HashSet<&str> = ["BodyValue"].into_iter().collect();
         let out = emit_message_getters(false, &text_types);
 
         assert!(
@@ -873,12 +860,12 @@ mod tests {
     /// JSON for the Swift side to decode into the union type.
     #[test]
     fn should_return_the_whole_value_as_json_beside_the_text_of_an_optional_text_type_field() {
-        let text_types: HashSet<&str> = ["AssistantContent"].into_iter().collect();
+        let text_types: HashSet<&str> = ["BodyValue"].into_iter().collect();
         let out = emit_message_getters(true, &text_types);
 
         assert!(
             out.contains(
-                "pub fn content_json(&self) -> Option<String> {\n        self.0.content.as_ref().map(|v| serde_json::to_string(v).unwrap_or_else(|_| \"null\".to_string()))"
+                "pub fn __alef_json_content(&self) -> Result<String, AlefBridgeError> {\n        serde_json::to_string(&self.0.content)"
             ),
             "an optional text-type field needs a JSON getter beside the text getter:\n{out}"
         );
@@ -886,12 +873,12 @@ mod tests {
 
     #[test]
     fn should_return_the_whole_value_as_json_beside_the_text_of_a_required_text_type_field() {
-        let text_types: HashSet<&str> = ["AssistantContent"].into_iter().collect();
+        let text_types: HashSet<&str> = ["BodyValue"].into_iter().collect();
         let out = emit_message_getters(false, &text_types);
 
         assert!(
             out.contains(
-                "pub fn content_json(&self) -> String {\n        serde_json::to_string(&self.0.content).unwrap_or_else(|_| \"null\".to_string())"
+                "pub fn __alef_json_content(&self) -> Result<String, AlefBridgeError> {\n        serde_json::to_string(&self.0.content)"
             ),
             "a required text-type field needs a JSON getter beside the text getter:\n{out}"
         );

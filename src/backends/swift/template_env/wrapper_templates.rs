@@ -1,11 +1,11 @@
 pub(super) static TEMPLATES: &[(&str, &str)] = &[
     (
-        "getter_display_text.rs.jinja",
-        include_str!("../templates/getter_display_text.rs.jinja"),
+        "getter_lossless_json.rs.jinja",
+        include_str!("../templates/getter_lossless_json.rs.jinja"),
     ),
     (
-        "getter_display_text_json.rs.jinja",
-        include_str!("../templates/getter_display_text_json.rs.jinja"),
+        "getter_display_text.rs.jinja",
+        include_str!("../templates/getter_display_text.rs.jinja"),
     ),
     (
         "struct_newtype.jinja",

@@ -5,6 +5,7 @@
 //! - `src/lib.rs` — `#[swift_bridge::bridge] mod ffi { … }` plus wrapper newtypes and shims
 //! - `build.rs` — calls `swift_bridge_build::parse_bridges` to run codegen at build time
 
+mod artifacts;
 pub(crate) mod bridge_error;
 #[cfg(test)]
 mod bridge_error_skipped_fields_tests;
@@ -31,6 +32,7 @@ pub(crate) mod service_app_wrappers;
 pub(crate) mod shims;
 #[cfg(test)]
 mod tagged_enum_wiring_tests;
+pub(crate) mod text_projection;
 pub mod trait_bridge;
 pub(crate) mod type_bridge;
 pub(crate) mod wrappers;
@@ -45,214 +47,7 @@ use crate::core::template_versions;
 use heck::AsSnakeCase;
 use std::collections::HashSet;
 
-/// Top-level entry point: emit all three files for the swift-bridge crate.
-pub fn emit(api: &ApiSurface, config: &ResolvedCrateConfig) -> anyhow::Result<Vec<GeneratedFile>> {
-    // mirror declares each function in a `#[cfg(...)] extern "Rust"` block; two same-named entries
-    let deduped_api = api.with_deduped_functions();
-    let api = &deduped_api;
-
-    // `rust/` is a sibling of `Sources/` under the SwiftPM package root -- the same root
-    // `generate_bindings`/`generate_service_api` derive via `swift_package_root` for the shared
-    // `Sources/RustBridge{,C}` targets, and the same root `build_config_with_config` points
-    // `cargo build --manifest-path` at. Deriving it independently here (as a hardcoded
-    // `packages/swift/rust` literal, as this used to) let this crate's actual on-disk location
-    // drift away from both of those -- a multi-crate workspace or an explicit
-    // `[crates.output] swift` override moves the package root, and only this call site's own
-    // literal used to stay behind. ~keep
-    let base_dir = resolve_output_dir(config.output_paths.get("swift"), &config.name, "packages/swift");
-    let package_root = swift_package_root(&base_dir, config.explicit_output.swift.is_some());
-    let base = package_root.join("rust");
-    let crate_name = &api.crate_name;
-    let version = &api.version;
-
-    let swift_bridge_ver = crate::backends::swift::naming::swift_bridge_version(config);
-    let swift_bridge_build_ver = template_versions::cargo::SWIFT_BRIDGE_BUILD;
-    let core_crate_dir = config.core_crate_for_language(Language::Swift);
-    let swift_override = config.swift.as_ref().and_then(|c| c.core_crate_override.as_deref());
-    let same_as_workspace =
-        swift_override.is_none() && core_crate_dir == *crate_name && config.workspace_root.is_none();
-    let core_path = if same_as_workspace {
-        "../../..".to_string()
-    } else {
-        format!("../../../crates/{core_crate_dir}")
-    };
-    let core_dep_key: String = match swift_override {
-        Some(name) => name.to_string(),
-        None => crate_name.replace('-', "_"),
-    };
-
-    let features_owned = feature_gate::configured_swift_features(config, &core_crate_dir, api);
-    let features: &[String] = &features_owned;
-    let mut exclude_functions: HashSet<String> = config
-        .swift
-        .as_ref()
-        .map(|c| c.exclude_functions.iter().cloned().collect())
-        .unwrap_or_default();
-    let mut exclude_types: HashSet<String> = config
-        .swift
-        .as_ref()
-        .map(|c| c.exclude_types.iter().cloned().collect())
-        .unwrap_or_default();
-    if let Some(ffi) = &config.ffi {
-        exclude_functions.extend(ffi.exclude_functions.iter().cloned());
-        exclude_types.extend(ffi.exclude_types.iter().cloned());
-    }
-    exclude_types.extend(api.types.iter().filter(|t| t.binding_excluded).map(|t| t.name.clone()));
-    exclude_types.extend(api.enums.iter().filter(|e| e.binding_excluded).map(|e| e.name.clone()));
-    for contract in &api.handler_contracts {
-        if let Some(adapter) = contract.response_adapter.as_deref()
-            && let Some(short) = adapter.rsplit("::").next()
-        {
-            exclude_functions.insert(short.to_string());
-        }
-    }
-    let exclude_fields: HashSet<String> = config
-        .swift
-        .as_ref()
-        .map(|c| c.exclude_fields.iter().cloned().collect())
-        .unwrap_or_default();
-    let configured_features: HashSet<&str> = features.iter().map(String::as_str).collect();
-    for typ in api.types.iter().filter(|typ| !exclude_types.contains(&typ.name)) {
-        extern_block::validate_legacy_constructor_fields(typ, &exclude_fields, &configured_features)?;
-    }
-    let license = config
-        .scaffold
-        .as_ref()
-        .and_then(|s| s.license.as_deref())
-        .unwrap_or("MIT");
-    let has_streaming_adapters = config
-        .adapters
-        .iter()
-        .any(|a| matches!(a.pattern, crate::core::config::AdapterPattern::Streaming));
-    let mut extra_deps = crate::scaffold::render_extra_deps(config, Language::Swift);
-    if !config.components.is_empty() {
-        append_component_dependencies(&mut extra_deps);
-    }
-    let target_overrides = config
-        .swift
-        .as_ref()
-        .map(|c| c.target_dep_overrides.as_slice())
-        .unwrap_or(&[]);
-    let excluded_default_features = config
-        .swift
-        .as_ref()
-        .map(|c| c.excluded_default_features.as_slice())
-        .unwrap_or(&[]);
-    let ffi_dep_key = config.ffi_crate_package_name();
-    let ffi_dep_path = config.ffi_crate_path_from_swift_rust();
-    let ffi_features = config.swift.as_ref().map(|c| c.ffi_features.as_slice()).unwrap_or(&[]);
-    let ffi_target_overrides = config
-        .swift
-        .as_ref()
-        .map(|c| c.ffi_target_dep_overrides.as_slice())
-        .unwrap_or(&[]);
-    let mut package_file_filters = crate::scaffold::render_cargo_package_file_filters(
-        config
-            .package_metadata
-            .as_ref()
-            .and_then(|metadata| metadata.cargo.as_ref()),
-    );
-    let authors = crate::scaffold::scaffold_meta(config).authors;
-    if !authors.is_empty() {
-        let table = toml::Table::from_iter([(
-            "authors".to_string(),
-            toml::Value::Array(authors.into_iter().map(toml::Value::String).collect()),
-        )]);
-        let authors = toml::to_string(&table).expect("author metadata serializes to TOML");
-        package_file_filters = format!("{}{package_file_filters}", authors);
-    }
-    let cargo_toml = cargo::emit_cargo_toml(
-        crate_name,
-        &core_dep_key,
-        &core_crate_dir,
-        version,
-        &swift_bridge_ver,
-        swift_bridge_build_ver,
-        &core_path,
-        features,
-        &extra_deps,
-        license,
-        has_streaming_adapters,
-        target_overrides,
-        api,
-        excluded_default_features,
-        &ffi_dep_key,
-        &ffi_dep_path,
-        ffi_features,
-        ffi_target_overrides,
-        &package_file_filters,
-        &config.cargo_lints,
-    );
-    let effective_features = feature_gate::effective_swift_codegen_features(api, config, &core_crate_dir);
-    let configured_features: HashSet<&str> = effective_features.iter().map(String::as_str).collect();
-    // The feature set is derived from the *unfiltered* surface above (`collect_cfg_features` reads
-    // every gate the surface mentions), so the method filter has to come after it — filtering
-    // first would shrink the very set it is filtered against. The Swift facade applies this same
-    // helper to the same set, which is what keeps extern declarations and Swift call sites in
-    // agreement. ~keep
-    let method_filtered_api = feature_gate::with_cfg_filtered_methods(api, &configured_features);
-    let api = &method_filtered_api;
-    let (lib_rs, owned_vec_accessors) = emit_lib_rs(
-        api,
-        config,
-        crate_name,
-        &exclude_functions,
-        &exclude_types,
-        &exclude_fields,
-        &configured_features,
-    )?;
-    let build_rs = cargo::emit_build_rs();
-
-    let mut files = vec![
-        GeneratedFile {
-            path: base.join("Cargo.toml"),
-            content: cargo_toml,
-            generated_header: false,
-        },
-        GeneratedFile {
-            path: base.join("src/lib.rs"),
-            content: lib_rs,
-            generated_header: false,
-        },
-        GeneratedFile {
-            path: base.join("build.rs"),
-            content: build_rs,
-            generated_header: false,
-        },
-    ];
-    if let Some(callback_file) = callback_files::emit_callback_registration_file(api, &base) {
-        files.push(callback_file);
-    }
-    let rust_bridge_sources = package_root.join("Sources").join("RustBridge");
-    if let Some(accessors) = owned_vec::emit_swift_file(&owned_vec_accessors, &rust_bridge_sources) {
-        files.push(accessors);
-    }
-    Ok(files)
-}
-
-fn append_component_dependencies(extra_deps: &mut String) {
-    let alef_version = env!("CARGO_PKG_VERSION");
-    for (name, line) in [
-        ("alef-component-abi", format!("alef-component-abi = \"{alef_version}\"")),
-        (
-            "alef-component-runtime",
-            format!("alef-component-runtime = \"{alef_version}\""),
-        ),
-        ("directories", "directories = \"6\"".to_string()),
-    ] {
-        let configured = extra_deps
-            .lines()
-            .filter_map(|line| line.split_once('=').map(|(key, _)| key.trim()))
-            .any(|key| key == name);
-        if configured {
-            continue;
-        }
-        if !extra_deps.is_empty() && !extra_deps.ends_with('\n') {
-            extra_deps.push('\n');
-        }
-        extra_deps.push_str(&line);
-    }
-}
+pub use artifacts::emit;
 
 fn emit_lib_rs(
     api: &ApiSurface,
@@ -477,6 +272,7 @@ fn emit_lib_rs(
             &first_class_names,
             enum_kinds,
             &config.untagged_union_text_types.iter().map(String::as_str).collect(),
+            &text_projection::serde_text_types(api, &config.untagged_union_text_types),
             configured_features,
         );
         extern_blocks.push(format!("{cfg_open}{raw_block}"));
@@ -787,6 +583,7 @@ fn emit_lib_rs(
             exclude_fields,
             configured_features,
             &text_types,
+            &text_projection::serde_text_types(api, &config.untagged_union_text_types),
         ));
         out.push('\n');
         if ty.is_opaque && !ty.methods.iter().all(|m| m.sanitized) && !ty.methods.is_empty() {
@@ -974,16 +771,4 @@ fn emit_lib_rs(
 }
 
 #[cfg(test)]
-mod component_dependency_tests {
-    use super::append_component_dependencies;
-
-    #[test]
-    fn configured_component_dependencies_are_not_duplicated() {
-        let mut dependencies = "alef-component-runtime = { path = \"../../runtime\" }\ndirectories = \"5\"".to_string();
-        append_component_dependencies(&mut dependencies);
-
-        assert_eq!(dependencies.matches("alef-component-runtime =").count(), 1);
-        assert_eq!(dependencies.matches("directories =").count(), 1);
-        assert_eq!(dependencies.matches("alef-component-abi =").count(), 1);
-    }
-}
+mod structured_text_tests;

@@ -9,6 +9,15 @@
 use super::super::super::types::{FieldResolver, SwiftFirstClassMap};
 
 impl FieldResolver {
+    pub(crate) fn swift_lossless_text_leaf_is_opaque(&self, field: &str) -> Option<bool> {
+        self.swift_leaf_fact(field, |_, owner, leaf, opaque| {
+            self.swift_lossless_text_fields
+                .get(owner)?
+                .contains(leaf)
+                .then_some(opaque)
+        })
+    }
+
     /// True when the leaf segment of `field` is a JSON-bridged Swift leaf on any IR type — the
     /// binding generator collapsed it to a single `RustString` holding the whole field
     /// JSON-encoded, per `SwiftFirstClassMap::json_bridged_field_names`.

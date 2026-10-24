@@ -318,6 +318,7 @@ pub(crate) fn emit_extern_block_for_type(
     first_class_names: &HashSet<&str>,
     enum_kinds: EnumKinds<'_, '_>,
     text_types: &HashSet<&str>,
+    serde_text_types: &HashSet<&str>,
     configured_features: &std::collections::HashSet<&str>,
 ) -> String {
     let parent_first_class = first_class_names.contains(ty.name.as_str());
@@ -392,6 +393,9 @@ pub(crate) fn emit_extern_block_for_type(
         ) {
             continue;
         }
+        if ty.has_serde && !field.serde_skip {
+            super::text_projection::emit_extern(field, serde_text_types, &mut block);
+        }
         let bridge_ty = getter_bridge_type(field, enum_kinds, no_serde_names, parent_first_class, text_types);
         let name = swift_ident(&field.name.to_snake_case());
         let swift_name = if owned_vec::owned_vec_element(&bridge_ty).is_some() {
@@ -414,24 +418,6 @@ pub(crate) fn emit_extern_block_for_type(
                 return_type => &bridge_ty,
             },
         ));
-        // The text getter above drops the parts of a list variant, so the same field gets a
-        // second getter that returns the whole value as JSON. ~keep
-        if super::type_bridge::text_projected_getter_type(field, text_types).is_some() {
-            let names = super::type_bridge::text_projected_value_names(&field.name);
-            block.push_str(&crate::backends::swift::template_env::render(
-                "extern_swift_name_attr.jinja",
-                crate::alef_context! {
-                    swift_name => &names.json_getter_swift,
-                },
-            ));
-            block.push_str(&crate::backends::swift::template_env::render(
-                "extern_fn_getter.jinja",
-                crate::alef_context! {
-                    name => &names.json_getter,
-                    return_type => &bridge_ty,
-                },
-            ));
-        }
     }
 
     if type_needs_own_block_noop(ty) {

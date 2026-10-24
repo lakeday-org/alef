@@ -50,6 +50,18 @@ static TEMPLATES: &[(&str, &str)] = &[
         include_str!("templates/typescript/stream_counter.jinja"),
     ),
     (
+        "swift/structured_text_unavailable.jinja",
+        include_str!("templates/swift/structured_text_unavailable.jinja"),
+    ),
+    (
+        "swift/exact_numeric_comparison.jinja",
+        include_str!("templates/swift/exact_numeric_comparison.jinja"),
+    ),
+    (
+        "swift/structured_text_assertion.jinja",
+        include_str!("templates/swift/structured_text_assertion.jinja"),
+    ),
+    (
         "typescript/nested_collection_probe.jinja",
         include_str!("templates/typescript/nested_collection_probe.jinja"),
     ),

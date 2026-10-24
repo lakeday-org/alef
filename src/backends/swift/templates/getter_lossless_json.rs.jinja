@@ -1,0 +1,4 @@
+    pub fn {{ getter_name }}(&self) -> {{ return_type }} {
+        serde_json::to_string(&self.0.{{ name }})
+            .map_err(|error| alef_bridge_error(format!("serializing structured {{ name }}: {error}")))
+    }

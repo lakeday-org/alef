@@ -8,6 +8,8 @@
 #[cfg(test)]
 mod assertion_guard_tests;
 mod enum_fixtures;
+#[cfg(test)]
+mod full_dispatch_list_tests;
 mod gradle;
 #[cfg(test)]
 mod gradle_tests;

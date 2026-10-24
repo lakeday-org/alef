@@ -1,0 +1,94 @@
+use serde::{Deserialize, Serialize};
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Piece {
+    Text { text: String },
+    Image { url: String, active: bool, score: i64, labels: Vec<String>, empty: String },
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum BodyValue {
+    Text(String),
+    Count(u64),
+    Signed(i64),
+    Number(f64),
+    Boolean(bool),
+    Parts(#[serde(serialize_with = "serialize_parts")] Vec<Piece>),
+}
+fn serialize_parts<S: serde::Serializer>(parts: &[Piece], serializer: S) -> Result<S::Ok, S::Error> {
+    if std::env::var("ALEF_STRUCTURED_TEXT_CASE").as_deref() == Ok("serialize") {
+        return Err(serde::ser::Error::custom("parts unavailable"));
+    }
+    parts.serialize(serializer)
+}
+impl std::fmt::Display for BodyValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text(text) => f.write_str(text),
+            Self::Count(value) => write!(f, "{value}"),
+            Self::Signed(value) => write!(f, "{value}"),
+            Self::Number(value) => write!(f, "{value}"),
+            Self::Boolean(value) => write!(f, "{value}"),
+            Self::Parts(parts) => {
+                for part in parts {
+                    if let Piece::Text { text } = part { f.write_str(text)?; }
+                }
+                Ok(())
+            }
+        }
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message { pub content: Option<BodyValue> }
+pub fn sample_message() -> Message {
+    let case = std::env::var("ALEF_STRUCTURED_TEXT_CASE").unwrap_or_default();
+    if case == "absent" { return absent_message(); }
+    if case == "scalar" { return Message { content: Some(BodyValue::Text("hello world".into())) }; }
+    let first = if case == "first" { "wrong" } else { "hello" };
+    let second = if case == "second" { "wrong" } else { " world" };
+    let mut parts = vec![
+        Piece::Image {
+            url: "https://example.invalid/image".into(), active: case != "active",
+            score: if case == "score" { 0 } else { 7 },
+            labels: if case == "labels" { vec!["wrong".into()] } else { vec!["one".into(), "two".into()] },
+            empty: if case == "empty" { "wrong".into() } else { String::new() },
+        },
+        Piece::Text { text: first.into() },
+        Piece::Text { text: second.into() },
+    ];
+    if case == "count" { parts.pop(); }
+    Message { content: Some(BodyValue::Parts(parts)) }
+}
+pub fn absent_message() -> Message { Message { content: None } }
+#[derive(Clone, Debug)]
+pub enum DisplayValue { Text(String) }
+impl std::fmt::Display for DisplayValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self { Self::Text(text) => f.write_str(text) }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct DisplayMessage { pub content: DisplayValue }
+
+pub fn scalar_message() -> Message {
+    let wrong = std::env::var("ALEF_STRUCTURED_TEXT_CASE").as_deref() == Ok("scalar_text");
+    Message { content: Some(BodyValue::Text(if wrong { "wrong" } else { "hello" }.into())) }
+}
+pub fn unsigned_message() -> Message {
+    let wrong = std::env::var("ALEF_STRUCTURED_TEXT_CASE").as_deref() == Ok("unsigned");
+    Message { content: Some(BodyValue::Count(if wrong { u64::MAX - 1 } else { u64::MAX })) }
+}
+
+pub fn matrix_max() -> Message { Message { content: Some(BodyValue::Count(u64::MAX)) } }
+pub fn matrix_neighbor() -> Message { Message { content: Some(BodyValue::Count(u64::MAX-1)) } }
+pub fn matrix_min() -> Message { Message { content: Some(BodyValue::Signed(i64::MIN)) } }
+pub fn matrix_negative() -> Message { Message { content: Some(BodyValue::Signed(-1)) } }
+pub fn matrix_fraction() -> Message { Message { content: Some(BodyValue::Number(7.5)) } }
+pub fn matrix_whole() -> Message { Message { content: Some(BodyValue::Number(7.0)) } }
+pub fn matrix_negative_fraction() -> Message { Message { content: Some(BodyValue::Number(-7.5)) } }
+pub fn matrix_quarter() -> Message { Message { content: Some(BodyValue::Number(0.25)) } }
+pub fn matrix_truth() -> Message { Message { content: Some(BodyValue::Boolean(true)) } }
+pub fn matrix_one() -> Message { Message { content: Some(BodyValue::Count(1)) } }
+pub fn matrix_two() -> Message { Message { content: Some(BodyValue::Count(2)) } }
+pub fn matrix_text() -> Message { Message { content: Some(BodyValue::Text("7".into())) } }
+pub fn matrix_huge() -> Message { Message { content: Some(BodyValue::Number(1e300)) } }

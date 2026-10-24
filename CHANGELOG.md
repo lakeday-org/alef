@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Execute scalar Swift text-enum variant assertions and compare finite JSON numeric and Boolean expectations without coercion, signed wrapping, truncation or floating-point rounding (#691).
+- Preserve structured Swift text-enum values through public `<field>Value()` accessors, DTO reconstruction and generated assertions, while keeping plain-text getters and propagating serialization errors with context (#691).
+- Verify Android structured-list assertions against the complete generated JNI producer and imported enum models (#688).
 - Preserve exact signed, unsigned, and fractional streaming usage comparisons in Go and WASM, preserve C integer width and sign, honor skipped C fields, and render usage probes through registered templates.
 - Resolve required and optional nested streaming usage fields from IR in Swift and Dart while preserving configured public names.
 - Render Java enum-list minimum-count and emptiness assertions against JSON, and fail unsupported union assertions explicitly instead of emitting missing variant accessors (#688).
 - Exercise nested Go and C enum-list assertions through full call generation and support Java root enum-list results without growing oversized generator modules (#688).
 - Exclude Rust-only skipped errors from generated Ruby error matchers while preserving visible typed errors, shared inheritance, and literal message assertions.
-- Expose the whole value of a Swift text-projected field through a public typed accessor named `<field>Value()`, so a reply made of parts stays readable. The first-class Swift struct property now holds the parts of such a reply, where it held only the text variant before, so code that switches on the variant can see the `parts` case at runtime. Generated Swift assertions read the accessor, and the text getter still returns the reply text (#691).
 
 ## [0.113.4] - 2026-10-23
 

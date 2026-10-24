@@ -92,6 +92,7 @@ impl FieldResolver {
             php_getter_map: PhpGetterMap::default(),
             variant_accessors: VariantAccessorMap::default(),
             swift_first_class_map: SwiftFirstClassMap::default(),
+            swift_lossless_text_fields: HashMap::new(),
             dart_first_class_map: DartFirstClassMap::default(),
             display_as_text_fields: HashSet::new(),
             ir_reachable_fields: HashSet::new(),
@@ -139,6 +140,7 @@ impl FieldResolver {
             php_getter_map: PhpGetterMap::default(),
             variant_accessors: VariantAccessorMap::default(),
             swift_first_class_map: SwiftFirstClassMap::default(),
+            swift_lossless_text_fields: HashMap::new(),
             dart_first_class_map: DartFirstClassMap::default(),
             display_as_text_fields: HashSet::new(),
             ir_reachable_fields: HashSet::new(),
@@ -201,6 +203,11 @@ impl FieldResolver {
     /// `render_swift_with_first_class_map` path.
     pub fn with_swift_first_class_map(mut self, swift_first_class_map: SwiftFirstClassMap) -> Self {
         self.swift_first_class_map = swift_first_class_map;
+        self
+    }
+
+    pub(crate) fn with_swift_lossless_text_fields(mut self, fields: HashMap<String, HashSet<String>>) -> Self {
+        self.swift_lossless_text_fields = fields;
         self
     }
 
