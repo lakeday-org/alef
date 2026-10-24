@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Render Java enum-list minimum-count and emptiness assertions against JSON, and fail unsupported union assertions explicitly instead of emitting missing variant accessors (#688).
 - Exercise nested Go and C enum-list assertions through full call generation and support Java root enum-list results without growing oversized generator modules (#688).
 - Exclude Rust-only skipped errors from generated Ruby error matchers while preserving visible typed errors, shared inheritance, and literal message assertions.
+- Expose the whole value of a Swift text-projected field through a public typed accessor named `<field>Value()`, so a reply made of parts stays readable. The first-class Swift struct property now holds the parts of such a reply, where it held only the text variant before, so code that switches on the variant can see the `parts` case at runtime. Generated Swift assertions read the accessor, and the text getter still returns the reply text (#691).
 
 ## [0.113.4] - 2026-10-23
 
