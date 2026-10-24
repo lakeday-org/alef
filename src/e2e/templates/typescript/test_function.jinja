@@ -43,7 +43,7 @@
 		// {{ skip_reason }}
 	});
 {% elif refusal_body %}
-	it.skip("{{ test_name }}: {{ description }}", () => {
+	it.skip("{{ test_name }}: {{ description }} ({{ refusal_reason }})", () => {
 {{ refusal_body }}
 	});
 {% elif expects_error %}
@@ -86,6 +86,9 @@
 {% if unrenderable_error_assertions %}
 {{ unrenderable_error_assertions }}
 {% endif %}
+{% if coverage_warning %}
+{{ coverage_warning }}
+{% endif %}
 	}, {{ timeout_ms }});
 {% else %}
 	it("{{ test_name }}: {{ description }}", {{ async_kw }}() => {
@@ -112,6 +115,9 @@
 {{ assertions_body }}
 {% if bridge_cleanup %}
 		{{ bridge_cleanup }}
+{% endif %}
+{% if coverage_warning %}
+{{ coverage_warning }}
 {% endif %}
 	}, {{ timeout_ms }});
 {% endif %}

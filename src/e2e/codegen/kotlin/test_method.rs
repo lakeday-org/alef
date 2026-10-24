@@ -439,7 +439,7 @@ pub(super) fn render_test_method(
             let _ = writeln!(out, "            {call_expr}");
             let _ = writeln!(out, "            client.close()");
             let _ = writeln!(out, "        }}");
-            crate::e2e::codegen::error_path_assertions::emit(out, fixture, "        // ", lang);
+            crate::e2e::codegen::error_path_assertions::emit_runtime(out, fixture, "        // ", lang);
             // Trailing `Unit` so the runBlocking { ... } lambda's final
             // expression is Unit (not the Exception returned by assertFailsWith).
             // The enclosing `fun ... = runBlocking { ... }` then infers Unit
@@ -510,7 +510,7 @@ pub(super) fn render_test_method(
         }
         let _ = writeln!(out, "            {call_receiver}.{function_name}({args_str})");
         let _ = writeln!(out, "        }}");
-        crate::e2e::codegen::error_path_assertions::emit(out, fixture, "        // ", lang);
+        crate::e2e::codegen::error_path_assertions::emit_runtime(out, fixture, "        // ", lang);
         // Trailing Unit — see comment in the client-factory branch above.
         let _ = writeln!(out, "        Unit");
         let _ = writeln!(out, "    }}");

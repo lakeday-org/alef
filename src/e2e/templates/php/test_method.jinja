@@ -48,5 +48,8 @@
 {{ field_bindings }}
 {{ assertions_body }}
 {% endif %}
+{% if coverage_warning %}
+{{ coverage_warning }}
+{% endif %}
 {{ teardown_block }}
     }

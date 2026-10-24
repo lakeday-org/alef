@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Report full runtime causes for skipped assertions and emit partial-coverage warnings after executable checks across all supported test renderers; retain warnings in normal Go, C# and Kotlin runner output (#697, #698).
+- Preserve skipped-assertion diagnostics in Zig serde JSON tests and safely render control characters in runtime refusals (#698).
 - Import Kotlin Android test types and assertions only when generated executable code references them, preserving required extension imports and mixed-fixture union imports (#700).
 - Project binding-visible errors consistently through e2e generators, direct error classifiers, Python introspection and snippet imports, while sharing the same visibility rule in Ruby, Go and Dart (#699).
 - Keep Swift collection elements alive after source containers leave scope, reserve internal owned-vector aliases, and convert owned handles and strings through facade methods, free functions, from-JSON helpers and generated indexed assertions (#693).

@@ -8,7 +8,7 @@ use crate::e2e::escape::{ruby_string_literal, sanitize_ident};
 use crate::e2e::field_access::FieldResolver;
 use crate::e2e::fixture::Fixture;
 
-use crate::e2e::codegen::inert_example::{self, InertCause, InertExample};
+use crate::e2e::codegen::inert_example::{self, InertCause};
 
 use super::args::build_args_and_setup;
 use super::assertions::render_assertion;
@@ -267,6 +267,7 @@ pub(super) fn render_chat_stream_example(
         out.push_str(&format!("    stream_complete = {expr}\n"));
     }
     out.push_str(&assertions_body);
+    out.push_str(&inert_example::coverage_warning(&assertions_body, "ruby", &fixture.id));
 
     // Trait-bridge teardown (e.g. unregister test backend) so RSpec's
     // shared-process registry state is restored between tests.
@@ -372,43 +373,8 @@ mod stream_complete_declaration_gate_tests {
     }
 }
 
-/// The example emitted in place of one whose assertions all funnelled into skip markers.
-///
-/// ~keep The rendered markers are carried into the refusal rather than dropped: they are the only
-/// record IN THE GENERATED FILE of what the fixture asked for and why it could not run, and the
-/// point of this change is to stop publishing a green test, not to restore the silence the markers
-/// were added to break.
-///
-/// Which refusal is emitted follows who can fix it. An unresolved field path is the consumer's to
-/// repair — under the default strict setting the run has already failed, so this shape only ever
-/// reaches a generated file on a deliberately disarmed run, and that run must still not go green:
-/// it gets a real expectation that always fails and names the fixture. Everything else is alef's
-/// generator debt or a language limit that no consumer edit clears; failing their suite for it
-/// would only force a blanket opt-out, so it gets RSpec's own `skip`, which reports the example as
-/// pending and never as a pass. `skip` also keeps the example present, so the enclosing `describe`
-/// does not go empty.
-fn render_refused_example(description_literal: &str, markers: &str, refusal: &InertExample) -> String {
-    let mut out = format!("  it {description_literal} do\n");
-    for line in markers.lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        out.push_str(line.trim_end());
-        out.push('\n');
-    }
-    let reason = ruby_string_literal(&refusal.reason());
-    match refusal.cause {
-        InertCause::UnresolvedFieldPath => {
-            out.push_str(&format!("    unresolved_assertion = {reason}\n"));
-            out.push_str("    expect(unresolved_assertion).to be_nil\n");
-        }
-        InertCause::AwaitedOrLimited | InertCause::RenderedNothing => {
-            out.push_str(&format!("    skip {reason}\n"));
-        }
-    }
-    out.push_str("  end\n");
-    out
-}
+mod inert_refusal;
+use inert_refusal::render_refused_example;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render_example(
@@ -569,6 +535,7 @@ pub(super) fn render_example(
             call_expr => call_expr,
             result_var => result_var,
             assertions_rendered => assertions_rendered,
+            coverage_warning => inert_example::coverage_warning_for_path(&assertions_rendered, expects_error, &[&crate::e2e::codegen::error_path_assertions::render(fixture, "    # ", "ruby")], "ruby", &fixture.id),
             has_usable => has_usable,
             returns_void => returns_void,
             client_factory => client_factory,
@@ -782,6 +749,10 @@ mod inert_example_refusal_tests {
         );
 
         let out = render_stream(&fixture);
+        let warning = out
+            .find("warn 'alef missing assertion coverage")
+            .expect("partial stream warns");
+        assert!(out.find("expect(chunks.length)").expect("real check") < warning);
 
         assert!(
             out.contains("expect(chunks.length).to be >= 1"),
@@ -827,7 +798,8 @@ mod inert_example_refusal_tests {
             "the markers must be carried into the refusal, got:\n{out}"
         );
         assert!(
-            out.contains("    skip 'alef rendered no runnable expectation for fixture `stream_all_skipped`"),
+            out.contains("    skip ")
+                && out.contains("alef rendered no runnable expectation for fixture `stream_all_skipped`"),
             "the refusal must be RSpec's own pending marker, naming why, got:\n{out}"
         );
         assert!(
@@ -895,7 +867,8 @@ mod inert_example_refusal_tests {
             "the marker must be carried into the refusal, got:\n{out}"
         );
         assert!(
-            out.contains("unresolved_assertion = 'alef resolved no assertion for fixture `plain_unresolved`")
+            out.contains("unresolved_assertion = ")
+                && out.contains("alef resolved no assertion for fixture `plain_unresolved`")
                 && out.contains("expect(unresolved_assertion).to be_nil"),
             "the refusal must be an expectation that fails, got:\n{out}"
         );

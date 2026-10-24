@@ -27,6 +27,15 @@
 //! [`has_executable_line`] is the single copy of a predicate four backends had already
 //! hand-rolled separately (python, typescript, elixir, r), each with its own comment character.
 
+#[cfg(test)]
+mod generation_tests;
+mod runtime_diagnostics;
+#[cfg(test)]
+mod runtime_diagnostics_tests;
+pub(crate) use runtime_diagnostics::{
+    completed_body, coverage_warning, coverage_warning_for_path, warn_completed_test,
+};
+
 use crate::e2e::fixture::Assertion;
 
 use super::{SkipVerdict, peek_skip_records};
@@ -77,6 +86,7 @@ pub(crate) struct InertExample {
     pub(crate) fixture_id: String,
     /// How many registered skip markers the funnels recorded for this example.
     pub(crate) markers: usize,
+    pub(crate) details: Vec<String>,
     pub(crate) cause: InertCause,
 }
 
@@ -84,7 +94,7 @@ impl InertExample {
     /// The sentence a generated refusal carries, so the reason survives into the emitted file
     /// rather than living only in alef's run log.
     pub(crate) fn reason(&self) -> String {
-        match self.cause {
+        let summary = match self.cause {
             InertCause::UnresolvedFieldPath => format!(
                 "alef resolved no assertion for fixture `{}`: {} assertion(s) name a field path \
                  the availability oracle rejected",
@@ -92,7 +102,7 @@ impl InertExample {
             ),
             InertCause::AwaitedOrLimited => format!(
                 "alef rendered no runnable expectation for fixture `{}`: all {} declared \
-                 assertion(s) were skipped (see the markers above)",
+                 assertion(s) were skipped",
                 self.fixture_id, self.markers,
             ),
             InertCause::RenderedNothing => format!(
@@ -100,7 +110,13 @@ impl InertExample {
                  produced no check and no skip marker",
                 self.fixture_id,
             ),
-        }
+        };
+        let reason = if self.details.is_empty() {
+            summary
+        } else {
+            format!("{summary}: {}", self.details.join("; "))
+        };
+        runtime_diagnostics::visible_control_text(&reason)
     }
 }
 
@@ -204,6 +220,7 @@ pub(crate) fn inert_verdict(
         language: language.to_string(),
         fixture_id: fixture_id.to_string(),
         markers: records.len(),
+        details: runtime_diagnostics::skip_details(assertions_body),
         cause,
     })
 }

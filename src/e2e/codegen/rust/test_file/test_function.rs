@@ -826,7 +826,11 @@ fn finalize_test_body(out: &mut String, fixture: &Fixture, e2e_config: &E2eConfi
     }
     crate::e2e::codegen::fail_on_unavailable_field_markers(body, "rust", &fixture.id, &fixture.assertions);
     crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(body, "rust", &fixture.id);
-    out.push_str(body);
+    out.push_str(&crate::e2e::codegen::inert_example::completed_body(
+        body,
+        "rust",
+        &fixture.id,
+    ));
 }
 
 #[cfg(test)]

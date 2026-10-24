@@ -261,5 +261,10 @@ pub(super) fn render_test_case(
         &fixture.assertions,
     );
 
+    out.push_str(&crate::e2e::codegen::inert_example::coverage_warning(
+        &out[assertions_start..],
+        "gleam",
+        &fixture.id,
+    ));
     let _ = writeln!(out, "}}");
 }

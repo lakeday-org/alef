@@ -1,0 +1,13 @@
+{% if language == "swift" %}
+{% if unresolved %}
+        XCTFail("{{ reason }}")
+{% else %}
+        try XCTSkipIf(true, "{{ reason }}")
+{% endif %}
+{% elif language == "java" %}
+{% if unresolved %}
+        org.junit.jupiter.api.Assertions.fail("{{ reason }}");
+{% else %}
+        org.junit.jupiter.api.Assumptions.assumeTrue(false, "{{ reason }}");
+{% endif %}
+{% endif %}

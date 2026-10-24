@@ -379,12 +379,13 @@ pub(super) fn render_test_file(
             },
         );
         let pending = super::error_assertions::pending_assertions(fixture, errors);
-        crate::e2e::codegen::error_path_assertions::emit_with_errors(
+        crate::e2e::codegen::error_path_assertions::emit_completed_runtime(
             &mut fixture_bodies,
             &pending,
             "  // ",
             "dart",
             &super::error_assertions::live_errors(errors),
+            "\n  });",
         );
     }
 

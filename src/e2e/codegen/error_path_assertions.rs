@@ -43,6 +43,9 @@
 //! [`super::fail_on_unsupported_assertion_type_markers`] — which [`render`] calls itself, so a
 //! backend cannot wire the wording in and forget the gate.
 
+mod runtime;
+pub(crate) use runtime::{emit_completed_runtime, emit_runtime, emit_runtime_with_errors};
+
 use std::fmt::Write as FmtWrite;
 
 use crate::core::ir::ErrorDef;
@@ -124,17 +127,6 @@ pub(crate) fn render_with_errors(fixture: &Fixture, line_prefix: &str, language:
 /// [`render`], appended straight onto a backend's output buffer.
 pub(crate) fn emit(out: &mut String, fixture: &Fixture, line_prefix: &str, language: &str) {
     out.push_str(&render(fixture, line_prefix, language));
-}
-
-/// [`render_with_errors`], appended straight onto a backend's output buffer.
-pub(crate) fn emit_with_errors(
-    out: &mut String,
-    fixture: &Fixture,
-    line_prefix: &str,
-    language: &str,
-    errors: &[ErrorDef],
-) {
-    out.push_str(&render_with_errors(fixture, line_prefix, language, errors));
 }
 
 #[cfg(test)]

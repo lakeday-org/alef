@@ -275,6 +275,11 @@ pub(super) fn render_test_case(
         &fixture.assertions,
     );
     crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&out[assertions_start..], "r", &fixture.id);
+    out.push_str(&crate::e2e::codegen::inert_example::coverage_warning(
+        &out[assertions_start..],
+        "r",
+        &fixture.id,
+    ));
 
     // Emit teardown for trait-bridge tests to clean up registered test backends.
     for line in teardown_block.lines() {

@@ -109,7 +109,6 @@ fn infer_opaque_handle_type(
         if !is_primitive_c_type(t) && t != "char*" {
             return Some(t.clone());
         }
-        // Primitive or explicit char* — caller handles those paths.
         return None;
     }
     // Inferred: nested keys exist with `field_snake` as the parent type prefix.
@@ -1267,6 +1266,7 @@ fn render_test_file(
             &fixture.assertions,
         );
         crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&out[fixture_start..], "c", &fixture.id);
+        crate::e2e::codegen::inert_example::warn_completed_test(&mut out, fixture_start, &fixture.id);
         if i + 1 < fixtures.len() {
             let _ = writeln!(out);
         }

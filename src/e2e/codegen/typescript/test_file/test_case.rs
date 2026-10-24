@@ -446,6 +446,10 @@ pub(in crate::e2e::codegen::typescript::test_file) fn render_test_case(
     // (`chunks` is a freshly bound array), so its remaining causes become vitest's own `it.skip`,
     // which never reports a pass, unless the fixture declared `not_error` — there the drive itself
     // is the check and refusing would delete it.
+    let refusal_reason = verdict
+        .as_ref()
+        .map(|refusal| escape_js(&refusal.reason()))
+        .unwrap_or_default();
     let mut refusal_body = String::new();
     let has_projected_assertion = lang == "wasm"
         && fixture
@@ -553,6 +557,7 @@ pub(in crate::e2e::codegen::typescript::test_file) fn render_test_case(
         await_kw => await_kw,
         collect_snippet => collect_snippet,
         assertions_body => assertions_body,
+        coverage_warning => inert_example::coverage_warning_for_path(&assertions_body, expects_error, &[error_skip_line.as_deref().unwrap_or(""), &unrenderable_error_assertions], lang, &fixture.id),
         expects_error => expects_error,
         unrenderable_error_assertions => unrenderable_error_assertions.trim_end(),
         error_value_regex => error_value_regex,
@@ -561,6 +566,7 @@ pub(in crate::e2e::codegen::typescript::test_file) fn render_test_case(
         lang => lang,
         skip_reason => skip_reason,
         refusal_body => refusal_body.trim_end(),
+        refusal_reason => refusal_reason,
         timeout_ms => timeout_ms,
         bridge_cleanup => bridge_cleanup,
     };

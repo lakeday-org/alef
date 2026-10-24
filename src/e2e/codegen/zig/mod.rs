@@ -74,6 +74,7 @@ use super::streaming_assertions::{StreamingFieldResolver, is_streaming_virtual_f
 /// Zig e2e code generator.
 mod args;
 mod assertion_mock_capture;
+mod assertion_runtime;
 mod assertions;
 mod build;
 mod enum_field_config;

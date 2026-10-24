@@ -37,6 +37,7 @@ mod tests {
             language: "ruby".to_owned(),
             fixture_id: "streaming_chunked_response".to_owned(),
             markers: 0,
+            details: Vec::new(),
             cause: InertCause::RenderedNothing,
         }];
 
@@ -60,12 +61,14 @@ mod tests {
                 language: "python".to_owned(),
                 fixture_id: "first_fixture".to_owned(),
                 markers: 0,
+                details: Vec::new(),
                 cause: InertCause::RenderedNothing,
             },
             InertExample {
                 language: "go".to_owned(),
                 fixture_id: "second_fixture".to_owned(),
                 markers: 2,
+                details: Vec::new(),
                 cause: InertCause::AwaitedOrLimited,
             },
         ];

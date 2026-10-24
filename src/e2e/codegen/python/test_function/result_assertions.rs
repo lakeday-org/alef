@@ -151,6 +151,11 @@ pub(super) fn emit_result_and_assertions(
         );
         crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&streaming_assertions, "python", &fixture.id);
         out.push_str(&streaming_assertions);
+        out.push_str(&crate::e2e::codegen::inert_example::coverage_warning(
+            &streaming_assertions,
+            "python",
+            &fixture.id,
+        ));
     } else {
         // For non-streaming: render assertions to a temporary buffer first,
         // then check if result_var is referenced. Only emit the assignment if it is.
@@ -213,6 +218,11 @@ pub(super) fn emit_result_and_assertions(
             crate::alef_context! { result_binding => result_binding, call_expr => call_expr },
         ));
         out.push_str(&temp_assertions);
+        out.push_str(&crate::e2e::codegen::inert_example::coverage_warning(
+            &temp_assertions,
+            "python",
+            &fixture.id,
+        ));
     }
 }
 

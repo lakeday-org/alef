@@ -196,7 +196,7 @@ fn emit_resolved_error_field_assertions(
 /// in [`crate::e2e::codegen::error_path_assertions`], shared with every other backend's error
 /// block; this stays as the python-shaped entry point (comment token `#`, four-space indent). ~keep
 fn render_unrenderable_error_path_assertions(out: &mut String, fixture: &Fixture, errors: &[ErrorDef]) {
-    crate::e2e::codegen::error_path_assertions::emit_with_errors(out, fixture, "    # ", "python", errors);
+    crate::e2e::codegen::error_path_assertions::emit_runtime_with_errors(out, fixture, "    # ", "python", errors);
 }
 
 #[cfg(test)]

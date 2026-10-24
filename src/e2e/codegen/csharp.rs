@@ -403,7 +403,6 @@ fn render_test_file(
             visitor_classes_str.push('\n');
         }
         visitor_classes_str.push('\n');
-        // Indent each line by 4 spaces to nest inside the test class
         for line in decl.lines() {
             visitor_classes_str.push_str("    ");
             visitor_classes_str.push_str(line);
@@ -978,6 +977,7 @@ fn render_test_method(
         void_not_error => void_not_error,
         result_var => result_var,
         assertions_body => assertions_body,
+        coverage_warning => inert_example::coverage_warning_for_path(&assertions_body, expects_error, &[declared_error_check.as_deref().unwrap_or(""), &unrenderable_error_assertions], "csharp", &fixture.id),
         refusal_skip_reason => refusal_skip_reason,
         is_streaming => _is_streaming,
         is_trait_bridge => is_trait_bridge_registration,
@@ -985,7 +985,6 @@ fn render_test_method(
     };
 
     let rendered = crate::e2e::template_env::render("csharp/test_method.jinja", ctx);
-    // Indent each line by 4 spaces to nest inside the test class
     for line in rendered.lines() {
         let trimmed = line.trim_end();
         if !trimmed.is_empty() {

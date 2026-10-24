@@ -444,6 +444,11 @@ pub(super) fn render_streaming_test_method(
         body.push_str(&inert_example::refusal_body(&markers, &statement));
     }
 
+    body.push_str(&inert_example::coverage_warning(
+        &body[assertions_start..],
+        "csharp",
+        &fixture.id,
+    ));
     body.push_str("    }\n");
 
     for line in std::iter::once(fact_attribute.as_str()).chain(body.lines()) {

@@ -1,4 +1,5 @@
 use super::args::build_args_and_setup;
+use super::assertion_runtime::{append_assertions, has_unavailable_fields};
 use super::assertions::{assertion_emits_code, render_assertion, render_json_assertion};
 use super::http::render_http_test_case;
 use super::stubs::test_backend_out_err_var_name;
@@ -605,7 +606,7 @@ fn render_test_fn(
         };
         emit_declared_error_value_assertion(out, fixture, errors, &expressions, for_docs);
         if !for_docs {
-            crate::e2e::codegen::error_path_assertions::emit(out, fixture, "    // ", "zig");
+            crate::e2e::codegen::error_path_assertions::emit_runtime(out, fixture, "    // ", "zig");
         }
     } else if (for_docs
         || fixture
@@ -753,14 +754,7 @@ fn render_test_fn(
                 for assertion in &fixture.assertions {
                     render_json_assertion(&mut assertions_body, assertion, result_var, field_resolver, true);
                 }
-                crate::e2e::codegen::fail_on_unavailable_field_markers(
-                    &assertions_body,
-                    "zig",
-                    &fixture.id,
-                    &fixture.assertions,
-                );
-                crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&assertions_body, "zig", &fixture.id);
-                out.push_str(&assertions_body);
+                append_assertions(out, &assertions_body, fixture);
             } else {
                 // JSON struct path: parse result JSON and access fields dynamically.
                 let _ = writeln!(
@@ -772,7 +766,7 @@ fn render_test_fn(
                 // no JSON parse (its helper call is self-contained), so only bind
                 // `_parsed`/`result_var` when a REAL field assertion needs them -- binding them
                 // for a mock-only fixture would leave both unused, a Zig compile error. ~keep
-                if any_emits_code || has_mock_assertions {
+                if any_emits_code || has_mock_assertions || has_unavailable_fields(fixture, field_resolver) {
                     if any_emits_code {
                         let _ = writeln!(
                             out,
@@ -785,23 +779,12 @@ fn render_test_fn(
                     for assertion in &fixture.assertions {
                         render_json_assertion(&mut assertions_body, assertion, result_var, field_resolver, false);
                     }
-                    crate::e2e::codegen::fail_on_unavailable_field_markers(
-                        &assertions_body,
-                        "zig",
-                        &fixture.id,
-                        &fixture.assertions,
-                    );
-                    crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(
-                        &assertions_body,
-                        "zig",
-                        &fixture.id,
-                    );
-                    out.push_str(&assertions_body);
+                    append_assertions(out, &assertions_body, fixture);
                 } else {
                     let _ = writeln!(out, "    std.debug.print(\"{{s}}\\n\", .{{_result_json}});");
                 }
             }
-        } else if any_emits_code || has_mock_assertions {
+        } else if any_emits_code || has_mock_assertions || has_unavailable_fields(fixture, field_resolver) {
             let try_kw = if call_returns_error_union { "try " } else { "" };
             // A mock-only fixture still needs the call made (the mock server logs the request
             // regardless of assertions), but must not bind `result_var` -- `mock.*`'s own
@@ -825,14 +808,7 @@ fn render_test_fn(
                     result_is_simple,
                 );
             }
-            crate::e2e::codegen::fail_on_unavailable_field_markers(
-                &assertions_body,
-                "zig",
-                &fixture.id,
-                &fixture.assertions,
-            );
-            crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&assertions_body, "zig", &fixture.id);
-            out.push_str(&assertions_body);
+            append_assertions(out, &assertions_body, fixture);
         } else if call_returns_error_union {
             let _ = writeln!(out, "    _ = try {call_prefix}.{function_name}({args_str});");
         } else if let Some(out_err_var) = register_out_err_var.as_deref() {

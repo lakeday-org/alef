@@ -35,6 +35,11 @@ pub(super) fn refuse_inert_example(out: &mut String, assertions_start: usize, fi
     let Some(refusal) =
         inert_example::inert_verdict(&out[assertions_start..], language, &fixture.id, &fixture.assertions)
     else {
+        out.push_str(&inert_example::coverage_warning(
+            &out[assertions_start..],
+            language,
+            &fixture.id,
+        ));
         return;
     };
     inert_example::record_refusal(&refusal);

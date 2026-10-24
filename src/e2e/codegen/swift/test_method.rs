@@ -1,7 +1,7 @@
 use crate::codegen::keywords::swift_ident;
 use crate::core::config::ResolvedCrateConfig;
 use crate::e2e::codegen::field_skip::FieldSkip;
-use crate::e2e::codegen::inert_example::{self, InertCause, InertExample};
+use crate::e2e::codegen::inert_example;
 use crate::e2e::config::E2eConfig;
 use crate::e2e::field_access::{FieldResolver, SwiftFirstClassMap};
 use crate::e2e::fixture::Fixture;
@@ -414,7 +414,7 @@ pub(super) fn render_test_method(
             let _ = writeln!(out, "            XCTFail(\"expected to throw\")");
             render_error_catch_block(out, fixture, errors);
         }
-        crate::e2e::codegen::error_path_assertions::emit(out, fixture, "        // ", "swift");
+        crate::e2e::codegen::error_path_assertions::emit_runtime(out, fixture, "        // ", "swift");
         let _ = writeln!(out, "    }}");
         return;
     }
@@ -691,6 +691,9 @@ pub(super) fn render_test_method(
 
     // Emit the buffered body (assertions and collect snippet).
     out.push_str(&body_buffer);
+    if refusal.is_none() {
+        out.push_str(&inert_example::coverage_warning(&body_buffer, "swift", &fixture.id));
+    }
 
     // Emit teardown for test backends: unregister to prevent leaking into subsequent tests.
     for arg in args {
@@ -716,25 +719,8 @@ pub(super) fn render_test_method(
     let _ = writeln!(out, "    }}");
 }
 
-/// The body emitted in place of one whose declared assertions all funnelled into skip markers.
-///
-/// ~keep Which refusal is emitted follows who can fix it, exactly as in `ruby/examples.rs`. An
-/// unresolved field path is the consumer's to repair, so it gets `XCTFail` — under the default
-/// strict setting the run has already failed, and the deliberately disarmed run must still not go
-/// green. Everything else is alef's generator debt or a swift-bridge limit that no consumer edit
-/// clears; failing their suite for it would only force a blanket opt-out, so it gets `XCTSkipIf`,
-/// which XCTest reports as skipped and never as a pass. Both spellings are already emitted
-/// elsewhere in this file, so neither introduces a construct the generated project cannot build.
-fn render_swift_refusal(markers: &str, refusal: &InertExample) -> String {
-    let reason = escape_swift(&refusal.reason());
-    let statement = match refusal.cause {
-        InertCause::UnresolvedFieldPath => format!("        XCTFail(\"{reason}\")\n"),
-        InertCause::AwaitedOrLimited | InertCause::RenderedNothing => {
-            format!("        try XCTSkipIf(true, \"{reason}\")\n")
-        }
-    };
-    inert_example::refusal_body(markers, &statement)
-}
+mod inert_refusal;
+use inert_refusal::render_swift_refusal;
 
 mod field_exclusion;
 use field_exclusion::is_assertion_field_swift_excluded;

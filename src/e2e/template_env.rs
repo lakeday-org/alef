@@ -1,86 +1,10 @@
 mod ruby_templates;
+mod runtime_assertion_templates;
 mod typed_list_templates;
 
 use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
-    (
-        "streaming/usage_unavailable.jinja",
-        include_str!("templates/streaming/usage_unavailable.jinja"),
-    ),
-    (
-        "c/usage_runtime_probe.jinja",
-        include_str!("templates/c/usage_runtime_probe.jinja"),
-    ),
-    (
-        "go/usage_runtime_probe.jinja",
-        include_str!("templates/go/usage_runtime_probe.jinja"),
-    ),
-    (
-        "typescript/usage_runtime_probe.jinja",
-        include_str!("templates/typescript/usage_runtime_probe.jinja"),
-    ),
-    (
-        "swift/usage_runtime_probe.jinja",
-        include_str!("templates/swift/usage_runtime_probe.jinja"),
-    ),
-    (
-        "dart/usage_runtime_probe.jinja",
-        include_str!("templates/dart/usage_runtime_probe.jinja"),
-    ),
-    (
-        "c/usage_declarations.jinja",
-        include_str!("templates/c/usage_declarations.jinja"),
-    ),
-    ("c/usage_capture.jinja", include_str!("templates/c/usage_capture.jinja")),
-    (
-        "c/usage_assertion.jinja",
-        include_str!("templates/c/usage_assertion.jinja"),
-    ),
-    (
-        "dart/stream_counter.jinja",
-        include_str!("templates/dart/stream_counter.jinja"),
-    ),
-    (
-        "go/stream_counter.jinja",
-        include_str!("templates/go/stream_counter.jinja"),
-    ),
-    (
-        "typescript/stream_counter.jinja",
-        include_str!("templates/typescript/stream_counter.jinja"),
-    ),
-    (
-        "swift/structured_text_unavailable.jinja",
-        include_str!("templates/swift/structured_text_unavailable.jinja"),
-    ),
-    (
-        "swift/exact_numeric_comparison.jinja",
-        include_str!("templates/swift/exact_numeric_comparison.jinja"),
-    ),
-    (
-        "swift/structured_text_assertion.jinja",
-        include_str!("templates/swift/structured_text_assertion.jinja"),
-    ),
-    (
-        "typescript/nested_collection_probe.jinja",
-        include_str!("templates/typescript/nested_collection_probe.jinja"),
-    ),
-    (
-        "typescript/text_projection_skip.jinja",
-        include_str!("templates/typescript/text_projection_skip.jinja"),
-    ),
-    (
-        "typescript/projected_test_probe.jinja",
-        include_str!("templates/typescript/projected_test_probe.jinja"),
-    ),
-    (
-        "elixir/collection_payload_probe.jinja",
-        include_str!("templates/elixir/collection_payload_probe.jinja"),
-    ),
-    (
-        "typescript/collection_payload_probe.jinja",
-        include_str!("templates/typescript/collection_payload_probe.jinja"),
-    ),
     (
         "elixir/collection_payload.jinja",
         include_str!("templates/elixir/collection_payload.jinja"),
@@ -843,8 +767,9 @@ static TEMPLATES: &[(&str, &str)] = &[
 pub(crate) fn make_env() -> Environment<'static> {
     let mut env = Environment::new();
     crate::template::configure_env(&mut env);
-    for (name, src) in TEMPLATES
+    for (name, src) in runtime_assertion_templates::TEMPLATES
         .iter()
+        .chain(TEMPLATES)
         .chain(ruby_templates::TEMPLATES)
         .chain(typed_list_templates::TEMPLATES)
     {

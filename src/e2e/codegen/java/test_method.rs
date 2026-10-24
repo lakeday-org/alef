@@ -19,28 +19,10 @@ use super::assertions::{fractional_scalar_fields, render_assertion};
 use super::http::render_http_test_method;
 use super::values::{java_builder_expression, json_to_java};
 use super::visitor::{apply_java_visitor_arg, build_java_visitor, java_visitor_binding};
-use crate::e2e::codegen::inert_example::{self, InertCause};
+use crate::e2e::codegen::inert_example;
 
-/// The body emitted in place of one whose declared assertions all funnelled into skip markers.
-///
-/// ~keep Which refusal is emitted follows who can fix it, exactly as in `ruby/examples.rs`. An
-/// unresolved field path is the consumer's to repair, so it gets an `Assertions.fail` naming the
-/// fixture — under the default strict setting the run has already failed, and the deliberately
-/// disarmed run must still not go green. Everything else is alef's generator debt or a JNI/ABI
-/// limit no consumer edit clears; failing their suite for it would only force a blanket opt-out,
-/// so it gets JUnit's `Assumptions.assumeTrue(false, ..)`, which reports the test as skipped and
-/// never as a pass. Both are fully qualified, which is what `test_method.jinja`'s fixed import set
-/// makes necessary — the same spelling the api-key assumption above already uses.
-fn render_java_refusal(markers: &str, refusal: &inert_example::InertExample) -> String {
-    let reason = escape_java(&refusal.reason());
-    let statement = match refusal.cause {
-        InertCause::UnresolvedFieldPath => format!("        org.junit.jupiter.api.Assertions.fail(\"{reason}\");\n"),
-        InertCause::AwaitedOrLimited | InertCause::RenderedNothing => {
-            format!("        org.junit.jupiter.api.Assumptions.assumeTrue(false, \"{reason}\");\n")
-        }
-    };
-    inert_example::refusal_body(markers, &statement)
-}
+mod inert_refusal;
+use inert_refusal::render_java_refusal;
 
 /// Render the JUnit assertion that checks a declared `error` fixture value against either
 /// the thrown exception's message or its simple class name — or, when the declared value
@@ -600,6 +582,7 @@ pub(super) fn render_test_method(
             void_not_error => void_not_error,
             collect_snippet => collect_snippet,
             assertions_body => assertions_body,
+            coverage_warning => inert_example::coverage_warning_for_path(&assertions_body, expects_error, &[declared_error_check.as_deref().unwrap_or(""), &unrenderable_error_assertions], "java", &fixture.id),
             teardown_block => teardown_block,
         },
     );

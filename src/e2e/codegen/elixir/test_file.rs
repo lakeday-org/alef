@@ -221,7 +221,14 @@ pub(super) fn render_test_file(
             // — leaves no trace in the generated file. The marker sits after the emitted `test`
             // block, at `defmodule` body level, rather than inside it: the body is built in
             // `test_case.rs`, which another change owns.
-            crate::e2e::codegen::error_path_assertions::emit(&mut out, fixture, "  # ", "elixir");
+            crate::e2e::codegen::error_path_assertions::emit_completed_runtime(
+                &mut out,
+                fixture,
+                "  # ",
+                "elixir",
+                &[],
+                "\n  end",
+            );
         }
         if i + 1 < fixtures.len() {
             let _ = writeln!(out);

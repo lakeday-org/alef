@@ -45,7 +45,7 @@ pub(super) fn render_test_file(
         // trace in the generated file. The marker sits after the emitted `test_that(...)` call
         // rather than inside its body: the body is built in `test_case.rs`, which another change
         // owns.
-        crate::e2e::codegen::error_path_assertions::emit(&mut out, fixture, "# ", "r");
+        crate::e2e::codegen::error_path_assertions::emit_completed_runtime(&mut out, fixture, "# ", "r", &[], "\n})");
         if i + 1 < fixtures.len() {
             let _ = writeln!(out);
         }

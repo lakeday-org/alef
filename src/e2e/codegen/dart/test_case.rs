@@ -714,6 +714,11 @@ fn emit_call_and_assertions(out: &mut String, ctx: &CallEmissionContext<'_>) {
             &fixture.assertions,
         );
         crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&out[assertions_start..], "dart", &fixture.id);
+        out.push_str(&crate::e2e::codegen::inert_example::coverage_warning(
+            &out[assertions_start..],
+            "dart",
+            &fixture.id,
+        ));
     }
 }
 

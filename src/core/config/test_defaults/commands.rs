@@ -70,9 +70,9 @@ pub(super) fn node_wasm_config(output_dir: &str, ctx: &LangContext) -> TestConfi
 
 pub(super) fn go_config(output_dir: &str, ctx: &LangContext) -> TestConfig {
     {
-        let cmd = wrap(format!("cd {output_dir} && go test ./..."), ctx.run_wrapper);
+        let cmd = wrap(format!("cd {output_dir} && go test -v ./..."), ctx.run_wrapper);
         let cov = wrap(
-            format!("cd {output_dir} && go test -coverprofile=coverage.out ./..."),
+            format!("cd {output_dir} && go test -v -coverprofile=coverage.out ./..."),
             ctx.run_wrapper,
         );
         TestConfig {
@@ -159,13 +159,15 @@ pub(super) fn csharp_config(output_dir: &str, ctx: &LangContext) -> TestConfig {
             // `dotnet test`'s value -- quote it the same way `output_dir` is quoted. ~keep
             let proj = super::super::shell::quote_word(proj);
             (
-                format!("dotnet test {proj}"),
-                format!("dotnet test {proj} --collect:\"XPlat Code Coverage\""),
+                format!("dotnet test {proj} --logger \"console;verbosity=normal\""),
+                format!("dotnet test {proj} --logger \"console;verbosity=normal\" --collect:\"XPlat Code Coverage\""),
             )
         } else {
             (
-                format!("dotnet test {output_dir}"),
-                format!("dotnet test {output_dir} --collect:\"XPlat Code Coverage\""),
+                format!("dotnet test {output_dir} --logger \"console;verbosity=normal\""),
+                format!(
+                    "dotnet test {output_dir} --logger \"console;verbosity=normal\" --collect:\"XPlat Code Coverage\""
+                ),
             )
         };
         TestConfig {
@@ -252,7 +254,7 @@ pub(super) fn c_config() -> TestConfig {
 
 pub(super) fn kotlin_kotlin_android_config(output_dir: &str, ctx: &LangContext) -> TestConfig {
     {
-        let cmd = wrap(format!("cd {output_dir} && gradle test"), ctx.run_wrapper);
+        let cmd = wrap(format!("cd {output_dir} && gradle test --info"), ctx.run_wrapper);
         TestConfig {
             precondition: Some(require_tool("gradle")),
             before: None,

@@ -77,6 +77,9 @@
     expect({{ result_var }}).not_to be_nil
 {% endif %}
 {% endif %}
+{% if coverage_warning %}
+{{ coverage_warning }}
+{% endif %}
 {% for line in teardown_lines %}
     {{ line }}
 {% endfor %}

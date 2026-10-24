@@ -262,7 +262,14 @@ pub(super) fn render_test_file(
             // `error.status_code` — leaves no trace in the generated module. The marker sits
             // after the emitted test function rather than inside it: the body is built in
             // `test_case.rs`, which another change owns.
-            crate::e2e::codegen::error_path_assertions::emit(&mut out, fixture, "// ", "gleam");
+            crate::e2e::codegen::error_path_assertions::emit_completed_runtime(
+                &mut out,
+                fixture,
+                "// ",
+                "gleam",
+                &[],
+                "\n}",
+            );
         }
         let _ = writeln!(out);
     }
@@ -278,5 +285,8 @@ pub(super) fn render_test_file(
         out.push_str(&rendered);
     }
 
+    if out.contains("io.println(") {
+        out.insert_str(0, "import gleam/io\n");
+    }
     out
 }

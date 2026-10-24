@@ -209,7 +209,14 @@ mod tests {
     fn go_uses_go_test() {
         let c = cfg(Language::Go, "packages/go");
         let cmd = c.command.unwrap().commands().join(" ");
-        assert!(cmd.contains("go test ./..."));
+        assert!(cmd.contains("go test -v ./..."));
+        assert!(
+            c.coverage
+                .unwrap()
+                .commands()
+                .join(" ")
+                .contains("go test -v -coverprofile=")
+        );
     }
 
     #[test]
@@ -290,6 +297,8 @@ mod tests {
             cov.contains(&format!("dotnet test {proj}")),
             "coverage command should use quoted project_file: {cov}"
         );
+        assert!(cmd.contains("--logger \"console;verbosity=normal\""));
+        assert!(cov.contains("--logger \"console;verbosity=normal\""));
     }
 
     /// A hostile `project_file` reaching `sh -c` must not execute a command substitution --
@@ -339,14 +348,18 @@ mod tests {
     }
 
     #[test]
-    fn kotlin_uses_gradle_test() {
-        let c = cfg(Language::Kotlin, "packages/kotlin");
-        let cmd = c.command.unwrap().commands().join(" ");
-        assert!(
-            cmd.contains("gradle test"),
-            "Kotlin test should use gradle test, got: {cmd}"
-        );
-        assert_eq!(c.precondition.as_deref(), Some("command -v gradle >/dev/null 2>&1"));
+    fn jvm_and_csharp_test_commands_expose_runtime_diagnostics() {
+        for (language, expected) in [
+            (Language::Kotlin, "gradle test --info"),
+            (Language::KotlinAndroid, "gradle test --info"),
+            (Language::Csharp, "--logger \"console;verbosity=normal\""),
+        ] {
+            let config = cfg(language, "packages/sample");
+            let command = config.command.expect("test command").commands().join(" ");
+            let coverage = config.coverage.expect("coverage command").commands().join(" ");
+            assert!(command.contains(expected), "{language:?}: {command}");
+            assert!(coverage.contains(expected), "{language:?}: {coverage}");
+        }
     }
 
     #[test]

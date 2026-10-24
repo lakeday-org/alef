@@ -78,6 +78,9 @@
 {% if unrenderable_error_assertions %}
 {{ unrenderable_error_assertions }}
 {% endif %}
+{% if coverage_warning %}
+{{ coverage_warning }}
+{% endif %}
     }
 {%- else %}
 {%- if refusal_skip_reason %}
@@ -127,6 +130,9 @@
         Assert.Null(exception);
 {% else %}
         {{ async_kw }}{{ call_target }}.{{ call_expr }};
+{% endif %}
+{% if coverage_warning %}
+{{ coverage_warning }}
 {% endif %}
     }
 {%- endif %}

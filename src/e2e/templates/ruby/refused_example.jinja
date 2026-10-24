@@ -1,0 +1,11 @@
+  it {{ description }} do
+{% for line in markers %}
+{{ line }}
+{% endfor %}
+{% if unresolved %}
+    unresolved_assertion = {{ reason }}
+    expect(unresolved_assertion).to be_nil
+{% else %}
+    skip {{ reason }}
+{% endif %}
+  end

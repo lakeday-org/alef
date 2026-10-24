@@ -345,7 +345,7 @@ pub(super) fn render_test_function_with_facts(
         let _ = writeln!(out, "\t\tt.Errorf(\"expected an error, but call succeeded\")");
         let _ = writeln!(out, "\t}}");
         declared_error_assertion::emit(out, fixture, errors, import_alias, &config.go_package_name());
-        crate::e2e::codegen::error_path_assertions::emit(out, fixture, "\t// ", "go");
+        crate::e2e::codegen::error_path_assertions::emit_runtime(out, fixture, "\t// ", "go");
         emit_trait_bridge_cleanup(out, fixture, base_function_name, import_alias);
         let _ = writeln!(out, "}}");
         return;
@@ -712,6 +712,11 @@ pub(super) fn render_test_function_with_facts(
         &fixture.assertions,
     );
     crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&out[assertions_start..], "go", &fixture.id);
+    out.push_str(&crate::e2e::codegen::inert_example::coverage_warning(
+        &out[assertions_start..],
+        "go",
+        &fixture.id,
+    ));
 
     emit_trait_bridge_cleanup(out, fixture, base_function_name, import_alias);
     let _ = writeln!(out, "}}");

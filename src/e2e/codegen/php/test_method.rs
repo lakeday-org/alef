@@ -523,6 +523,7 @@ pub(super) fn render_test_method(
             collect_snippet => collect_snippet,
             field_bindings => field_bindings,
             assertions_body => assertions_body,
+            coverage_warning => inert_example::coverage_warning(if expects_error { &error_test_body } else { &assertions_body }, "php", &fixture.id),
             teardown_block => teardown_block,
         },
     );

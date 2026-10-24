@@ -126,8 +126,7 @@ pub(super) fn render_test_case(
     let test_name = sanitize_ident(&fixture.id);
     let test_label = fixture.id.replace('"', "\\\"");
 
-    // Helper function to extract module-level definitions from a setup_block that may
-    // contain a trait-bridge marker. Trait-bridge setup blocks are formatted as:
+    // ~keep Trait-bridge setup blocks separate module definitions from runtime statements:
     //   <module definitions ending with "end\n">
     //   \n__TRAIT_BRIDGE_MODULE_DEFS_END__\n
     //   <test-function-level setup>
@@ -700,11 +699,7 @@ pub(super) fn render_test_case(
     // entirely comment-only, vacuously-passing test body. `not_error` already emits
     // a real `refute is_nil(...)` (see `render_assertion`'s `not_error` arm) whenever
     // that's safe, so this only fires on the remaining gap: real field assertions that
-    // all got dropped. Elixir was the one backend in this defect class with no fallback
-    // of any kind for that case — mirror python/php/typescript's
-    // `apply_vacuous_assertion_fallback`. A fixture with genuinely zero declared
-    // assertions is left untouched, matching every other backend's deliberate "just
-    // call it" smoke-test contract.
+    // all got dropped. Assertionless fixtures keep the deliberate smoke-test contract.
     //
     // `not_error_result_is_option` gates this the same way it gates `render_assertion`'s
     // own `not_error` arm: this fallback emits the identical `refute is_nil(...)` idiom,
@@ -733,6 +728,11 @@ pub(super) fn render_test_case(
     );
     crate::e2e::codegen::fail_on_unsupported_assertion_type_markers(&assertions_body, "elixir", &fixture.id);
     out.push_str(&assertions_body);
+    out.push_str(&crate::e2e::codegen::inert_example::coverage_warning(
+        &assertions_body,
+        "elixir",
+        &fixture.id,
+    ));
 
     if needs_api_key_skip {
         let _ = writeln!(out, "      end");

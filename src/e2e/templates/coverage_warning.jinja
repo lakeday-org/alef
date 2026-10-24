@@ -1,0 +1,34 @@
+{% if language == "swift" %}
+        print({{ reason }})
+{% elif language == "ruby" %}
+    warn {{ reason }}
+{% elif language == "php" %}
+        fwrite(STDERR, {{ reason }} . PHP_EOL);
+{% elif language == "java" %}
+        System.err.println({{ reason }});
+{% elif language == "kotlin" or language == "kotlin_android" %}
+        System.err.println({{ reason }})
+{% elif language == "csharp" %}
+        System.Console.Error.WriteLine({{ reason }});
+{% elif language == "node" or language == "wasm" or language == "typescript" %}
+        console.warn({{ reason }});
+{% elif language == "python" %}
+    __import__("warnings").warn({{ reason }}, stacklevel=1)
+{% elif language == "go" %}
+    t.Log({{ reason }})
+{% elif language == "rust" %}
+    std::io::Write::write_all(&mut std::io::stderr(), concat!({{ reason }}, "\n").as_bytes())
+        .expect("writing skipped assertion coverage warning");
+{% elif language == "elixir" %}
+    IO.warn({{ reason }})
+{% elif language == "r" %}
+    warning({{ reason }}, call. = FALSE)
+{% elif language == "dart" %}
+    print({{ reason }});
+{% elif language == "c" %}
+    fprintf(stderr, "%s\n", {{ reason }});
+{% elif language == "zig" %}
+    std.debug.print("{s}\n", .{ {{ reason }} });
+{% elif language == "gleam" %}
+  io.println({{ reason }})
+{% endif %}
