@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.114.0] - 2026-10-24
+
 ### Added
 
 - Record multiple ordered Swift constructor signatures with `constructor_history`, preserving released public initializer and RustBridge factory function references and native symbols alongside the current full constructor. Existing `legacy_constructor_fields` behavior is retained; old serialized IR remains readable.
@@ -32,10 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve structured Swift text-enum values through public `<field>Value()` accessors, DTO reconstruction and generated assertions, while keeping plain-text getters and propagating serialization errors with context (#691).
 - Verify Android structured-list assertions against the complete generated JNI producer and imported enum models (#688).
 - Preserve exact signed, unsigned, and fractional streaming usage comparisons in Go and WASM, preserve C integer width and sign, honor skipped C fields, and render usage probes through registered templates.
-- Resolve required and optional nested streaming usage fields from IR in Swift and Dart while preserving configured public names.
+- Resolve required and optional nested streaming usage fields from IR in Swift and Dart while preserving configured public names (#689).
 - Render Java enum-list minimum-count and emptiness assertions against JSON, and fail unsupported union assertions explicitly instead of emitting missing variant accessors (#688).
 - Exercise nested Go and C enum-list assertions through full call generation and support Java root enum-list results without growing oversized generator modules (#688).
-- Exclude Rust-only skipped errors from generated Ruby error matchers while preserving visible typed errors, shared inheritance, and literal message assertions.
+- Exclude Rust-only skipped errors from generated Ruby error matchers while preserving visible typed errors, shared inheritance, and literal message assertions (#687).
 
 ## [0.113.4] - 2026-10-23
 
