@@ -2,7 +2,22 @@ import static org.junit.jupiter.api.Assertions.*;
 public final class Probe {
     public static void main(String[] args) throws Exception {
         var result = new com.fasterxml.jackson.databind.ObjectMapper().readValue(args[0], Reply.class);
+        if (args.length == 1) {
 {{ assertions }}
-        System.out.println("PASS:3");
+            System.out.println("PASS:3");
+            return;
+        }
+        switch (args[1]) {
+{% for check in checks %}
+            case "{{ check.name }}": {{ check.name }}(result); break;
+{% endfor %}
+            default: throw new IllegalArgumentException("unknown probe check");
+        }
+        System.out.println("PASS:collection");
     }
+{% for check in checks %}
+    private static void {{ check.name }}(Reply result) {
+{{ check.assertions }}
+    }
+{% endfor %}
 }

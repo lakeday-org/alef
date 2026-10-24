@@ -9,6 +9,6 @@ fn parts(values: &[&str]) -> Body {
 fn main() {
     let cases = [reply(Some(parts(&["hello", " world"]))), reply(Some(parts(&["hello"]))),
         reply(Some(parts(&["bad", " world"]))), reply(Some(parts(&["hello", "bad"]))),
-        reply(Some(Body::Text("[1,2]".to_string()))), reply(None)];
+        reply(Some(Body::Text("[1,2]".to_string()))), reply(None), reply(Some(parts(&[])))];
     println!("{}", serde_json::to_string(&cases).unwrap());
 }

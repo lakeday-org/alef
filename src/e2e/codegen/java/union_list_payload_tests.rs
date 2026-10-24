@@ -170,3 +170,50 @@ fn issue688_java_root_enum_collection_uses_json_wrapper() {
         assert!(!output.contains(".parts()"), "{output}");
     }
 }
+
+#[test]
+fn issue688_java_standard_collection_checks_use_wrapper_json() {
+    for (root, path) in [("Body", "parts"), ("Reply", "choices[0].message.content.parts")] {
+        for (kind, value, fragment) in [
+            ("count_min", serde_json::json!(2), ".size() >= 2"),
+            ("is_empty", serde_json::Value::Null, ".isEmpty()"),
+            ("not_empty", serde_json::Value::Null, ".isEmpty()"),
+        ] {
+            let output = render_returning(kind, path, value, root);
+            assert!(!output.contains(".parts()"), "{output}");
+            assert!(output.contains(".value().isArray()"), "{output}");
+            assert!(output.contains(fragment), "{output}");
+            assert!(!output.contains("Assumptions"), "{output}");
+        }
+    }
+}
+
+#[test]
+fn issue688_java_unsupported_collection_checks_fail_explicitly() {
+    for kind in ["contains", "future_kind"] {
+        let output = render_returning(kind, "parts", serde_json::json!("needle"), "Body");
+        assert!(!output.contains(".parts()"), "{output}");
+        assert!(
+            output.contains("fail(\"unsupported enum collection assertion"),
+            "{output}"
+        );
+        assert!(!output.contains("Assumptions"), "{output}");
+    }
+}
+
+#[test]
+fn issue688_java_invalid_collection_counts_fail_without_narrowing() {
+    for value in [
+        serde_json::json!(u64::MAX),
+        serde_json::json!(-1),
+        serde_json::Value::Null,
+    ] {
+        let output = render_returning("count_min", "parts", value, "Body");
+        assert!(
+            output.contains("fail(\"invalid value for enum collection assertion"),
+            "{output}"
+        );
+        assert!(!output.contains(".parts()"), "{output}");
+        assert!(!output.contains("18446744073709551615"), "{output}");
+    }
+}

@@ -1,6 +1,39 @@
+{% if error %}
+        fail({{ error }});
+{% else %}
         assertNotNull({{ container }}, "expected content");
         assertTrue({{ payload }}.isArray(), "expected list variant");
-{% if not count %}
+{% if kind == "equals" %}
         assertTrue({{ expression }}.isTextual(), "expected text field");
+        assertEquals({{ expected }}, {{ expression }}.asText());
+{% elif kind in ["count_equals", "count_min"] %}
+{% if nested %}
+        assertTrue(
+            {{ expression }} != null && {{ expression }}.isArray(),
+            "expected collection value");
 {% endif %}
-        assertEquals({{ expected }}, {{ expression }}.{% if count %}size(){% else %}asText(){% endif %});
+{% if kind == "count_equals" %}
+        assertEquals({{ expected }}, {{ expression }}.size());
+{% else %}
+        assertTrue(
+            {{ expression }}.size() >= {{ expected }},
+            "expected at least {{ expected }} elements");
+{% endif %}
+{% else %}
+{% if nested %}
+        assertTrue(
+            {{ expression }} != null && ({{ expression }}.isArray() || {{ expression }}.isTextual()),
+            "expected collection or text value");
+{% endif %}
+{% set empty_assertion = "assertTrue" if kind == "is_empty" else "assertFalse" %}
+        {{ empty_assertion }}(
+{% if nested %}
+            {{ expression }}.isTextual()
+                ? {{ expression }}.asText().isEmpty()
+                : {{ expression }}.isEmpty(),
+{% else %}
+            {{ expression }}.isEmpty(),
+{% endif %}
+            "expected {% if kind == "not_empty" %}non-{% endif %}empty collection");
+{% endif %}
+{% endif %}

@@ -45,7 +45,7 @@ pub(crate) fn assertions() -> Vec<Assertion> {
     crate::e2e::codegen::php::enum_collection_test_support::assertions()
 }
 
-pub(crate) fn core_cases(wire: bool) -> Vec<serde_json::Value> {
+fn all_core_cases(wire: bool) -> Vec<serde_json::Value> {
     let directory = tempfile::tempdir().unwrap();
     let source = crate::e2e::template_env::render(
         "go/enum_collection_core_probe.rs.jinja",
@@ -77,8 +77,19 @@ pub(crate) fn core_cases(wire: bool) -> Vec<serde_json::Value> {
         .unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
     let cases: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(cases.len(), 7);
+    cases
+}
+
+pub(crate) fn core_cases(wire: bool) -> Vec<serde_json::Value> {
+    let cases = all_core_cases(wire).into_iter().take(6).collect::<Vec<_>>();
     assert_eq!(cases.len(), 6);
     cases
+}
+
+pub(crate) fn core_collection_cases(wire: bool) -> Vec<serde_json::Value> {
+    let [good, _, _, _, wrong_shape, null, empty]: [serde_json::Value; 7] = all_core_cases(wire).try_into().unwrap();
+    vec![empty, good, wrong_shape, null]
 }
 
 pub(crate) fn tool(name: &str, directory: &Path) -> PathBuf {
@@ -139,8 +150,13 @@ pub(crate) fn generate_collection_call(
     generator: &dyn crate::e2e::codegen::E2eCodegen,
     api: &ApiSurface,
 ) -> Vec<crate::core::backend::GeneratedFile> {
-    use crate::e2e::fixture::{Fixture, FixtureGroup};
-    let e2e = crate::e2e::config::E2eConfig {
+    let assertions = assertions();
+    assert_eq!(assertions.len(), 3);
+    generate_call_with_assertions(generator, api, assertions)
+}
+
+fn collection_call_config() -> crate::e2e::config::E2eConfig {
+    crate::e2e::config::E2eConfig {
         call: crate::e2e::config::CallConfig {
             function: "fetch_reply".to_string(),
             module: "example.com/sample".to_string(),
@@ -155,9 +171,17 @@ pub(crate) fn generate_collection_call(
             ..Default::default()
         },
         ..Default::default()
-    };
-    let assertions = assertions();
-    assert_eq!(assertions.len(), 3);
+    }
+}
+
+pub(crate) fn generate_call_with_assertions(
+    generator: &dyn crate::e2e::codegen::E2eCodegen,
+    api: &ApiSurface,
+    assertions: Vec<Assertion>,
+) -> Vec<crate::core::backend::GeneratedFile> {
+    use crate::e2e::fixture::{Fixture, FixtureGroup};
+    assert!(!assertions.is_empty());
+    let e2e = collection_call_config();
     let groups = [FixtureGroup {
         category: "payload".to_string(),
         fixtures: vec![Fixture {
