@@ -1,0 +1,21 @@
+{{ header }}
+#include <stdint.h>
+enum alef_test_status alef_current_test_status = ALEF_TEST_PASSED;
+static char *sample_stream_chunk_choices(uint64_t chunk) {
+    (void)chunk;
+    const char *json = "{{ payload }}";
+    char *copy = malloc(strlen(json) + 1);
+    memcpy(copy, json, strlen(json) + 1);
+    return copy;
+}
+static void sample_free_string(char *value) { free(value); }
+static void run_capture(void) {
+    uint64_t chunk = 1;
+{{ declarations }}
+{{ capture }}
+{{ assertions }}
+}
+int main(void) {
+    run_capture();
+    return alef_current_test_status == ALEF_TEST_PASSED ? 0 : 1;
+}

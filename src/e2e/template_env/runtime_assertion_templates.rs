@@ -4,6 +4,14 @@ pub(super) static TEMPLATES: &[(&str, &str)] = &[
         include_str!("../templates/streaming/usage_unavailable.jinja"),
     ),
     (
+        "c/stream_content_assertion.jinja",
+        include_str!("../templates/c/stream_content_assertion.jinja"),
+    ),
+    (
+        "c/content_runtime_probe.jinja",
+        include_str!("../templates/c/content_runtime_probe.jinja"),
+    ),
+    (
         "c/usage_runtime_probe.jinja",
         include_str!("../templates/c/usage_runtime_probe.jinja"),
     ),

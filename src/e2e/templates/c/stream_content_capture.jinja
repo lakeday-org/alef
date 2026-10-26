@@ -18,7 +18,7 @@
             char *first_choice_json = alef_json_array_get_index(chunk_choices, 0);
             if (first_choice_json != NULL) {
 {%- if finish %}
-                char *choice_finish = alef_json_get_string(first_choice_json, "finish_reason");
+                char *choice_finish = alef_json_get_string(first_choice_json, "{{ wire.finish }}");
                 if (choice_finish != NULL && strcmp(choice_finish, "null") != 0) {
                     free(stream_finish_reason);
                     stream_finish_reason = choice_finish;
@@ -27,14 +27,14 @@
                 }
 {%- endif %}
 {%- if tools %}
-                char *choice_delta = alef_json_get_object(first_choice_json, "delta");
-                char *delta_tool_calls = alef_json_get_object(choice_delta, "tool_calls");
+                char *choice_delta = alef_json_get_object(first_choice_json, "{{ wire.delta }}");
+                char *delta_tool_calls = alef_json_get_object(choice_delta, "{{ wire.tools }}");
                 if (delta_tool_calls != NULL) {
                     int delta_tool_call_count = alef_json_array_count(delta_tool_calls);
                     if (delta_tool_call_count > 0 && stream_tool_calls_count == 0) {
                         char *first_call = alef_json_array_get_index(delta_tool_calls, 0);
-                        char *call_function = alef_json_get_object(first_call, "function");
-                        stream_tool_call_name = alef_json_get_string(call_function, "name");
+                        char *call_function = alef_json_get_object(first_call, "{{ wire.function }}");
+                        stream_tool_call_name = alef_json_get_string(call_function, "{{ wire.name }}");
                         free(call_function);
                         free(first_call);
                     }

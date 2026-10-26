@@ -1,0 +1,2 @@
+    final _doneAt = {{ result_var }}.indexWhere((c) => c.choices.any((ch) => ch.finishReason != null));
+    expect(_doneAt >= 0 && _doneAt == {{ result_var }}.length - 1, isTrue);

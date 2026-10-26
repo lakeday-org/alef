@@ -1,5 +1,6 @@
 mod ruby_templates;
 mod runtime_assertion_templates;
+mod stream_state_templates;
 mod typed_list_templates;
 
 use minijinja::Environment;
@@ -779,6 +780,7 @@ pub(crate) fn make_env() -> Environment<'static> {
         .iter()
         .chain(TEMPLATES)
         .chain(ruby_templates::TEMPLATES)
+        .chain(stream_state_templates::TEMPLATES)
         .chain(typed_list_templates::TEMPLATES)
     {
         env.add_template(name, src).expect("built-in template is valid");

@@ -43,17 +43,12 @@ pub(super) fn emit_chat_stream_assertion(
     }
     let field = assertion.field.as_deref().unwrap_or("");
 
-    // Ruby drives the stream with a block, so by the time the call returns there is no iterator
-    // left to ask for one more element. The check reads the collected chunks instead: the stream
-    // is done at the first chunk that carries a finish reason, and no later chunk may carry text
-    // or tool calls. It stays separate from `stream_complete`, which only asks whether a done
-    // chunk exists. ~keep
+    // ~keep Collection preserves chunk order: even an empty chunk after the first terminal chunk
+    // violates the boundary. Checking only its payload would silently permit later chunks.
     if field == "no_chunks_after_done" && atype == "is_true" && stream_complete_is_derived {
-        out.push_str(concat!(
-            "    done_at = chunks.index { |c| c.choices.any? { |ch| !ch.finish_reason.nil? } }\n",
-            "    expect(done_at).not_to be_nil\n",
-            "    expect(chunks.drop(done_at + 1).all? { |c| c.choices.all? { |ch| ",
-            "ch.delta.content.to_s.empty? && (ch.delta.tool_calls || []).empty? } }).to be true\n",
+        out.push_str(&crate::e2e::template_env::render(
+            "ruby/no_chunks_after_done.jinja",
+            minijinja::context! {},
         ));
         return;
     }
@@ -311,7 +306,7 @@ mod emit_chat_stream_assertion_tests {
     }
 
     /// The done check reads the collected chunks: a done chunk must exist and nothing after it
-    /// may carry text or tool calls.
+    /// may exist, including an empty chunk or another terminal chunk. ~keep
     #[test]
     fn no_chunks_after_done_checks_the_chunks_after_the_done_chunk() {
         let assertion = Assertion {
@@ -322,7 +317,7 @@ mod emit_chat_stream_assertion_tests {
         let mut out = String::new();
         emit_chat_stream_assertion(&mut out, &assertion, &E2eConfig::default(), None, true);
         assert!(
-            out.starts_with("    done_at = chunks.index { |c| c.choices.any? { |ch| !ch.finish_reason.nil? } }\n    expect(done_at).not_to be_nil\n    expect(chunks.drop(done_at + 1).all?"),
+            out.starts_with("    done_at = chunks.index { |c| c.choices.any? { |ch| !ch.finish_reason.nil? } }\n    expect(done_at).not_to be_nil\n    expect(done_at == chunks.length - 1).to be true"),
             "got: {out}"
         );
         assert!(!out.contains("skipped"), "got: {out}");

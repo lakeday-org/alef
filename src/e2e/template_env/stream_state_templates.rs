@@ -1,0 +1,26 @@
+pub(super) static TEMPLATES: &[(&str, &str)] = &[
+    (
+        "dart/stream_complete.jinja",
+        include_str!("../templates/dart/stream_complete.jinja"),
+    ),
+    (
+        "dart/no_chunks_after_done.jinja",
+        include_str!("../templates/dart/no_chunks_after_done.jinja"),
+    ),
+    (
+        "dart/stream_finish_reason.jinja",
+        include_str!("../templates/dart/stream_finish_reason.jinja"),
+    ),
+    (
+        "dart/stream_tool_calls.jinja",
+        include_str!("../templates/dart/stream_tool_calls.jinja"),
+    ),
+    (
+        "dart/stream_tool_call_leaf.jinja",
+        include_str!("../templates/dart/stream_tool_call_leaf.jinja"),
+    ),
+    (
+        "ruby/no_chunks_after_done.jinja",
+        include_str!("../templates/ruby/no_chunks_after_done.jinja"),
+    ),
+];

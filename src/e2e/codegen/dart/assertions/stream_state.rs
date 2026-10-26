@@ -4,8 +4,6 @@
 //! `no_chunks_after_done`, `finish_reason` and `tool_calls` are not members of a chunk, so each one
 //! is derived from the whole list. A chunk is done when one of its choices carries a finish reason.
 
-use std::fmt::Write as FmtWrite;
-
 use crate::e2e::fixture::Assertion;
 
 use super::super::escape_dart;
@@ -42,57 +40,48 @@ pub(super) fn try_render(out: &mut String, assertion: &Assertion, result_var: &s
         return false;
     };
     let kind = assertion.assertion_type.as_str();
-    match (field, kind) {
-        ("stream_complete", "is_true" | "is_false") => {
-            let matcher = if kind == "is_true" { "isTrue" } else { "isFalse" };
-            let _ = writeln!(
-                out,
-                "    expect({}.any((ch) => ch.finishReason != null), {matcher});",
-                choices(result_var)
-            );
-        }
-        // A chunk cannot arrive after the stream is collected, so the check is on the content: no
-        // chunk after the first done chunk carries text or tool calls.
-        ("no_chunks_after_done", "is_true") => {
-            let _ = writeln!(
-                out,
-                "    final _doneAt = {result_var}.indexWhere((c) => c.choices.any((ch) => ch.finishReason != null));"
-            );
-            let _ = writeln!(
-                out,
-                "    expect(_doneAt >= 0 && {result_var}.skip(_doneAt + 1).every((c) => c.choices.every((ch) => (ch.delta.content ?? '').isEmpty && (ch.delta.toolCalls ?? []).isEmpty)), isTrue);"
-            );
-        }
-        ("finish_reason", "equals") => {
-            let Some(serde_json::Value::String(expected)) = &assertion.value else {
-                return false;
-            };
-            let _ = writeln!(
-                out,
-                "    expect({}.map((ch) => ch.finishReason?.wireValue).nonNulls.lastOrNull, equals('{}'));",
-                choices(result_var),
-                escape_dart(expected)
-            );
-        }
-        ("tool_calls", "not_empty") => {
-            let _ = writeln!(out, "    expect({}, isNotEmpty);", tool_calls(result_var));
-        }
+    let (template, context) = match (field, kind) {
+        ("stream_complete", "is_true" | "is_false") => (
+            "dart/stream_complete.jinja",
+            minijinja::context! {
+                choices => choices(result_var),
+                matcher => if kind == "is_true" { "isTrue" } else { "isFalse" },
+            },
+        ),
+        ("no_chunks_after_done", "is_true") => ("dart/no_chunks_after_done.jinja", minijinja::context! { result_var }),
+        ("tool_calls", "not_empty") => (
+            "dart/stream_tool_calls.jinja",
+            minijinja::context! { tool_calls => tool_calls(result_var) },
+        ),
         (_, "equals") => {
-            let (Some((index, leaf)), Some(serde_json::Value::String(expected))) =
-                (tool_call_leaf(field), &assertion.value)
-            else {
+            let Some(rendered) = equality_template(assertion, field, result_var) else {
                 return false;
             };
-            let _ = writeln!(
-                out,
-                "    expect({}.elementAtOrNull({index})?.{leaf}, equals('{}'));",
-                tool_calls(result_var),
-                escape_dart(expected)
-            );
+            rendered
         }
         _ => return false,
-    }
+    };
+    out.push_str(&crate::e2e::template_env::render(template, context));
     true
+}
+
+fn equality_template(assertion: &Assertion, field: &str, result_var: &str) -> Option<(&'static str, minijinja::Value)> {
+    let serde_json::Value::String(expected) = assertion.value.as_ref()? else {
+        return None;
+    };
+    if field == "finish_reason" {
+        return Some((
+            "dart/stream_finish_reason.jinja",
+            minijinja::context! { choices => choices(result_var), expected => escape_dart(expected) },
+        ));
+    }
+    let (index, leaf) = tool_call_leaf(field)?;
+    Some((
+        "dart/stream_tool_call_leaf.jinja",
+        minijinja::context! {
+            tool_calls => tool_calls(result_var), index, leaf, expected => escape_dart(expected),
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -119,10 +108,13 @@ mod tests {
     }
 
     #[test]
-    fn no_chunks_after_done_rejects_content_after_the_done_chunk() {
+    fn no_chunks_after_done_requires_the_done_chunk_to_be_last() {
         let out = render("is_true", "no_chunks_after_done", None).expect("rendered");
         assert!(out.contains("final _doneAt = result.indexWhere"), "got:\n{out}");
-        assert!(out.contains("result.skip(_doneAt + 1).every"), "got:\n{out}");
+        assert!(
+            out.contains("_doneAt >= 0 && _doneAt == result.length - 1"),
+            "got:\n{out}"
+        );
     }
 
     #[test]

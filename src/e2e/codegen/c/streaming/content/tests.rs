@@ -253,3 +253,5 @@ fn a_chunk_without_finish_reason_or_tool_calls_keeps_the_skip() {
         assert!(!body.contains("chunk_choices"), "Emitted:\n{body}");
     }
 }
+
+mod wire;

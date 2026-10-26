@@ -1,0 +1,3 @@
+    done_at = chunks.index { |c| c.choices.any? { |ch| !ch.finish_reason.nil? } }
+    expect(done_at).not_to be_nil
+    expect(done_at == chunks.length - 1).to be true

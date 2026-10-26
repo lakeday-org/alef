@@ -21,6 +21,47 @@ pub(super) struct ContentProbe {
     finish: bool,
     /// The tool calls of the first choice's delta are counted and the first call's name is kept.
     tools: bool,
+    wire: WireKeys,
+}
+
+#[derive(Default, serde::Serialize)]
+struct WireKeys {
+    finish: String,
+    delta: String,
+    tools: String,
+    function: String,
+    name: String,
+}
+
+impl WireKeys {
+    fn resolve(choice: &TypeDef, delta: Option<&TypeDef>, types: &[TypeDef]) -> Self {
+        let tool = delta
+            .and_then(|owner| field_type(owner, "tool_calls"))
+            .and_then(list_element);
+        let tool = tool.and_then(|name| types.iter().find(|ty| ty.name == name && !ty.binding_excluded));
+        let function = tool.and_then(|owner| field_type(owner, "function")).and_then(named);
+        let function = function.and_then(|name| types.iter().find(|ty| ty.name == name && !ty.binding_excluded));
+        Self {
+            finish: wire_key(Some(choice), "finish_reason"),
+            delta: wire_key(Some(choice), "delta"),
+            tools: wire_key(delta, "tool_calls"),
+            function: wire_key(tool, "function"),
+            name: wire_key(function, "name"),
+        }
+    }
+}
+
+fn wire_key(owner: Option<&TypeDef>, name: &str) -> String {
+    let field =
+        owner.and_then(|owner| crate::codegen::shared::binding_fields(&owner.fields).find(|field| field.name == name));
+    let wire = crate::codegen::naming::wire_field_name(
+        name,
+        field.and_then(|field| field.serde_rename.as_deref()),
+        owner.and_then(|owner| owner.serde_rename_all.as_deref()),
+    );
+    // Runner helpers match serialized key bytes, so JSON escaping precedes C literal escaping. ~keep
+    let json = serde_json::to_string(&wire).expect("wire name serializes as a JSON string");
+    escape_c(&json[1..json.len() - 1])
 }
 
 /// The streaming pseudo-fields this probe reads from the chunks.
@@ -55,14 +96,9 @@ impl ContentProbe {
         };
         let delta = field_type(choice, "delta").and_then(named).and_then(find);
         let text = wants_text && delta.is_some_and(|delta| field_type(delta, "content").is_some_and(is_text));
-        // The finish reason and the tool calls are read from the choice's JSON, so the wire
-        // name must be the declared field name.
-        let finish = wants_finish && has_plain_field(choice, "finish_reason");
+        let finish = wants_finish && field_type(choice, "finish_reason").is_some();
         let tools = wants_tools
-            && delta.is_some_and(|delta| {
-                has_plain_field(delta, "tool_calls")
-                    && field_type(delta, "tool_calls").is_some_and(|ty| list_element(ty).is_some())
-            });
+            && delta.is_some_and(|delta| field_type(delta, "tool_calls").is_some_and(|ty| list_element(ty).is_some()));
         if !(text || finish || tools) {
             return Self::default();
         }
@@ -73,6 +109,7 @@ impl ContentProbe {
             text,
             finish,
             tools,
+            wire: WireKeys::resolve(choice, delta, types),
         }
     }
 
@@ -109,7 +146,7 @@ impl ContentProbe {
             "c/stream_content_capture.jinja",
             crate::alef_context! {
                 prefix => prefix, prefix_upper => prefix_upper, result => result,
-                text => self.text, finish => self.finish, tools => self.tools,
+                text => self.text, finish => self.finish, tools => self.tools, wire => self.wire,
                 choices_getter => symbols(&self.item, "choices"),
                 choice_type => crate::codegen::naming::pascal_to_snake(&self.choice),
                 delta_getter => symbols(&self.choice, "delta"),
@@ -163,8 +200,9 @@ impl ContentProbe {
             ),
             _ => return false,
         };
-        out.push_str(&format!(
-            "    assert(({expression}) && \"{kind} assertion failed for {field}\");\n"
+        out.push_str(&crate::e2e::template_env::render(
+            "c/stream_content_assertion.jinja",
+            crate::alef_context! { expression => expression, kind => escape_c(kind), field => escape_c(field) },
         ));
         true
     }
@@ -172,11 +210,6 @@ impl ContentProbe {
 
 fn escape_c(text: &str) -> String {
     crate::e2e::escape::escape_c(text)
-}
-
-fn has_plain_field(owner: &TypeDef, name: &str) -> bool {
-    crate::codegen::shared::binding_fields(&owner.fields)
-        .any(|field| field.name == name && field.serde_rename.is_none())
 }
 
 fn field_type<'a>(owner: &'a TypeDef, name: &str) -> Option<&'a TypeRef> {

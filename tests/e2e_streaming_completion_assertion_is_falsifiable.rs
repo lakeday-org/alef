@@ -231,7 +231,7 @@ fn ruby_no_chunks_after_done_reads_the_chunks_after_the_done_chunk() {
         "no_chunks_after_done must locate the done chunk. Emitted:\n{body}"
     );
     assert!(
-        body.contains("expect(chunks.drop(done_at + 1).all?"),
+        body.contains("expect(done_at == chunks.length - 1).to be true"),
         "no_chunks_after_done must check the chunks after the done chunk. Emitted:\n{body}"
     );
     assert_eq!(
