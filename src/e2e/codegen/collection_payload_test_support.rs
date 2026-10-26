@@ -17,7 +17,26 @@ pub fn api() -> ApiSurface {
 }
 
 pub fn resolver(text_projection: bool) -> FieldResolver {
-    let api = api();
+    let mut api = api();
+    // The extractor of a bare fixture leaves `has_serde` unset; the real IR sets it for a
+    // type that derives `Serialize`, which this fixture does.
+    for definition in &mut api.enums {
+        definition.has_serde = true;
+    }
+    build_resolver(api, text_projection)
+}
+
+/// A text-projected resolver whose union has no serde support, so the WASM binding emits no
+/// lossless getter for it.
+pub fn resolver_without_serde() -> FieldResolver {
+    let mut api = api();
+    for definition in &mut api.enums {
+        definition.has_serde = false;
+    }
+    build_resolver(api, true)
+}
+
+fn build_resolver(api: ApiSurface, text_projection: bool) -> FieldResolver {
     let projected = if text_projection {
         vec!["Body".into()]
     } else {
@@ -36,6 +55,7 @@ pub fn resolver(text_projection: bool) -> FieldResolver {
     )
     .with_wasm_enum_representations(&api.enums)
     .with_text_projected_enums(&projected)
+    .with_wasm_text_value_fields(&api.types, &api.enums, &[])
 }
 
 pub fn assertions() -> Vec<Assertion> {

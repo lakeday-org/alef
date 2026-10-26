@@ -115,7 +115,15 @@ impl Backend for WasmBackend {
             }
         }
 
-        let mapper = WasmMapper::new(type_overrides, prefix.clone());
+        // ~keep The e2e generator asks the same question through `FieldResolver::wasm_text_value_accessor`,
+        // which reads the same `text_value_enum_names` and `text_value_companion` functions.
+        let text_value_enum_names = crate::codegen::conversions::helpers::text_value_enum_names(
+            &api.enums,
+            &text_field_enum_names,
+            &exclude_types,
+        );
+        let mapper =
+            WasmMapper::new(type_overrides, prefix.clone()).with_text_value_enums(text_value_enum_names.clone());
         let core_import = config.core_import_for_language(Language::Wasm);
         // See `enums::gen_enum`'s doc comment: wasm-bindgen cannot express a per-variant cfg
         // guard, so its declaration must be resolved definitively against this binding's own
@@ -681,6 +689,11 @@ impl Backend for WasmBackend {
                 None
             } else {
                 Some(&text_field_enum_names)
+            },
+            text_value_enum_names: if text_value_enum_names.is_empty() {
+                None
+            } else {
+                Some(&text_value_enum_names)
             },
             wasm_camel_recased_enums: if wasm_camel_recased_enums.is_empty() {
                 None
