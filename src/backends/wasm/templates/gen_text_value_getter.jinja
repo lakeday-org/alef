@@ -1,0 +1,6 @@
+/// The whole value of `{{ js_name }}` as a plain JS value: a string, or an array of parts.
+/// The `{{ js_name }}` getter returns the display text and drops the parts of a list.
+#[wasm_bindgen(getter, js_name = "{{ companion_js_name }}")]
+pub fn {{ companion }}(&self) -> JsValue {
+    self.{{ companion }}.clone().unwrap_or_else(|| {% if optional %}match &self.{{ name }} { Some(text) => JsValue::from_str(text), None => JsValue::UNDEFINED }{% else %}JsValue::from_str(&self.{{ name }}){% endif %})
+}

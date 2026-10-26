@@ -464,12 +464,17 @@ pub(super) fn gen_text_value_setter(
     has_default: bool,
     companion: &str,
 ) -> String {
-    format!(
-        "#[wasm_bindgen(setter{})]\npub fn set_{name}(&mut self, value: {}) {{\n    self.{name} = value;\n    self.{companion} = None;\n}}",
-        js_name_attr(field),
-        setter_field_type(field, env, has_default),
-        name = field.name,
+    crate::backends::wasm::template_env::render(
+        "gen_text_value_setter",
+        minijinja::context! {
+            name => &field.name,
+            js_name_attr => js_name_attr(field),
+            field_type => setter_field_type(field, env, has_default),
+            companion => companion,
+        },
     )
+    .trim_end_matches('\n')
+    .to_string()
 }
 
 /// Generate the `<field>Value` getter of a text-projected union field.
@@ -478,19 +483,85 @@ pub(super) fn gen_text_value_setter(
 /// returns the stored union as a plain JS value: a string, or an array of parts. A struct built
 /// in JS has no stored union yet, so the getter falls back to the display text. ~keep
 pub(super) fn gen_text_value_getter(field: &FieldDef, companion: &str) -> String {
-    let name = &field.name;
-    let fallback = if stores_option(field) {
-        format!("match &self.{name} {{ Some(text) => JsValue::from_str(text), None => JsValue::UNDEFINED }}")
-    } else {
-        format!("JsValue::from_str(&self.{name})")
-    };
-    format!(
-        "/// The whole value of `{}` as a plain JS value: a string, or an array of parts.\n\
-         /// The `{}` getter returns the display text and drops the parts of a list.\n\
-         #[wasm_bindgen(getter, js_name = \"{}\")]\npub fn {companion}(&self) -> JsValue {{\n    \
-         self.{companion}.clone().unwrap_or_else(|| {fallback})\n}}",
-        to_node_name(name),
-        to_node_name(name),
-        to_node_name(companion),
+    crate::backends::wasm::template_env::render(
+        "gen_text_value_getter",
+        minijinja::context! {
+            name => &field.name,
+            js_name => to_node_name(&field.name),
+            companion => companion,
+            companion_js_name => to_node_name(companion),
+            optional => stores_option(field),
+        },
     )
+    .trim_end_matches('\n')
+    .to_string()
+}
+
+#[cfg(test)]
+mod text_value_accessor_tests {
+    use super::*;
+
+    #[test]
+    fn text_value_accessors_preserve_exact_emission() {
+        let mapper = WasmMapper::new(std::collections::HashMap::new(), "Wasm".to_string());
+        let names = AHashSet::default();
+        let values = AHashMap::default();
+        let env = AccessorEnv {
+            mapper: &mapper,
+            enum_names: &names,
+            tagged_data_enum_names: &names,
+            untagged_ts_value_types: &values,
+            class_type_names: &names,
+        };
+        for (optional, ty) in [
+            (false, TypeRef::String),
+            (true, TypeRef::String),
+            (false, TypeRef::Optional(Box::new(TypeRef::String))),
+        ] {
+            let field = FieldDef {
+                name: "body_text".to_string(),
+                optional,
+                ty,
+                ..Default::default()
+            };
+            let expected_getter = if stores_option(&field) {
+                OPTIONAL_GETTER
+            } else {
+                REQUIRED_GETTER
+            };
+            let expected_setter = if stores_option(&field) {
+                OPTIONAL_SETTER
+            } else {
+                REQUIRED_SETTER
+            };
+            assert_eq!(gen_text_value_getter(&field, "body_text_value"), expected_getter);
+            assert_eq!(
+                gen_text_value_setter(&field, &env, false, "body_text_value"),
+                expected_setter
+            );
+        }
+    }
+
+    const REQUIRED_GETTER: &str = r#"/// The whole value of `bodyText` as a plain JS value: a string, or an array of parts.
+/// The `bodyText` getter returns the display text and drops the parts of a list.
+#[wasm_bindgen(getter, js_name = "bodyTextValue")]
+pub fn body_text_value(&self) -> JsValue {
+    self.body_text_value.clone().unwrap_or_else(|| JsValue::from_str(&self.body_text))
+}"#;
+    const OPTIONAL_GETTER: &str = r#"/// The whole value of `bodyText` as a plain JS value: a string, or an array of parts.
+/// The `bodyText` getter returns the display text and drops the parts of a list.
+#[wasm_bindgen(getter, js_name = "bodyTextValue")]
+pub fn body_text_value(&self) -> JsValue {
+    self.body_text_value.clone().unwrap_or_else(|| match &self.body_text { Some(text) => JsValue::from_str(text), None => JsValue::UNDEFINED })
+}"#;
+    const REQUIRED_SETTER: &str = r#"#[wasm_bindgen(setter, js_name = "bodyText")]
+pub fn set_body_text(&mut self, value: String) {
+    self.body_text = value;
+    self.body_text_value = None;
+}"#;
+    const OPTIONAL_SETTER: &str = r#"#[wasm_bindgen(setter, js_name = "bodyText")]
+pub fn set_body_text(&mut self, value: Option<String>) {
+    self.body_text = value;
+    self.body_text_value = None;
+}"#;
 }
