@@ -5,6 +5,7 @@
 //! that engine/handle creation failed.
 
 use alef::core::config::NewAlefConfig;
+use alef::core::ir::{ErrorDef, MethodDef, PrimitiveType, TypeRef};
 use alef::e2e::codegen::E2eCodegen;
 use alef::e2e::codegen::elixir::ElixirCodegen;
 use alef::e2e::fixture::{Assertion, Fixture, FixtureGroup};
@@ -90,12 +91,16 @@ returns_result = true
 "#;
 
 fn render(fixture: Fixture, category: &str) -> String {
+    render_with_errors(fixture, category, &[])
+}
+
+fn render_with_errors(fixture: Fixture, category: &str, errors: &[ErrorDef]) -> String {
     let cfg: NewAlefConfig = toml::from_str(TOML).expect("config parses");
     let resolved = cfg.clone().resolve().expect("config resolves").remove(0);
     let e2e = cfg.crates[0].e2e.clone().expect("e2e config present");
     let groups = vec![group(fixture, category)];
     let files = ElixirCodegen
-        .generate(&groups, &e2e, &resolved, &[], &[], &[], &[])
+        .generate(&groups, &e2e, &resolved, &[], &[], &[], errors)
         .expect("generation succeeds");
     files.iter().map(|f| f.content.clone()).collect::<Vec<_>>().join("\n")
 }
@@ -190,4 +195,57 @@ fn validation_category_without_declared_value_still_calls_the_operation() {
         content.contains("assert {:error, _} = DemoLib.scrape(engine, \"https://example.com\")"),
         "expected a bare error assertion on the operation call, got:\n{content}"
     );
+}
+
+fn status_code_error() -> ErrorDef {
+    ErrorDef {
+        name: "ApiError".to_string(),
+        rust_path: "demo_lib::ApiError".to_string(),
+        original_rust_path: String::new(),
+        exception_base: None,
+        variants: Vec::new(),
+        doc: String::new(),
+        methods: vec![MethodDef {
+            name: "status_code".to_string(),
+            return_type: TypeRef::Primitive(PrimitiveType::U16),
+            ..MethodDef::default()
+        }],
+        binding_excluded: false,
+        binding_exclusion_reason: None,
+        version: Default::default(),
+    }
+}
+
+#[test]
+fn validation_creation_failure_checks_error_fields_before_the_operation_branch() {
+    for (status, declared_message) in [(401, None), (429, Some("rate limited"))] {
+        let mut fixture = base_fixture("validation_status_code", "validation", declared_message);
+        fixture.assertions.push(Assertion {
+            assertion_type: "equals".to_string(),
+            field: Some("error.status_code".to_string()),
+            value: Some(serde_json::json!(status)),
+            ..Assertion::default()
+        });
+        let content = render_with_errors(fixture, "validation", &[status_code_error()]);
+        let creation = content
+            .split_once("case DemoLib.create_engine(")
+            .expect("handle creation case")
+            .1;
+        let (failure, success) = creation
+            .split_once("        {:ok, engine} ->")
+            .expect("creation success branch");
+        assert!(failure.contains("        {:error, __reason} ->"), "{failure}");
+        let check = format!("          assert %{{status: {status}}} = __reason\n");
+        assert!(
+            failure.contains(&check),
+            "construction failure must check its own error.status_code before the operation branch:\n{failure}"
+        );
+        assert!(success.contains("DemoLib.scrape(engine,"), "{success}");
+        assert!(
+            success.contains(&check),
+            "operation failure must retain its independent field check:\n{success}"
+        );
+        assert_eq!(failure.matches(&check).count(), 1);
+        assert_eq!(success.matches(&check).count(), 1);
+    }
 }
