@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.115.0] - 2026-10-26
+
 ### Added
 
 - Expose lossless WASM `<field>Value` accessors alongside display-text getters for serializable text unions.
