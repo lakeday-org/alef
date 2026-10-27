@@ -106,4 +106,9 @@ opencode.json
 plugin/.ai-rulez/.generated-manifest.json
 .agents/settings.json
 .claude/settings.json
+.claude/plugins.json
+.codex/commands/
+.codex/config.toml
+.codex/plugins.json
+/.mcp.json
 .cursor/
