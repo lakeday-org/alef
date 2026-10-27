@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve nullable Ruby tagged-enum fields in RBS constructor parameters, verified with real Steep acceptance and rejection checks.
 - Marshal C# scalar policy arguments through the C ABI in both visitor and ordinary bridge-field calls.
 
 ## [0.115.4] - 2026-10-27

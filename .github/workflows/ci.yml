@@ -158,6 +158,9 @@ jobs:
         uses: ruby/setup-ruby@v1.335.0
         with:
           ruby-version: "4.0"
+      - name: Install Steep for generated Ruby signature regression
+        if: runner.os != 'Windows'
+        run: gem install steep --version 2.1.0 --no-document
       - name: Install generated Ruby runtime dependency
         run: gem install sorbet-runtime --version 0.6.13506 --no-document
       # Exact pin, not a floor: `template_versions::pypi::PYREFLY` sets the floor emitted into

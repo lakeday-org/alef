@@ -781,7 +781,7 @@ fn gen_tagged_enum_stub(enum_def: &EnumDef, emit_docstrings: bool) -> String {
                 field_type.clone()
             };
             lines.push(format!("    attr_reader {}: {}", name, accessor_type));
-            params.push(format!("{}: {}", name, field_type));
+            params.push(format!("{}: {}", name, accessor_type));
         }
         if !variant.fields.is_empty() {
             lines.push(String::new());
