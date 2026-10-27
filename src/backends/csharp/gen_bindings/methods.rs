@@ -13,3 +13,6 @@ mod fallible_void_tests;
 
 #[cfg(test)]
 mod bytes_out_param_tests;
+
+#[cfg(test)]
+mod bridge_scalar_tests;

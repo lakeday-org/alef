@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `alef` agent skill now documents the consumer `alef:*`, `e2e:*` and `version:*` tasks and why `alef sync-versions` alone is not a version bump, replacing the agent-conventions `alef-workflow` skill.
 
+### Fixed
+
+- Marshal C# scalar policy arguments through the C ABI in both visitor and ordinary bridge-field calls.
+
 ## [0.115.4] - 2026-10-27
 
 ### Fixed

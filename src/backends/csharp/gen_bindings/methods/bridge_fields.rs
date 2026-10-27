@@ -1,4 +1,4 @@
-use super::super::{HANDLE_PINVOKE_TYPE, zero_sentinel, zero_sentinel_for_pinvoke_type};
+use super::super::{HANDLE_PINVOKE_TYPE, native_call_arg, zero_sentinel, zero_sentinel_for_pinvoke_type};
 use crate::backends::csharp::type_map::csharp_type;
 use crate::codegen::doc_emission;
 use crate::codegen::naming::{csharp_type_name, to_csharp_name};
@@ -14,7 +14,7 @@ pub(super) fn gen_bridge_field_wrapper_function(
     bridge_match: &crate::codegen::generators::trait_bridge::BridgeFieldMatch<'_>,
     exception_name: &str,
     _enum_names: &HashSet<String>,
-    _true_opaque_types: &HashSet<String>,
+    true_opaque_types: &HashSet<String>,
     _handle_returned_types: &HashSet<String>,
 ) -> String {
     use crate::backends::csharp::template_env::render;
@@ -162,7 +162,12 @@ pub(super) fn gen_bridge_field_wrapper_function(
             if p.name == *options_param {
                 format!("{options_param_camel}Handle")
             } else {
-                p.name.to_lower_camel_case().to_string()
+                let name = p.name.to_lower_camel_case();
+                if matches!(p.ty, TypeRef::Primitive(_) | TypeRef::Duration) {
+                    native_call_arg(&p.ty, &name, p.optional, true_opaque_types)
+                } else {
+                    name
+                }
             }
         })
         .collect();
