@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Check concrete native members without requiring structural Python protocol callbacks on the native marker class, including generic and qualified `typing.Protocol` bases.
+
 ## [0.115.2] - 2026-10-27
 
 ### Fixed
