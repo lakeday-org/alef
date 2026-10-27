@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.115.5] - 2026-10-27
+
 ### Changed
 
 - Generate Brew and Homebrew suites with Bats and shared helpers, retain compatibility launchers, and cover release and census scripts with shell regression tests in CI.
