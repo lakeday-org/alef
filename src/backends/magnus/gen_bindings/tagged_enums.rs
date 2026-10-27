@@ -217,7 +217,8 @@ pub(super) fn gen_tagged_enum_ruby_classes(
                         } else {
                             f.name.clone()
                         };
-                        let val_expr = format!("hash[:{key_string}] || hash[\"{key_string}\"]");
+                        let val_expr =
+                            format!("hash.key?(:{key_string}) ? hash[:{key_string}] : hash[\"{key_string}\"]");
                         format!("{param_name}: {val_expr}")
                     })
                     .collect();

@@ -20,12 +20,16 @@ record = Fixture::MessageRecord.new(label: payload, enabled: false, note: nil)
 raise "named reader lost payload identity" unless record.label.equal?(payload)
 raise "false payload changed" unless record.enabled == false
 raise "nil payload changed" unless record.note.nil?
+raise "symbol false lost" unless Fixture::MessageRecord.from_hash(enabled: false).enabled == false
+raise "string false lost" unless Fixture::MessageRecord.from_hash("enabled" => false).enabled == false
+raise "symbol precedence lost" unless Fixture::MessageRecord.from_hash({enabled: false, "enabled" => true}).enabled == false
+raise "explicit nil lost" unless Fixture::MessageRecord.from_hash({note: nil, "note" => "fallback"}).note.nil?
 raise "record predicate changed" unless record.record? && !record.text?
 Fixture::MessageRecord.class_eval { def to_h = raise "overridden to_h called" }
 raise "reader dispatched to overridden to_h" unless record.label.equal?(payload)
 empty = Fixture::MessageEmpty.new
 raise "unit variant changed" unless empty.empty?
-puts "8 runtime checks passed"
+puts "12 runtime checks passed"
 "#;
     let script = format!("{generated}\n{assertions}");
     let result = std::process::Command::new(ruby)
@@ -39,7 +43,7 @@ puts "8 runtime checks passed"
     );
     assert_eq!(
         String::from_utf8_lossy(&result.stdout).trim(),
-        "8 runtime checks passed"
+        "12 runtime checks passed"
     );
 }
 

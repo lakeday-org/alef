@@ -3576,7 +3576,7 @@ fn tagged_enum_dispatcher_emits_rubocop_clean_ruby() {
         "no rename_all declared, so the wire value is verbatim, and the dispatcher `when` arm must use double quotes:\n{content}"
     );
     assert!(
-        content.contains("hash[:content] || hash[\"content\"]"),
+        content.contains("hash.key?(:content) ? hash[:content] : hash[\"content\"]"),
         "variant field read must use double quotes:\n{content}"
     );
     assert!(

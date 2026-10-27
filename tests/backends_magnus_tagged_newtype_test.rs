@@ -143,7 +143,8 @@ fn should_keep_reading_the_positional_key_for_representations_serde_does_not_fla
         (Some("role"), None, false, false, "_0"),
     ] {
         let native_rb = generated_native_rb(tag, content, untagged, tuple);
-        let expected = format!(r#"new(value: hash[:{expected_key}] || hash["{expected_key}"])"#);
+        let expected =
+            format!(r#"new(value: hash.key?(:{expected_key}) ? hash[:{expected_key}] : hash["{expected_key}"])"#);
         assert!(
             native_rb.contains(&expected),
             "tag={tag:?} content={content:?} untagged={untagged} tuple={tuple} must read \
