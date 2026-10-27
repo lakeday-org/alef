@@ -20,6 +20,5 @@ Pipeline: `extract → core → codegen → backends::<lang>`, in one root-flat 
 - `cli/` — library support: build cache, crate-filter resolution (`dispatch.rs::select_crates`), git helpers, breaking-change detection, version pinning
 - `extensions/` (dylib/template loading), `adapters/` (framework adapters), `docs/`, `readme/`, `scaffold/`, `snippets/`, `e2e/`, `publish/`
 
-- `src/cli/dispatch.rs` only resolves `--crate`; the real command dispatch is `src/bin_cli/dispatch.rs`.
 - `src/codegen/naming.rs` is the naming-policy module (host identifiers, wire names, internal Rust names, ABI symbols).
-- `generated_header: true` files are overwritten by `alef build`; `generated_header: false` files are written once by `alef scaffold` and user-owned after.
+- Create-once seeds (written only when absent, then user-owned) differ from marked outputs (alef header or `alef:hash:`, rewritten every generation); the marker scan in `src/core/hash/markers.rs` decides ownership, not the command. `GeneratedFile.generated_header` only controls the DO-NOT-EDIT header.
