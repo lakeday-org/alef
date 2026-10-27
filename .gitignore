@@ -94,14 +94,10 @@ erl_crash.dump
 .claude/rules/typescript.md
 .claude/rules/wasm.md
 .claude/rules/zig.md
-.claude/settings.json
 .claude/skills/
 .codex/agents/
 .opencode/agents/
 .opencode/commands/
-.pi/agents/
-.pi/mcp.json
-.pi/prompts/
 AGENTS.md
 CLAUDE.md
 opencode.json

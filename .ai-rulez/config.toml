@@ -3,7 +3,7 @@ version = "5.0"
 name = 'Alef'
 description = 'Polyglot binding generator that produces type-safe language bindings for Rust libraries with generator backends for C#, Dart, R/extendr, C FFI, Gleam, Go, Java, JNI, Kotlin, Kotlin Android, Ruby/Magnus, Node/NAPI, PHP, Python/PyO3, Elixir/Rustler, Swift, WASM, and Zig'
 gitignore = true
-presets = ["claude", "codex", "opencode", "pi"]
+presets = ["claude", "codex", "opencode"]
 compact = true
 builtins = ["!agent-delegation", "!ai-governance", "!git-workflow", "!testing", "default-commands"]
 
