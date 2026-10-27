@@ -5,7 +5,13 @@ description = 'Polyglot binding generator that produces type-safe language bindi
 gitignore = true
 presets = ["claude", "codex", "opencode"]
 compact = true
-builtins = ["!agent-delegation", "!ai-governance", "!git-workflow", "!testing", "default-commands"]
+builtins = [
+  "!agent-delegation",
+  "!ai-governance/agent-workflow",
+  "!git-workflow",
+  "!testing/test-alongside-code",
+  "default-commands",
+]
 
 default_layers = ["plugins"]
 
