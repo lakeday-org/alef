@@ -68,7 +68,6 @@ poly.local.toml
 erl_crash.dump
 
 # BEGIN ai-rulez (DO NOT EDIT - managed by ai-rulez)
-.ai-rulez/local/
 .claude/agents/
 .claude/rules/backend-modules.md
 .claude/rules/centralized-naming.md
@@ -79,7 +78,6 @@ erl_crash.dump
 .claude/rules/go.md
 .claude/rules/java.md
 .claude/rules/kotlin-android.md
-.claude/rules/logging-tracing.md
 .claude/rules/php.md
 .claude/rules/pipeline-hooks.md
 .claude/rules/project-agnostic-codegen.md
@@ -87,6 +85,7 @@ erl_crash.dump
 .claude/rules/r.md
 .claude/rules/ruby.md
 .claude/rules/rust.md
+.claude/rules/shell.md
 .claude/rules/typescript.md
 .claude/skills/
 .codex/agents/
