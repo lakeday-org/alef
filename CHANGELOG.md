@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `alef` agent skill now documents the consumer `alef:*`, `e2e:*` and `version:*` tasks and why `alef sync-versions` alone is not a version bump, replacing the agent-conventions `alef-workflow` skill.
+
 ## [0.115.4] - 2026-10-27
 
 ### Fixed

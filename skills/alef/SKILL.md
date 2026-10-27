@@ -74,6 +74,32 @@ cargo run -q --manifest-path ../alef/Cargo.toml -- docs
 cargo run -q --manifest-path ../alef/Cargo.toml -- all --clean
 ```
 
+## Consumer Tasks
+
+Every consumer repo defines these tasks; read each before running it, since the flags differ by
+repo (xberg adds `--skip-compile --skip-snippet-validation`, crawlberg `--format=false`):
+
+- `task alef:generate` regenerates all Alef-managed output without compiling bindings.
+- `task alef:verify` checks that generated output is fresh; fast regeneration does not run it.
+- `task e2e:generate`, then `task e2e:test`, is the e2e loop.
+- `task build:all` builds the core plus the bindings.
+
+Only some repos define `alef:build`, `build:bindings`, `test:bindings`, `e2e:build`, `e2e:all` and
+`e2e:verify` (none of them exist in liter-llm), and only crawlberg and tree-sitter-language-pack
+define `alef:format` (`alef fmt`); elsewhere `task format` formats generated output. Check
+`task --list`.
+
+## Versions
+
+- `Cargo.toml` is the single source of the version. Never hand-edit a binding manifest's version.
+- Use the full version task: `version:sync`, `version:bump:{major,minor,patch}` and
+  `version:check` (plus `version:set` in some repos). Besides the manifests, it regenerates
+  everything derived from the version (generate, stubs, scaffold, readme, test-apps, e2e) and
+  syncs the coding-agent plugin pin (`plugin/.ai-rulez/config.plugins.toml` `[plugin].version`).
+- `alef sync-versions` alone rewrites only the manifests and leaves the plugin pin and derived
+  files behind; that is how releases have been tagged broken. A repo's `alef:sync` task may be
+  that narrow command or may delegate to the full sync, so read it before relying on it.
+
 ## Config Model
 
 Current Alef configs use:
