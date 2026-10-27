@@ -689,7 +689,7 @@ jobs:
 
       - name: Install Task for package verification
         if: needs.prepare.outputs.dry_run == 'true'
-        uses: xberg-io/actions/install-task@59f1b4d0d2e6186a995f4b8a543951c39ac5edd2
+        uses: xberg-io/actions/install-task@v1
 
       - name: Verify release crates without publishing
         if: needs.prepare.outputs.dry_run == 'true'
