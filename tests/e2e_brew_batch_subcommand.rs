@@ -170,13 +170,13 @@ fn brew_renders_mock_url_list_as_positional_urls() {
 
     let test_file = files
         .iter()
-        .find(|f| f.path.to_string_lossy().contains("test_batch.sh"))
-        .expect("test_batch.sh should be emitted");
+        .find(|f| f.path.to_string_lossy().contains("test_batch.bats"))
+        .expect("test_batch.bats should be emitted");
 
     let content = &test_file.content;
 
     assert!(
-        content.contains("test_scrape_batch_basic()"),
+        content.contains("@test \"scrape_batch_basic\""),
         "test function must be defined. Content:\n{content}"
     );
 
@@ -205,8 +205,8 @@ fn brew_honors_override_subcommand() {
 
     let test_file = files
         .iter()
-        .find(|f| f.path.to_string_lossy().contains("test_batch.sh"))
-        .expect("test_batch.sh should be emitted");
+        .find(|f| f.path.to_string_lossy().contains("test_batch.bats"))
+        .expect("test_batch.bats should be emitted");
 
     let content = &test_file.content;
 
@@ -227,13 +227,13 @@ fn brew_override_subcommand_works_with_tag_routing() {
 
     let test_file = files
         .iter()
-        .find(|f| f.path.to_string_lossy().contains("test_crawl.sh"))
-        .expect("test_crawl.sh should be emitted");
+        .find(|f| f.path.to_string_lossy().contains("test_crawl.bats"))
+        .expect("test_crawl.bats should be emitted");
 
     let content = &test_file.content;
 
     assert!(
-        content.contains("test_crawl_batch_depth()"),
+        content.contains("@test \"crawl_batch_depth\""),
         "test function must be defined. Content:\n{content}"
     );
 

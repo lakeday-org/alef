@@ -663,7 +663,7 @@ pub mod precommit {
     /// under the new recipe, so this bump is what makes `alef verify` report that
     /// one-time transition instead of silently comparing against a golden vector that
     /// no longer matches what the code computes.
-    pub const CODEGEN_FORMAT_VERSION: &str = "3";
+    pub const CODEGEN_FORMAT_VERSION: &str = "4";
 }
 
 /// Wire-representation generations for the FFI ABI surfaces that binding

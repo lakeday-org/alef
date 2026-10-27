@@ -13,6 +13,7 @@ keywords = ["codegen", "bindings", "ffi", "polyglot", "pyo3"]
 categories = ["development-tools::ffi", "development-tools::build-utils"]
 readme = "README.md"
 include = [
+  "tests/lib/xberg-bats/load.bash",
   "Cargo.lock",
   "LICENSE",
   "README.md",

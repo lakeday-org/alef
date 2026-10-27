@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export BATS_LIB_PATH="$SCRIPT_DIR/lib${BATS_LIB_PATH:+:$BATS_LIB_PATH}"
+exec bats "$SCRIPT_DIR/homebrew.bats"

@@ -91,8 +91,8 @@ fn generate_category_script() -> String {
         .expect("brew generation succeeds");
     files
         .iter()
-        .find(|f| f.path.to_string_lossy().ends_with("test_batch.sh"))
-        .expect("test_batch.sh is emitted")
+        .find(|f| f.path.to_string_lossy().ends_with("test_batch.bats"))
+        .expect("test_batch.bats is emitted")
         .content
         .clone()
 }

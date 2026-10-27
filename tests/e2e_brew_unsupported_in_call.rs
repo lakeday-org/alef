@@ -111,8 +111,8 @@ fn brew_emits_skip_comment_for_unsupported_in_call() {
 
     let test_file = files
         .iter()
-        .find(|f| f.path.to_string_lossy().contains("test_interaction.sh"))
-        .expect("test_interaction.sh should be emitted");
+        .find(|f| f.path.to_string_lossy().contains("test_interaction.bats"))
+        .expect("test_interaction.bats should be emitted");
 
     let content = &test_file.content;
 
@@ -127,12 +127,12 @@ fn brew_emits_skip_comment_for_unsupported_in_call() {
     );
 
     assert!(
-        content.contains("return 0"),
+        content.contains("skip "),
         "skip comment must be followed by 'return 0' so the test passes. Content:\n{content}"
     );
 
     assert!(
-        content.contains("test_interact_click()"),
+        content.contains("@test \"interact_click\""),
         "test function must still be defined (not silently omitted). Content:\n{content}"
     );
 }

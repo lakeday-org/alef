@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Generate Brew and Homebrew suites with Bats and shared helpers, retain compatibility launchers, and cover release and census scripts with shell regression tests in CI.
+- Remove two generator function-length lint exemptions and refresh the lint-debt baseline.
 - The `alef` agent skill now documents the consumer `alef:*`, `e2e:*` and `version:*` tasks and why `alef sync-versions` alone is not a version bump, replacing the agent-conventions `alef-workflow` skill.
 
 ### Fixed

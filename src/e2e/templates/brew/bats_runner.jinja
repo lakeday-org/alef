@@ -1,0 +1,12 @@
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export BATS_LIB_PATH="$SCRIPT_DIR/lib${BATS_LIB_PATH:+:$BATS_LIB_PATH}"
+{% if categories %}
+bats \
+{% for category in categories %}
+  "$SCRIPT_DIR/test_{{ category }}.bats"{% if not loop.last %} \
+{% endif %}
+{% endfor %}
+{% else %}
+echo 'error: no active Brew fixtures were generated' >&2
+exit 1
+{% endif %}

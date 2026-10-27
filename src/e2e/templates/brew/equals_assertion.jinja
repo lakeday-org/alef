@@ -1,1 +1,5 @@
-  assert_equals "$val_{{ identifier }}" '{{ expected }}' '{{ field }}' || return "$?"
+{% if needs_literal_comment|default(false) %}
+  # ~keep Fixture expectations are literal data, not shell expressions.
+  # shellcheck disable=SC2016
+{% endif %}
+  [[ "$val_{{ identifier }}" == '{{ expected }}' ]]

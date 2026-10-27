@@ -65,6 +65,23 @@ tasks:
     cmds:
       - task test:run -- --lib swift_callback_link_tests -- --ignored --test-threads=1
 
+  test:bats:
+    desc: "Run shell regression suites"
+    env:
+      BATS_LIB_PATH: "{{.ROOT_DIR}}/tests/lib"
+    cmds:
+      - bats scripts/tests
+
+  test:lib:sync:
+    desc: "Synchronize the pinned shared Bats library"
+    cmds:
+      - python3 scripts/sync_bats_lib.py
+
+  test:lib:check:
+    desc: "Check the shared Bats library against its pinned source"
+    cmds:
+      - python3 scripts/sync_bats_lib.py --check
+
   test:census:
     desc: "Report how many toolchain-dependent fixtures the last test run actually executed"
     cmds:

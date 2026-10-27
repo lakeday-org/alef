@@ -21,6 +21,20 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  shell:
+    name: Shell regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: xberg-io/actions/install-task@v1
+      - uses: xberg-io/actions/install-bats@v1
+      - name: Check shared Bats library
+        run: task test:lib:check
+      - uses: xberg-io/actions/run-bats@v1
+        with:
+          path: scripts/tests
+          lib-path: tests/lib
+
   validate:
     name: Validate
     runs-on: ubuntu-latest
@@ -158,6 +172,9 @@ jobs:
         uses: ruby/setup-ruby@v1.335.0
         with:
           ruby-version: "4.0"
+      - name: Install Bats for generated shell runtime tests
+        if: runner.os != 'Windows'
+        uses: xberg-io/actions/install-bats@v1
       - name: Install Steep for generated Ruby signature regression
         if: runner.os != 'Windows'
         run: gem install steep --version 2.1.0 --no-document

@@ -1,0 +1,17 @@
+{% if needs_literal_comment|default(false) %}
+  # ~keep Fixture expectations are literal data, not shell expressions.
+  # shellcheck disable=SC2016
+{% endif %}
+{% if kind == "equals" %}
+  [[ "${{ actual }}" == {{ expected }} ]]
+{% elif kind == "contains" %}
+  [[ "${{ actual }}" == *{{ expected }}* ]]
+{% elif kind == "not_contains" %}
+  [[ "${{ actual }}" != *{{ expected }}* ]]
+{% elif kind == "not_empty" %}
+  [[ -n "${{ actual }}" && "${{ actual }}" != null && "${{ actual }}" != '[]' && "${{ actual }}" != '{}' ]]
+{% elif kind == "is_empty" %}
+  [[ -z "${{ actual }}" ]]
+{% else %}
+  jq -en --arg actual "${{ actual }}" --arg expected {{ expected }} '($actual | tonumber) {{ operator }} ($expected | tonumber)' >/dev/null
+{% endif %}

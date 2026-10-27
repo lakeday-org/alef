@@ -3,17 +3,16 @@
 //! Generates a self-contained shell-script test suite that tests a CLI binary
 //! installed via Homebrew.  The suite consists of:
 //!
-//! - `run_tests.sh` — main runner that sources per-category files, tracks
-//!   pass/fail counts and exits 1 on any failure.
-//! - `test_{category}.sh` — one file per fixture category, each containing
-//!   a `test_{fixture_id}()` shell function.
+//! - `run_tests.sh` — compatibility entry point that starts the mock server and invokes Bats.
+//! - `test_{category}.bats` — one file per fixture category, each containing
+//!   one Bats test per fixture.
 //!
 //! Each test function:
 //! 1. Constructs a CLI invocation: `{binary} {subcommand} "{url}" {flags...}`
 //! 2. Captures stdout into a variable.
-//! 3. Uses `jq` to extract fields and runs helper assertion functions.
+//! 3. Uses `jq` to extract fields and checks values with native Bats assertions.
 //!
-//! Requirements at runtime: `bash`, `jq`, and `MOCK_SERVER_URL` env var.
+//! Requirements at runtime: `bash`, `bats`, `jq`, and `MOCK_SERVER_URL` env var.
 
 use crate::core::backend::GeneratedFile;
 use crate::core::config::ResolvedCrateConfig;
@@ -31,6 +30,50 @@ mod snippet;
 
 use category::render_category_file;
 use run_tests::render_run_tests;
+
+struct BrewSettings {
+    default_subcommand: String,
+    static_cli_args: Vec<String>,
+    cli_flags: std::collections::HashMap<String, String>,
+    binary_name: String,
+}
+
+impl BrewSettings {
+    fn resolve(e2e_config: &E2eConfig) -> Self {
+        // Resolve call config with overrides for the "brew" language key.
+        let call = &e2e_config.call;
+        let overrides = call.overrides.get("brew");
+        // Default subcommand (used when fixture has no routing tags).
+        let default_subcommand = overrides
+            .and_then(|o| o.function.as_ref())
+            .cloned()
+            .unwrap_or_else(|| call.function.clone());
+
+        // Static CLI flags appended to every invocation.
+        let static_cli_args: Vec<String> = overrides.map(|o| o.cli_args.clone()).unwrap_or_default();
+
+        // Field-to-flag mapping (fixture input field → CLI flag name).
+        let cli_flags: std::collections::HashMap<String, String> =
+            overrides.map(|o| o.cli_flags.clone()).unwrap_or_default();
+
+        // Resolve binary name from the "brew" package entry, falling back to call.module.
+        let binary_name = e2e_config
+            .registry
+            .packages
+            .get("brew")
+            .and_then(|p| p.name.as_ref())
+            .cloned()
+            .or_else(|| e2e_config.packages.get("brew").and_then(|p| p.name.as_ref()).cloned())
+            .unwrap_or_else(|| call.module.clone());
+
+        Self {
+            default_subcommand,
+            static_cli_args,
+            cli_flags,
+            binary_name,
+        }
+    }
+}
 
 /// Brew (Homebrew CLI) e2e code generator.
 pub struct BrewCodegen;
@@ -52,31 +95,12 @@ impl E2eCodegen for BrewCodegen {
         let lang = self.language_name();
         let output_base = PathBuf::from(e2e_config.effective_output()).join(lang);
 
-        // Resolve call config with overrides for the "brew" language key.
-        let call = &e2e_config.call;
-        let overrides = call.overrides.get(lang);
-        // Default subcommand (used when fixture has no routing tags).
-        let default_subcommand = overrides
-            .and_then(|o| o.function.as_ref())
-            .cloned()
-            .unwrap_or_else(|| call.function.clone());
-
-        // Static CLI flags appended to every invocation.
-        let static_cli_args: Vec<String> = overrides.map(|o| o.cli_args.clone()).unwrap_or_default();
-
-        // Field-to-flag mapping (fixture input field → CLI flag name).
-        let cli_flags: std::collections::HashMap<String, String> =
-            overrides.map(|o| o.cli_flags.clone()).unwrap_or_default();
-
-        // Resolve binary name from the "brew" package entry, falling back to call.module.
-        let binary_name = e2e_config
-            .registry
-            .packages
-            .get(lang)
-            .and_then(|p| p.name.as_ref())
-            .cloned()
-            .or_else(|| e2e_config.packages.get(lang).and_then(|p| p.name.as_ref()).cloned())
-            .unwrap_or_else(|| call.module.clone());
+        let BrewSettings {
+            default_subcommand,
+            static_cli_args,
+            cli_flags,
+            binary_name,
+        } = BrewSettings::resolve(e2e_config);
 
         // Filter active groups (non-skipped fixtures).
         let active_groups: Vec<(&FixtureGroup, Vec<&Fixture>)> = groups
@@ -91,7 +115,11 @@ impl E2eCodegen for BrewCodegen {
             })
             .collect();
 
-        let mut files = Vec::new();
+        let mut files = vec![GeneratedFile {
+            path: output_base.join("lib/xberg-bats/load.bash"),
+            content: include_str!("../../../tests/lib/xberg-bats/load.bash").to_owned(),
+            generated_header: true,
+        }];
 
         // Generate run_tests.sh.
         let category_names: Vec<String> = active_groups
@@ -107,7 +135,7 @@ impl E2eCodegen for BrewCodegen {
         // Generate per-category test files.
         for (group, active) in &active_groups {
             let safe_category = sanitize_filename(&group.category);
-            let filename = format!("test_{safe_category}.sh");
+            let filename = format!("test_{safe_category}.bats");
             let content = render_category_file(
                 &group.category,
                 active,

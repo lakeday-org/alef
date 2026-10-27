@@ -171,39 +171,10 @@ pub(super) fn render_run_tests(
     let _ = writeln!(out, "  exit 1");
     let _ = writeln!(out, "fi");
     let _ = writeln!(out);
-    // Harness core: pass/fail counters, the assertion helpers the generated
-    // category tests call, and `run_test`. Emitted from a template because it is a
-    // single logical shell unit with no per-suite parameters.
     out.push_str(&crate::e2e::template_env::render(
-        "brew/harness.sh.jinja",
-        crate::alef_context! {},
+        "brew/bats_runner.jinja",
+        crate::alef_context! { categories => categories },
     ));
-    let _ = writeln!(out);
-
-    // Source per-category files.
-    let script_dir = r#"SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)""#;
-    let _ = writeln!(out, "{script_dir}");
-    let _ = writeln!(out);
-    for category in categories {
-        let _ = writeln!(out, "# shellcheck source=test_{category}.sh");
-        let _ = writeln!(out, "source \"$SCRIPT_DIR/test_{category}.sh\"");
-    }
-    let _ = writeln!(out);
-
-    // Gather all test function names from category files then call them.
-    // We enumerate them at code-generation time so the runner doesn't need
-    // introspection at runtime.
-    let _ = writeln!(out, "# Run all generated test functions.");
-    for category in categories {
-        let _ = writeln!(out, "# Category: {category}");
-        // We emit a placeholder comment — the actual list is per-category.
-        // The run_test calls are emitted inline below based on known IDs.
-        let _ = writeln!(out, "run_tests_{category}");
-    }
-    let _ = writeln!(out);
-    let _ = writeln!(out, "echo \"\"");
-    let _ = writeln!(out, "echo \"Results: $PASS passed, $FAIL failed\"");
-    let _ = writeln!(out, "[ \"$FAIL\" -eq 0 ]");
     out
 }
 
@@ -242,14 +213,24 @@ mod tests {
     /// `false` also renders as text and must keep passing.
     #[test]
     fn not_empty_for_brew_rejects_the_json_renderings_of_empty_values() {
-        let script = render_run_tests(&["auth".to_string()], &BTreeMap::new(), "sample-cli", "localhost");
-        assert!(
-            script.contains(
-                "  if [ -z \"$actual\" ] || [ \"$actual\" = \"null\" ] || [ \"$actual\" = \"[]\" ] \
-                 || [ \"$actual\" = \"{}\" ]; then"
-            ),
-            "got: {script}"
+        let script = crate::e2e::template_env::render(
+            "brew/bats_assertion.jinja",
+            crate::alef_context! {kind => "not_empty", actual => "val", expected => "''", operator => ""},
         );
+        for value in ["", "null", "[]", "{}"] {
+            let status = crate::core::bash_command()
+                .args(["-c", &format!("val='{}'; {}", value, script)])
+                .status()
+                .unwrap();
+            assert!(!status.success(), "empty rendering {value:?} passed");
+        }
+        for value in ["0", "false"] {
+            let status = crate::core::bash_command()
+                .args(["-c", &format!("val='{}'; {}", value, script)])
+                .status()
+                .unwrap();
+            assert!(status.success(), "valid scalar {value:?} failed");
+        }
     }
 
     #[test]
@@ -387,7 +368,7 @@ mod tests {
         }
         let script = render_run_tests(&["smoke".to_string()], &BTreeMap::new(), "sample-cli", "localhost");
         std::fs::write(root.join("run_tests.sh"), &script).expect("write runner");
-        std::fs::write(root.join("test_smoke.sh"), category_body).expect("write category file");
+        std::fs::write(root.join("test_smoke.bats"), category_body).expect("write category file");
 
         let path_var = format!(
             "{}:{}",
@@ -411,57 +392,24 @@ mod tests {
     #[cfg(unix)]
     fn three_assertion_category(first_expected: &str) -> String {
         format!(
-            "#!/usr/bin/env bash\nset -euo pipefail\n\n\
-             test_three_assertions() {{\n\
-             \x20 assert_equals \"2\" \"{first_expected}\" 'first'\n\
-             \x20 assert_equals 'ok' 'ok' 'second'\n\
-             \x20 assert_equals 'ok' 'ok' 'third'\n\
-             }}\n\n\
-             run_tests_smoke() {{\n\
-             \x20 run_test test_three_assertions\n\
-             }}\n"
+            "@test \"three assertions\" {{\n  [[ 2 == {first_expected} ]]\n  [[ ok == ok ]]\n  [[ ok == ok ]]\n}}\n"
         )
     }
 
-    /// Regression: a test whose FIRST of three assertions fails must be reported
-    /// as FAIL and must fail the runner. `run_test` used to invoke the test
-    /// function as an `if` condition, which disables errexit for the whole call,
-    /// so the function's status was just its last command's — every assertion but
-    /// the last could fail while the suite reported PASS and exited 0.
     #[cfg(unix)]
     #[test]
     fn runner_fails_when_only_the_first_of_three_assertions_fails() {
         let (success, output) = run_generated_harness(&three_assertion_category("99"));
-        assert!(
-            output.contains("FAIL [first]: expected '99', got '2'"),
-            "the failing assertion must report itself; got:\n{output}"
-        );
-        assert!(
-            output.contains("FAIL: test_three_assertions"),
-            "the test must be reported as FAIL; got:\n{output}"
-        );
-        assert!(
-            output.contains("Results: 0 passed, 1 failed"),
-            "the tally must count the test as failed; got:\n{output}"
-        );
-        assert!(!success, "the runner must exit non-zero; got:\n{output}");
+        assert!(output.contains("not ok 1 three assertions"), "{output}");
+        assert!(!success, "{output}");
     }
 
-    /// The other half of the guard: the fix must not turn every test red. A
-    /// three-assertion test that passes all three still reports PASS and exits 0.
     #[cfg(unix)]
     #[test]
     fn runner_passes_when_every_assertion_passes() {
         let (success, output) = run_generated_harness(&three_assertion_category("2"));
-        assert!(
-            output.contains("PASS: test_three_assertions"),
-            "an all-passing test must be reported as PASS; got:\n{output}"
-        );
-        assert!(
-            output.contains("Results: 1 passed, 0 failed"),
-            "the tally must count the test as passed; got:\n{output}"
-        );
-        assert!(success, "the runner must exit zero; got:\n{output}");
+        assert!(output.contains("ok 1 three assertions"), "{output}");
+        assert!(success, "{output}");
     }
 
     /// #442: a non-default `[crates.e2e] alt_host` must be baked into the standalone

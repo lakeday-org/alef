@@ -7,6 +7,26 @@ use minijinja::Environment;
 
 static TEMPLATES: &[(&str, &str)] = &[
     (
+        "homebrew/suite.bats.jinja",
+        include_str!("templates/homebrew/suite.bats.jinja"),
+    ),
+    (
+        "homebrew/runner.sh.jinja",
+        include_str!("templates/homebrew/runner.sh.jinja"),
+    ),
+    (
+        "brew/bats_assertion.jinja",
+        include_str!("templates/brew/bats_assertion.jinja"),
+    ),
+    (
+        "brew/bats_test_header.jinja",
+        include_str!("templates/brew/bats_test_header.jinja"),
+    ),
+    (
+        "brew/bats_runner.jinja",
+        include_str!("templates/brew/bats_runner.jinja"),
+    ),
+    (
         "brew/value_capture.jinja",
         include_str!("templates/brew/value_capture.jinja"),
     ),
@@ -238,7 +258,6 @@ static TEMPLATES: &[(&str, &str)] = &[
         "snippets/docs_only_file.md.jinja",
         include_str!("templates/snippets/docs_only_file.md.jinja"),
     ),
-    ("brew/harness.sh.jinja", include_str!("templates/brew/harness.sh.jinja")),
     (
         "brew/snippet_body.jinja",
         include_str!("templates/brew/snippet_body.jinja"),

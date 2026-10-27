@@ -22,11 +22,14 @@ pub(super) fn render_equals(out: &mut String, assertion: &Assertion, resolver: &
     let identifier = sanitize_ident(field);
     let jq_path = super::field_to_jq_path(&resolver.result_relative_path(field));
     render(out, &identifier, &jq_path, field);
+    let expected = super::json_value_to_shell_string(expected);
+    let needs_literal_comment = expected.contains(['$', '`']);
     out.push_str(&crate::e2e::template_env::render(
         "brew/equals_assertion.jinja",
         minijinja::context! {
             identifier => identifier,
-            expected => super::json_value_to_shell_string(expected),
+            expected => expected,
+            needs_literal_comment => needs_literal_comment,
             field => escape_shell(field),
         },
     ));

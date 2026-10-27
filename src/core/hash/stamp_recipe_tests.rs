@@ -27,6 +27,9 @@
 //! contract requires. The vectors below were regenerated on 2026-08-27 by printing the real
 //! `compute_inputs_hash`/`compute_file_hash` output for the fixtures above and copying it back.
 //!
+//! Format 4 invalidates cached generation for the Bats migration. Its vectors were
+//! recomputed through the compiled public hash functions; the per-file recipe is unchanged. ~keep
+//!
 //! Never hand-derive these. Nobody can compute a blake3 digest by hand, and a fabricated vector
 //! that happens to match a wrong implementation is exactly the "check that examined nothing"
 //! failure this repo keeps hitting -- worse than a failing test, because it locks the bug in.
@@ -42,9 +45,9 @@ const FIXTURE_FILE_BODY: &str = "fn fixture() {}\n";
 
 /// The revision the vectors below were computed under. Asserted separately so a bump without
 /// recomputed vectors, and recomputed vectors without a bump, both fail loudly. ~keep
-const PINNED_CODEGEN_FORMAT_VERSION: &str = "3";
+const PINNED_CODEGEN_FORMAT_VERSION: &str = "4";
 
-const GOLDEN_INPUTS_HASH: &str = "3b80c2438f94b045843fcd148c2128953c96dfcd6dbca82748d6633a3160d50f";
+const GOLDEN_INPUTS_HASH: &str = "5a0ca22240a045ef9af6c201034627527bf7dd5622ee0b080bb82643a31f48cb";
 const GOLDEN_FILE_HASH: &str = "335f0c0982c5e42c05344f61b9f107bf072b2bdc778fd920c94b25cc02c57126";
 
 #[test]

@@ -62,25 +62,44 @@ fn generate_assertions(assertions: Vec<Assertion>) -> String {
         .unwrap();
     files
         .into_iter()
-        .find(|file| file.path.ends_with("test_capture.sh"))
+        .find(|file| file.path.ends_with("test_capture.bats"))
         .unwrap()
         .content
 }
 
 fn execute(script: &str, payload: &str) -> (Output, usize) {
     let directory = tempfile::tempdir().unwrap();
-    let category = directory.path().join("category.sh");
+    let category = directory.path().join("category.bats");
     let log = directory.path().join("assertions.log");
-    std::fs::write(&category, script).unwrap();
-    let output = Command::new("bash")
-        .arg("-c")
-        .arg(include_str!("fixtures/brew_value_capture_runtime.sh"))
-        .env("CATEGORY_SCRIPT", category)
+    let instrumented = script
+        .lines()
+        .map(|line| {
+            if line.starts_with("  [[ \"$val_") && line.contains(" == ") {
+                format!("  printf 'assertion\\n' >> \"$ASSERTION_LOG\"\n{line}")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let stub = directory.path().join("sample_cli");
+    std::fs::write(&stub, "#!/usr/bin/env bash\nprintf '%s' \"$JSON_PAYLOAD\"\n").unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::write(&category, instrumented).unwrap();
+    let mut output = Command::new("bats")
+        .arg(&category)
         .env("JSON_PAYLOAD", payload)
         .env("ASSERTION_LOG", &log)
+        .env("BATS_LIB_PATH", concat!(env!("CARGO_MANIFEST_DIR"), "/tests/lib"))
+        .env(
+            "PATH",
+            format!("{}:{}", directory.path().display(), std::env::var("PATH").unwrap()),
+        )
         .current_dir(directory.path())
         .output()
-        .expect("Brew runtime regressions require Bash and real jq");
+        .expect("Bats and real jq are required");
+    output.stderr.extend_from_slice(&output.stdout);
     let count = std::fs::read_to_string(log).unwrap_or_default().lines().count();
     (output, count)
 }
@@ -159,7 +178,7 @@ fn other_string_assertions_use_the_same_lossless_capture() {
             &generate(kind, "value", expected),
             &json!({"value": payload}).to_string(),
             success,
-            usize::from(kind == "contains"),
+            usize::from(matches!(kind, "contains" | "ends_with")),
         );
     }
 }
@@ -169,13 +188,13 @@ fn previous_capture_fails_for_trailing_newlines_for_the_expected_reason() {
     for value in ["one\n", "many\n\n"] {
         let script = generate("equals", "value", json!(value));
         let begin = script.find("  local val_value\n").unwrap();
-        let end = script[begin..].find("  assert_equals").unwrap() + begin;
+        let end = script[begin..].find("  [[ ").unwrap() + begin;
         let legacy = "  local val_value\n  val_value=$(echo \"$output\" | jq -r '.value')\n";
         let script = [&script[..begin], legacy, &script[end..]].concat();
         let (output, assertions) = execute(&script, &json!({"value": value}).to_string());
         assert!(!output.status.success());
         assert_eq!(assertions, 1);
-        assert_eq!(String::from_utf8_lossy(&output.stderr).trim(), "exact mismatch");
+        assert!(String::from_utf8_lossy(&output.stdout).contains("not ok 1 capture"));
     }
 }
 
@@ -190,9 +209,10 @@ fn first_equals_failure_cannot_be_masked_by_a_later_success() {
     let script = generate_assertions(assertions.into());
     let payload = json!({"first": "wrong", "second": "expected"}).to_string();
     assert_status(&script, &payload, false, 1);
-    let unguarded = script.replace(" || return \"$?\"", "");
-    assert_ne!(unguarded, script);
-    assert_status(&unguarded, &payload, true, 2);
+    let native_assertion = "  [[ \"$val_first\" == 'expected' ]]";
+    let ignored_failure = script.replace(native_assertion, &format!("{native_assertion} || true"));
+    assert_ne!(ignored_failure, script);
+    assert_status(&ignored_failure, &payload, true, 2);
 }
 
 #[test]
@@ -255,7 +275,7 @@ fn jq_join_negative_control_proves_the_false_contains_pass() {
     let (output, assertions) = execute(&script, &payload);
     assert!(!output.status.success());
     assert_eq!(assertions, 1);
-    assert_eq!(String::from_utf8_lossy(&output.stderr).trim(), "contains mismatch");
+    assert!(String::from_utf8_lossy(&output.stdout).contains("not ok 1 capture"));
     let joined = script
         .replace("jq -r -s", "jq -j -s")
         .lines()
@@ -266,5 +286,29 @@ fn jq_join_negative_control_proves_the_false_contains_pass() {
     let (output, assertions) = execute(&joined, &payload);
     assert!(output.status.success());
     assert_eq!(assertions, 1);
-    assert!(output.stderr.is_empty());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("ok 1 capture"));
+}
+
+#[test]
+fn numeric_assertions_reject_missing_null_boolean_and_nonnumeric_values() {
+    for kind in [
+        "greater_than",
+        "greater_than_or_equal",
+        "less_than",
+        "less_than_or_equal",
+    ] {
+        let script = generate(kind, "value", json!(0));
+        for payload in [
+            json!({}),
+            json!({"value":null}),
+            json!({"value":true}),
+            json!({"value":false}),
+            json!({"value":"nonsense"}),
+        ] {
+            assert_status(&script, &payload.to_string(), false, 0);
+        }
+        let valid = if kind.starts_with("greater") { 0.5 } else { -0.5 };
+        assert_status(&script, &json!({"value":valid}).to_string(), true, 0);
+        assert_status(&script, &json!({"value":-valid}).to_string(), false, 0);
+    }
 }

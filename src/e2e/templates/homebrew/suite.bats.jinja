@@ -1,0 +1,50 @@
+#!/usr/bin/env bats
+{{ header }}
+export VERSION={{ version }}
+export TAP={{ tap }}
+export CLI_FORMULA={{ cli_formula }}
+{% if ffi_formula %}
+FFI_FORMULA={{ ffi_formula }}
+FFI_FORMULA_QUALIFIED="$TAP/$FFI_FORMULA"
+{% endif %}
+
+setup_file() {
+  brew trust "$TAP" || true
+  brew bundle install --file="$BATS_TEST_DIRNAME/Brewfile"
+}
+
+setup() {
+  export SCRIPT_DIR="$BATS_TEST_DIRNAME"
+  bats_load_library xberg-bats
+}
+{% for test in tests %}
+
+@test {{ test.title }} {
+  run bash -euo pipefail -c {{ test.command }}
+  xberg_assert_status 0
+{% if test.expected %}
+  xberg_assert_output_contains {{ test.expected }}
+{% endif %}
+}
+{% endfor %}
+{% if ffi_formula %}
+
+@test "ffi-smoke" {
+  FFI_CFLAGS=""
+  FFI_LIBS=""
+  if command -v pkg-config &>/dev/null; then
+    FFI_CFLAGS=$(pkg-config --cflags "$FFI_FORMULA" 2>/dev/null || true)
+    FFI_LIBS=$(pkg-config --libs "$FFI_FORMULA" 2>/dev/null || true)
+  fi
+  if [[ -z "$FFI_CFLAGS" || -z "$FFI_LIBS" ]]; then
+    FFI_PREFIX=$(brew --prefix "$FFI_FORMULA_QUALIFIED")
+    FFI_CFLAGS="-I$FFI_PREFIX/include"
+    FFI_LIB_NAME={{ ffi_lib_name }}
+    FFI_LIBS="-L$FFI_PREFIX/lib -l${FFI_LIB_NAME}"
+  fi
+  # shellcheck disable=SC2086
+  cc $FFI_CFLAGS -o "$BATS_TEST_TMPDIR/ffi_smoke" "$BATS_TEST_DIRNAME/ffi_smoke.c" $FFI_LIBS
+  run "$BATS_TEST_TMPDIR/ffi_smoke"
+  xberg_assert_status 0
+}
+{% endif %}

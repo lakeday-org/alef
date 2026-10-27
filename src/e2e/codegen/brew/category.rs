@@ -3,7 +3,7 @@ mod value_capture;
 use crate::core::hash::{self, CommentStyle};
 use crate::e2e::codegen::field_skip::FieldSkip;
 use crate::e2e::config::E2eConfig;
-use crate::e2e::escape::{escape_shell, sanitize_filename, sanitize_ident};
+use crate::e2e::escape::{escape_shell, sanitize_ident};
 use crate::e2e::field_access::FieldResolver;
 use crate::e2e::fixture::{Assertion, Fixture};
 use std::fmt::Write as FmtWrite;
@@ -20,12 +20,11 @@ pub(super) fn render_category_file(
     args: &[crate::e2e::config::ArgMapping],
     e2e_config: &E2eConfig,
 ) -> String {
-    let safe_category = sanitize_filename(category);
     let mut out = String::new();
-    let _ = writeln!(out, "#!/usr/bin/env bash");
+    let _ = writeln!(out, "#!/usr/bin/env bats");
     out.push_str(&hash::e2e_header(CommentStyle::Hash));
     let _ = writeln!(out, "# E2e tests for category: {category}");
-    let _ = writeln!(out, "set -euo pipefail");
+    out.push_str("setup() {\n  bats_load_library xberg-bats\n  set -euo pipefail\n}\n");
     let _ = writeln!(out);
 
     for fixture in fixtures {
@@ -42,13 +41,6 @@ pub(super) fn render_category_file(
         let _ = writeln!(out);
     }
 
-    // Emit a runner function for this category.
-    let _ = writeln!(out, "run_tests_{safe_category}() {{");
-    for fixture in fixtures {
-        let fn_name = sanitize_ident(&fixture.id);
-        let _ = writeln!(out, "  run_test test_{fn_name}");
-    }
-    let _ = writeln!(out, "}}");
     out
 }
 
@@ -120,7 +112,10 @@ fn render_test_function(
 
     let expects_error = fixture.assertions.iter().any(|a| a.assertion_type == "error");
 
-    let _ = writeln!(out, "test_{fn_name}() {{");
+    out.push_str(&crate::e2e::template_env::render(
+        "brew/bats_test_header.jinja",
+        crate::alef_context! { name => fn_name },
+    ));
     let _ = writeln!(out, "  # {description}");
 
     // Resolve fixture-specific call config if provided, otherwise use defaults.
@@ -135,7 +130,7 @@ fn render_test_function(
     // Check if this call is unsupported in brew. If so, skip the test with a documented reason.
     if let Some(reason) = call_config.unsupported_in.get("brew") {
         let _ = writeln!(out, "  # SKIP [brew unsupported]: {reason}");
-        let _ = writeln!(out, "  return 0");
+        let _ = writeln!(out, "  skip {}", crate::core::config::shell::quote_word(reason));
         let _ = writeln!(out, "}}");
         return;
     }
@@ -407,6 +402,21 @@ fn build_brew_method_call(binary_name: &str, method_name: &str, args: Option<&se
     }
 }
 
+fn render_check(out: &mut String, kind: &str, actual: &str, expected: &str) {
+    let operator = match kind {
+        "greater_than" => ">",
+        "greater_than_or_equal" | "count_min" => ">=",
+        "less_than" => "<",
+        "less_than_or_equal" => "<=",
+        _ => "==",
+    };
+    out.push_str(&crate::e2e::template_env::render(
+        "brew/bats_assertion.jinja",
+        crate::alef_context! { kind => kind, actual => actual, expected => expected, operator => operator,
+        needs_literal_comment => expected.contains(['$', '`']), },
+    ));
+}
+
 /// Render a single assertion as shell code.
 fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, field_resolver: &FieldResolver) {
     // Skip assertions on fields not available on the result type.
@@ -429,9 +439,11 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let expected_str = json_value_to_shell_string(expected);
                 let safe_field = sanitize_ident(field);
                 value_capture::render(out, &safe_field, &jq_path, field);
-                let _ = writeln!(
+                render_check(
                     out,
-                    "  assert_contains \"$val_{safe_field}\" '{expected_str}' '{field}'"
+                    "contains",
+                    &format!("val_{safe_field}"),
+                    &format!("'{expected_str}'"),
                 );
             }
         }
@@ -441,7 +453,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
                 value_capture::render(out, &safe_field, &jq_path, field);
-                let _ = writeln!(out, "  assert_not_empty \"$val_{safe_field}\" '{field}'");
+                render_check(out, "not_empty", &format!("val_{safe_field}"), "''");
             }
         }
         "count_min" | "root_child_count_min" => {
@@ -457,7 +469,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                     out,
                     "  count_{safe_field}=$(echo \"$output\" | jq '{jq_path} | length')"
                 );
-                let _ = writeln!(out, "  assert_count_min \"$count_{safe_field}\" {min} '{field}'");
+                render_check(out, "count_min", &format!("count_{safe_field}"), &min.to_string());
             }
         }
         "greater_than" => {
@@ -469,9 +481,11 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let threshold = json_value_to_shell_string(val);
                 let safe_field = sanitize_ident(field);
                 value_capture::render(out, &safe_field, &jq_path, field);
-                let _ = writeln!(
+                render_check(
                     out,
-                    "  assert_greater_than \"$val_{safe_field}\" '{threshold}' '{field}'"
+                    "greater_than",
+                    &format!("val_{safe_field}"),
+                    &format!("'{threshold}'"),
                 );
             }
         }
@@ -484,9 +498,11 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let threshold = json_value_to_shell_string(val);
                 let safe_field = sanitize_ident(field);
                 value_capture::render(out, &safe_field, &jq_path, field);
-                let _ = writeln!(
+                render_check(
                     out,
-                    "  assert_greater_than_or_equal \"$val_{safe_field}\" '{threshold}' '{field}'"
+                    "greater_than_or_equal",
+                    &format!("val_{safe_field}"),
+                    &format!("'{threshold}'"),
                 );
             }
         }
@@ -498,12 +514,9 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
                 value_capture::render(out, &safe_field, &jq_path, field);
-                for (index, item) in items.iter().enumerate() {
+                for item in items {
                     let item_str = json_value_to_shell_string(item);
-                    let _ = writeln!(
-                        out,
-                        "  assert_contains \"$val_{safe_field}\" '{item_str}' '{field}[{index}]'"
-                    );
+                    render_check(out, "contains", &format!("val_{safe_field}"), &format!("'{item_str}'"));
                 }
             }
         }
@@ -513,7 +526,7 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let jq_path = field_to_jq_path(&resolved);
                 let safe_field = sanitize_ident(field);
                 value_capture::render(out, &safe_field, &format!("{jq_path} // empty"), field);
-                let _ = writeln!(out, "  assert_is_empty \"$val_{safe_field}\" '{field}'");
+                render_check(out, "is_empty", &format!("val_{safe_field}"), "''");
             }
         }
         "less_than" => {
@@ -525,7 +538,12 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let threshold = json_value_to_shell_string(val);
                 let safe_field = sanitize_ident(field);
                 value_capture::render(out, &safe_field, &jq_path, field);
-                let _ = writeln!(out, "  assert_less_than \"$val_{safe_field}\" '{threshold}' '{field}'");
+                render_check(
+                    out,
+                    "less_than",
+                    &format!("val_{safe_field}"),
+                    &format!("'{threshold}'"),
+                );
             }
         }
         "not_contains" => {
@@ -537,9 +555,11 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let expected_str = json_value_to_shell_string(expected);
                 let safe_field = sanitize_ident(field);
                 value_capture::render(out, &safe_field, &jq_path, field);
-                let _ = writeln!(
+                render_check(
                     out,
-                    "  assert_not_contains \"$val_{safe_field}\" '{expected_str}' '{field}'"
+                    "not_contains",
+                    &format!("val_{safe_field}"),
+                    &format!("'{expected_str}'"),
                 );
             }
         }
@@ -586,9 +606,11 @@ fn render_assertion(out: &mut String, assertion: &Assertion, binary_name: &str, 
                 let threshold = json_value_to_shell_string(val);
                 let safe_field = sanitize_ident(field);
                 value_capture::render(out, &safe_field, &jq_path, field);
-                let _ = writeln!(
+                render_check(
                     out,
-                    "  assert_less_than_or_equal \"$val_{safe_field}\" '{threshold}' '{field}'"
+                    "less_than_or_equal",
+                    &format!("val_{safe_field}"),
+                    &format!("'{threshold}'"),
                 );
             }
         }
@@ -742,177 +764,7 @@ fn json_value_to_shell_string(value: &serde_json::Value) -> String {
 }
 
 #[cfg(test)]
-mod render_error_test_body_tests {
-    use super::render_error_test_body;
-
-    #[test]
-    fn no_declared_value_is_byte_identical_to_bare_success_check() {
-        let body = render_error_test_body("mycli extract --file x", None);
-        assert_eq!(
-            body,
-            "  if mycli extract --file x >/dev/null 2>&1; then\n    echo 'FAIL [error]: expected command to fail but it succeeded' >&2\n    return 1\n  fi"
-        );
-    }
-
-    #[test]
-    fn declared_value_adds_output_grep_check() {
-        let body = render_error_test_body("mycli extract --file x", Some("BadRequest"));
-        assert_eq!(
-            body,
-            "  if output=$(mycli extract --file x 2>&1); then\n    echo 'FAIL [error]: expected command to fail but it succeeded' >&2\n    return 1\n  fi\n  if ! grep -qF 'BadRequest' <<<\"$output\"; then\n    echo 'FAIL [error]: expected output to contain ''BadRequest' >&2\n    return 1\n  fi"
-        );
-    }
-
-    #[test]
-    fn declared_value_with_regex_metacharacters_needs_no_escaping_under_fixed_string_grep() {
-        // `grep -F` treats the pattern as a literal string, not a regex, so
-        // metacharacters like `.` and `[0]` pass through unescaped and still
-        // match only literally — this is the concern the fixed-string flag exists to avoid.
-        let body = render_error_test_body("mycli extract --file x", Some("field.name[0]"));
-        assert!(body.contains("grep -qF 'field.name[0]'"), "got: {body}");
-    }
-
-    #[test]
-    fn declared_value_with_single_quote_is_shell_escaped() {
-        let body = render_error_test_body("mycli extract --file x", Some("it's bad"));
-        assert!(body.contains(r"grep -qF 'it'\''s bad'"), "got: {body}");
-    }
-
-    /// Regression test: the diagnostic echo previously embedded the already
-    /// single-quoted `{quoted}` fragment inside a *double*-quoted string
-    /// (`echo "... {quoted}" >&2`). Beyond breaking on a literal `"` in the
-    /// value, that also re-enabled `$`/backtick expansion of the value's raw
-    /// content — a real injection hazard, not just a cosmetic quoting bug.
-    /// Assert every double-quoted context in the echo line is free of both
-    /// the raw declared value and shell metacharacters that would expand.
-    #[test]
-    fn declared_value_with_double_quote_and_dollar_does_not_break_out_of_double_quoted_context() {
-        let value = r#"say "$(rm -rf /)""#;
-        let body = render_error_test_body("mycli extract --file x", Some(value));
-        let echo_line = body
-            .lines()
-            .find(|line| line.contains("expected output to contain"))
-            .expect("diagnostic echo line must be present");
-        // The whole message must be built from single-quoted segments only —
-        // no `"..."` span should contain the raw value (which would let `$(...)`
-        // expand at runtime).
-        assert!(
-            !echo_line.contains("\"FAIL"),
-            "diagnostic message must not be embedded in a double-quoted string: {echo_line}"
-        );
-        assert!(
-            echo_line.starts_with("    echo 'FAIL [error]: expected output to contain '"),
-            "got: {echo_line}"
-        );
-    }
-}
+mod render_error_test_body_tests;
 
 #[cfg(test)]
-mod unavailable_field_marker_tests {
-    use super::render_test_function;
-    use crate::e2e::config::{CallConfig, E2eConfig};
-    use crate::e2e::fixture::{Assertion, Fixture};
-
-    fn e2e_config_with_result_fields() -> E2eConfig {
-        E2eConfig {
-            result_fields: std::collections::HashSet::from(["content".to_string()]),
-            call: CallConfig {
-                function: "process".to_string(),
-                ..CallConfig::default()
-            },
-            ..E2eConfig::default()
-        }
-    }
-
-    fn dirty_fixture(id: &str) -> Fixture {
-        Fixture {
-            id: id.to_string(),
-            description: "test fixture".to_string(),
-            assertions: vec![Assertion {
-                assertion_type: "equals".to_string(),
-                field: Some("nonexistent_field".to_string()),
-                value: Some(serde_json::json!("x")),
-                ..Default::default()
-            }],
-            ..Fixture::default()
-        }
-    }
-
-    /// A field absent from `result_fields` renders the shell skip-comment; the
-    /// wired-in `fail_on_unavailable_field_markers` call must see that exact
-    /// text in the fixture's own rendered body.
-    #[test]
-    fn dropped_field_assertion_carries_the_marker() {
-        let e2e_config = e2e_config_with_result_fields();
-        let mut out = String::new();
-
-        render_test_function(
-            &mut out,
-            &dirty_fixture("dirty_smoke"),
-            "mycli",
-            "extract",
-            &[],
-            &std::collections::HashMap::new(),
-            &[],
-            &e2e_config,
-        );
-
-        assert!(
-            out.contains("# skipped: field 'nonexistent_field' not available on result type"),
-            "got: {out}"
-        );
-    }
-
-    /// Two fixtures rendered into the same shared `out` buffer (as
-    /// `render_category_file` does): the first fixture's render must not pick up
-    /// a skip marker appended later by the second fixture, proving the scan is
-    /// correctly offset-scoped per fixture rather than scanning the whole buffer.
-    #[test]
-    fn dropped_field_assertion_is_correctly_attributed_per_fixture() {
-        let e2e_config = e2e_config_with_result_fields();
-        let mut out = String::new();
-
-        let clean_fixture = Fixture {
-            id: "clean_smoke".to_string(),
-            description: "test fixture".to_string(),
-            assertions: vec![Assertion {
-                assertion_type: "not_error".to_string(),
-                ..Default::default()
-            }],
-            ..Fixture::default()
-        };
-        render_test_function(
-            &mut out,
-            &clean_fixture,
-            "mycli",
-            "extract",
-            &[],
-            &std::collections::HashMap::new(),
-            &[],
-            &e2e_config,
-        );
-        let clean_len = out.len();
-
-        render_test_function(
-            &mut out,
-            &dirty_fixture("dirty_smoke"),
-            "mycli",
-            "extract",
-            &[],
-            &std::collections::HashMap::new(),
-            &[],
-            &e2e_config,
-        );
-
-        assert!(
-            !out[..clean_len].contains("not available"),
-            "the first fixture's own render must carry no skip marker, got:\n{}",
-            &out[..clean_len]
-        );
-        assert!(
-            out[clean_len..].contains("# skipped: field 'nonexistent_field' not available on result type"),
-            "got:\n{}",
-            &out[clean_len..]
-        );
-    }
-}
+mod unavailable_field_marker_tests;
