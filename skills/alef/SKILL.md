@@ -14,8 +14,7 @@ Alef extracts a Rust public API surface and generates language-native bindings,
 package scaffolding, type stubs, READMEs, docs, e2e tests, and release metadata
 from `alef.toml`.
 
-Use this skill when working in Alef itself or in a downstream repo that uses
-Alef.
+Use this skill in a repo that uses Alef.
 
 ## Core Rules
 
@@ -23,11 +22,6 @@ Alef.
 - Read the local `alef.toml` before proposing config or generation changes.
 - Do not hand-edit Alef-managed generated files except when adopting an existing
   file into Alef management.
-- Preserve user changes in dirty worktrees. Stage and commit only the requested
-  scope.
-- Prefer narrow commands while iterating, then run the broader verification
-  command before committing.
-- For user-visible Alef behavior changes, update `CHANGELOG.md`.
 
 ## Standard Consumer Workflow
 
@@ -40,7 +34,7 @@ alef stubs
 alef scaffold
 alef readme
 alef docs
-alef verify --exit-code
+alef verify
 ```
 
 Use the combined command when a full refresh is expected. `--clean` bypasses the cache;
@@ -57,7 +51,7 @@ Use filters to keep iteration small:
 alef generate --lang python,node
 alef docs --output docs/reference
 alef test --lang python
-alef verify --exit-code
+alef verify
 ```
 
 Use `--skip-compile` for source-only generation when the repository builds Swift bridge
@@ -66,12 +60,12 @@ language artifacts exist; run snippet validation after building them. Both flags
 work they defer. `alef generate` does not refresh `test_apps/`; use `alef test-apps generate`
 or the corresponding repository task.
 
-When testing an unreleased local Alef from a sibling repo, use its configured local-build task
-or run the binary through Cargo instead of using the installed version:
+When testing an unreleased local Alef, use the repo's local-build task or run the alef checkout
+in the polyrepo root through Cargo (`../alef` from a root checkout, `../../../alef` from
+`.worktrees/<repo>/<name>`):
 
 ```bash
-cargo run -q --manifest-path ../alef/Cargo.toml -- docs
-cargo run -q --manifest-path ../alef/Cargo.toml -- all --clean
+cargo run -q --manifest-path <polyrepo-root>/alef/Cargo.toml -- all --clean
 ```
 
 ## Consumer Tasks
@@ -79,7 +73,9 @@ cargo run -q --manifest-path ../alef/Cargo.toml -- all --clean
 Every consumer repo defines these tasks; read each before running it, since the flags differ by
 repo (all pass `--skip-snippet-validation`; crawlberg omits `--skip-compile`):
 
-- `task alef:generate` regenerates all Alef-managed output without compiling bindings.
+- `task alef:generate` regenerates all Alef-managed output. In crawlberg (no `--skip-compile`) it
+  also compiles the Swift bridge and the FFI header gate, so a subagent without build scope must
+  not run it there.
 - `task alef:verify` checks that generated output is fresh; fast regeneration does not run it.
 - `task e2e:generate`, then `task e2e:test`, is the e2e loop.
 - `task build:all` builds the core plus the bindings.
@@ -88,6 +84,24 @@ Only some repos define `alef:build`, `build:bindings`, `test:bindings`, `e2e:bui
 `e2e:verify` (none of them exist in liter-llm), and only crawlberg and tree-sitter-language-pack
 define `alef:format` (`alef fmt`); elsewhere `task format` formats generated output. Check
 `task --list`.
+
+## Regeneration Is an Audit
+
+- `alef generate`/`all` exit 0 while warning. Capture the log and read every warning (`refusing
+  to write`, `Unavailable`, `Unsupported`, `0 files`, suspiciously round counts).
+- A handful of files where many were expected, or `Generated 0 files` after a config change, is a
+  cache hit: rerun with `--clean` (`alef cache clear` drops `.alef/`). Changing `alef_version`
+  does not change the cache key.
+- A pre-existing file without an alef marker stays un-owned until `alef adopt <path> --write`;
+  `RUST_LOG=alef=debug` shows `refusing to write`.
+- Most diffs are `alef:hash:` churn; review `git diff --numstat | awk '$1>2 || $2>2'`.
+- `alef verify` content-verifies only files with an alef marker. It lists unmarked paths
+  (create-once seeds, user-owned files) as "present but NOT content-verified" and passes them, and
+  a drifted create-once seed (`frozen path(s) DRIFTED`) never fails the exit code.
+- Never run two `alef snippets check` passes at once in one repo; they share `.alef/snippets`
+  session dirs.
+- Workflows install the latest alef unless a step sets `alef-version:`; compare `alef.toml`
+  `alef_version` with `alef --version`.
 
 ## Versions
 
@@ -210,7 +224,7 @@ Then check:
 Stale output:
 
 ```bash
-alef verify --exit-code
+alef verify
 alef diff
 alef generate --clean
 ```
@@ -228,37 +242,3 @@ Docs generation issues:
 - Confirm configured CLI/MCP source paths exist.
 - Confirm generated outputs have Alef headers or `adopt_existing = true`.
 - Use `-v`/`RUST_LOG` when a warning is expected but not visible.
-
-## Working on Alef Itself
-
-In the Alef repo, prefer focused checks while iterating:
-
-```bash
-task format:check
-task lint
-task test:run -- docs:: --nocapture
-```
-
-Use `task test:run -- <test-filter>` for a specific regression. Before committing behavior changes, run the highest-signal relevant tests. For
-docs/template work, also smoke test downstream repos with the local binary:
-
-```bash
-cargo run -q --manifest-path ../alef/Cargo.toml -- docs
-git diff --check
-```
-
-Use the sibling repos that exercise Alef broadly:
-
-- `../crawlberg`
-- `../html-to-markdown`
-- `../liter-llm`
-- `../tree-sitter-language-pack`
-
-Choose downstream consumers relevant to the changed surface; Xberg is also a consumer when its configuration exercises the change.
-
-## Release Notes and Commits
-
-- Update `CHANGELOG.md` under `[Unreleased]` for user-visible changes.
-- Keep release commits separate from feature/fix commits.
-- Do not add AI attribution to commits, tags, or release notes.
-- Use the existing release procedure skill when cutting a version.
