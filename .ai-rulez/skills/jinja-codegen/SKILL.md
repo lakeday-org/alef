@@ -22,7 +22,7 @@ The `codegen-structure` rule says parameterized generated code goes through temp
 
 ## Which `template_env`
 
-There is no `crate::template_env`. Each module owns one: `src/backends/<lang>/template_env.rs`, and `src/{codegen,core,docs,readme,scaffold,e2e}/template_env.rs`. Call the one local to the code:
+There is no `crate::template_env`. Each module owns one: `src/backends/<lang>/template_env.rs`, and `src/{codegen,core,docs,readme,scaffold,e2e}/template_env.rs`, `src/publish/package/template_env.rs`. Call the one local to the code:
 
 ```rust
 out.push_str(&crate::backends::<lang>::template_env::render("block_name.jinja", minijinja::context! {
@@ -36,7 +36,7 @@ In that `template_env.rs`: `("block_name.jinja", include_str!("templates/block_n
 
 ## Engine settings
 
-Each `make_env()` sets `trim_blocks = true`, `lstrip_blocks = true`, `keep_trailing_newline = true`.
+Each `make_env()` calls `crate::template::configure_env` (trim/lstrip blocks, keep trailing newline); a new env must too. `render` also strips `~keep` markers (`strip_keep_markers`).
 
 ## Inline templates
 
