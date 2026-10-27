@@ -37,7 +37,6 @@ rust_out.*
 # AI assistant generated files (broader patterns covering all generated content)
 .github/agents/
 .github/commands/
-.github/copilot-instructions.md
 .github/skills/
 
 .agents/
