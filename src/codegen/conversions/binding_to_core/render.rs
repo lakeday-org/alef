@@ -122,7 +122,6 @@ pub fn gen_from_binding_to_core_cfg(typ: &TypeDef, core_import: &str, config: &C
             .any(|f| !f.optional && matches!(f.ty, TypeRef::Duration));
 
     if has_optionalized_fields {
-        let optionalized = config.optionalize_defaults && typ.has_default;
         let mut statements = Vec::new();
         for field in &typ.fields {
             if field.binding_excluded {
@@ -147,7 +146,8 @@ pub fn gen_from_binding_to_core_cfg(typ: &TypeDef, core_import: &str, config: &C
                 && typ.has_default
                 && !field.optional
                 && matches!(field.ty, TypeRef::Duration);
-            let field_is_config_optionalized = (optionalized && !field.optional) || field_is_optionalized_by_duration;
+            let field_is_config_optionalized =
+                config.field_is_optionalized(typ, field) || field_is_optionalized_by_duration;
 
             let _field_is_genuinely_optional = config.option_duration_on_defaults && typ.has_default && field.optional;
 
@@ -228,15 +228,10 @@ pub fn gen_from_binding_to_core_cfg(typ: &TypeDef, core_import: &str, config: &C
         if optionalized && ((field.sanitized && field.core_wrapper != CoreWrapper::Cow) || references_excluded) {
             continue;
         }
-        let field_was_optionalized = optionalized && !field.optional;
-        let field_was_bare_default_optionalized = config.optionalize_bare_field_defaults
-            && field.has_bare_serde_enum_default()
-            && !field.optional
-            && !field_was_optionalized
-            && !matches!(field.ty, TypeRef::Optional(_));
+        let field_was_optionalized = config.field_is_optionalized(typ, field);
         let binding_name_field = config.binding_field_name_owned(&typ.name, &field.name);
         let conversion = field_core_conversion(field, typ, config, field_was_optionalized, references_excluded);
-        let conversion = if field_was_bare_default_optionalized {
+        let conversion = if field_was_optionalized && !optionalized {
             if let Some(expr) = conversion.strip_prefix(&format!("{}: ", field.name)) {
                 format!(
                     "{}: val.{binding_name_field}.map(|__v| {}).unwrap_or_default()",

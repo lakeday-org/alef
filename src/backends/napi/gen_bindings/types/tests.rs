@@ -94,6 +94,112 @@ fn bare_serde_default_is_optional_without_optionalizing_required_sibling() {
     );
 }
 
+fn legacy_cell(has_default: bool) -> TypeDef {
+    let fields = [
+        ("content", TypeRef::String),
+        ("row", TypeRef::Primitive(crate::core::ir::PrimitiveType::U32)),
+        ("label", TypeRef::Optional(Box::new(TypeRef::String))),
+        ("annotations", TypeRef::Vec(Box::new(TypeRef::String))),
+    ]
+    .into_iter()
+    .map(|(name, ty)| FieldDef {
+        name: name.into(),
+        ty,
+        ..Default::default()
+    })
+    .collect();
+    let mut typ = TypeDef {
+        name: "GridCell".into(),
+        fields,
+        has_default,
+        ..Default::default()
+    };
+    typ.version.legacy_constructor_fields = vec!["content".into(), "row".into(), "label".into()];
+    typ
+}
+
+#[test]
+fn legacy_constructor_fields_preserve_required_napi_fields() {
+    for has_default in [true, false] {
+        let typ = legacy_cell(has_default);
+        for (field, expected) in typ.fields.iter().zip([false, false, true, true]) {
+            assert_eq!(
+                napi_field_is_optional(field, &typ),
+                expected,
+                "{} default={has_default}",
+                field.name
+            );
+        }
+        let rendered = gen_struct(
+            &typ,
+            &NapiMapper::new("Js".into()),
+            "Js",
+            true,
+            &ahash::AHashSet::default(),
+            &[],
+            &[],
+            "sample_core",
+            &ahash::AHashSet::default(),
+            None,
+            &[],
+        );
+        for expected in [
+            "pub content: String",
+            "pub row: u32",
+            "pub label: Option<String>",
+            "pub annotations: Option<Vec<String>>",
+        ] {
+            assert!(rendered.contains(expected), "missing {expected}: {rendered}");
+        }
+    }
+}
+
+#[test]
+fn legacy_constructor_fields_preserve_required_napi_declarations() {
+    for has_default in [true, false] {
+        let api = crate::core::ir::ApiSurface {
+            types: vec![legacy_cell(has_default)],
+            ..Default::default()
+        };
+        let rendered = super::super::errors::gen_dts(
+            &api,
+            "Js",
+            &Default::default(),
+            &[],
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            "sample_core",
+            None,
+        );
+        for expected in [
+            "readonly content: string",
+            "readonly row: number",
+            "readonly label?:",
+            "readonly annotations?:",
+        ] {
+            assert!(rendered.contains(expected), "missing {expected}: {rendered}");
+        }
+    }
+}
+
+#[test]
+fn default_without_legacy_constructor_keeps_optional_napi_fields() {
+    let field = FieldDef {
+        name: "content".into(),
+        ty: TypeRef::String,
+        ..Default::default()
+    };
+    for has_default in [false, true] {
+        let owner = TypeDef {
+            has_default,
+            ..Default::default()
+        };
+        assert_eq!(napi_field_is_optional(&field, &owner), has_default);
+    }
+}
+
 #[test]
 fn non_enum_bare_default_preserves_required_field_shape() {
     let field = FieldDef {
@@ -543,3 +649,5 @@ fn napi_dto_instance_wither_declares_borrowed_wrapper_local_before_use() {
         "wrapper local must be declared before the wither borrows it:\n{output}"
     );
 }
+
+mod legacy_constructor_runtime;

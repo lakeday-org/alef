@@ -297,6 +297,22 @@ pub struct ConversionConfig<'a> {
 }
 
 impl<'a> ConversionConfig<'a> {
+    /// Whether policy adds an Option layer beyond the core field's own type. ~keep
+    pub(crate) fn field_is_optionalized(
+        &self,
+        owner: &crate::core::ir::TypeDef,
+        field: &crate::core::ir::FieldDef,
+    ) -> bool {
+        if field.optional || matches!(field.ty, crate::core::ir::TypeRef::Optional(_)) {
+            return false;
+        }
+        if !owner.legacy_constructor_fields().is_empty() {
+            return self.optionalize_defaults && owner.is_constructor_extension(field);
+        }
+        (self.optionalize_defaults && owner.has_default)
+            || (self.optionalize_bare_field_defaults && field.has_bare_serde_enum_default())
+    }
+
     /// Look up the binding struct field name for a given type and IR field name.
     ///
     /// Returns the escaped name (e.g. `"class_"`) when the field was renamed due to a

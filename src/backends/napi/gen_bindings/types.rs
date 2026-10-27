@@ -29,16 +29,16 @@ pub(super) use opaque_methods::{
 /// Whether the generated NAPI binding declares `field` of `owner` as `Option<T>`, i.e. whether
 /// the emitted `.d.ts` spells it `name?: T` and a JS caller may read `undefined` from it.
 ///
-/// ~keep In addition to fields that are inherently optional, a type implementing `Default`
-/// widens every field to `Option<T>`, while a bare field-level serde default widens only that
-/// field. e2e snippet codegen has to reach the same verdict as this emitter or it can generate
-/// an unconditional property access against a `?`-typed member and fail `tsc` with `TS18048`,
-/// so `FieldResolver::ir_result_field_facts` calls this named predicate too.
+/// ~keep Recorded constructor fields retain their requiredness when `Default` is added
+/// for extension fields. Without constructor history, `Default` still widens every field.
+/// e2e field resolution shares this predicate so its property accesses agree with the binding.
 pub(crate) fn napi_field_is_optional(field: &FieldDef, owner: &TypeDef) -> bool {
-    matches!(field.ty, TypeRef::Optional(_))
-        || field.optional
-        || owner.has_default
-        || field.has_bare_serde_enum_default()
+    let policy = crate::codegen::conversions::ConversionConfig {
+        optionalize_defaults: true,
+        optionalize_bare_field_defaults: true,
+        ..Default::default()
+    };
+    matches!(field.ty, TypeRef::Optional(_)) || field.optional || policy.field_is_optionalized(owner, field)
 }
 
 /// Map a struct-field `TypeRef` containing `TypeRef::Bytes` (Rust `Vec<u8>`) to the TS

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve required NAPI fields listed in `legacy_constructor_fields` when their type implements `Default`; only optional and extension fields may be omitted, and both conversion directions preserve that shape.
+
 ## [0.115.0] - 2026-10-26
 
 ### Added
