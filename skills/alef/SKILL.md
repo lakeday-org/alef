@@ -1,6 +1,6 @@
 ---
 name: alef
-description: "Alef Rust-to-polyglot binding generation: alef.toml, bindings, READMEs, API/CLI/MCP docs, llms.txt, skills and e2e suites, the safe command sequence and generated-output rules. Use when configuring Alef or debugging stale generated output."
+description: "Alef Rust-to-polyglot binding generation: alef.toml, bindings, READMEs, API/CLI/MCP docs and e2e suites, safe command order, generated-output rules. Use when configuring Alef, running task alef:* or e2e:*, bumping versions, or debugging stale output."
 license: MIT
 metadata:
   author: xberg-io
@@ -77,7 +77,7 @@ cargo run -q --manifest-path ../alef/Cargo.toml -- all --clean
 ## Consumer Tasks
 
 Every consumer repo defines these tasks; read each before running it, since the flags differ by
-repo (xberg adds `--skip-compile --skip-snippet-validation`, crawlberg `--format=false`):
+repo (all pass `--skip-snippet-validation`; crawlberg omits `--skip-compile`):
 
 - `task alef:generate` regenerates all Alef-managed output without compiling bindings.
 - `task alef:verify` checks that generated output is fresh; fast regeneration does not run it.
