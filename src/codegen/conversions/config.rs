@@ -313,6 +313,19 @@ impl<'a> ConversionConfig<'a> {
             || (self.optionalize_bare_field_defaults && field.has_bare_serde_enum_default())
     }
 
+    /// NAPI follows regular field optionality; Duration-only policies retain defaulted timeouts. ~keep
+    pub(crate) fn duration_field_is_optionalized(
+        &self,
+        owner: &crate::core::ir::TypeDef,
+        field: &crate::core::ir::FieldDef,
+    ) -> bool {
+        self.option_duration_on_defaults
+            && owner.has_default
+            && !field.optional
+            && matches!(field.ty, crate::core::ir::TypeRef::Duration)
+            && (!self.optionalize_defaults || self.field_is_optionalized(owner, field))
+    }
+
     /// Look up the binding struct field name for a given type and IR field name.
     ///
     /// Returns the escaped name (e.g. `"class_"`) when the field was renamed due to a

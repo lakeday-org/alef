@@ -106,20 +106,11 @@ pub fn gen_from_binding_to_core_cfg(typ: &TypeDef, core_import: &str, config: &C
         );
     }
 
-    let uses_builder_pattern = (config.option_duration_on_defaults
-        && typ.has_default
-        && typ
-            .fields
-            .iter()
-            .any(|f| !f.optional && matches!(f.ty, TypeRef::Duration)))
-        || (config.optionalize_defaults && typ.has_default);
-
-    let has_optionalized_fields = config.option_duration_on_defaults
-        && typ.has_default
-        && typ
-            .fields
-            .iter()
-            .any(|f| !f.optional && matches!(f.ty, TypeRef::Duration));
+    let has_optionalized_fields = typ
+        .fields
+        .iter()
+        .any(|field| config.duration_field_is_optionalized(typ, field));
+    let uses_builder_pattern = has_optionalized_fields || (config.optionalize_defaults && typ.has_default);
 
     if has_optionalized_fields {
         let mut statements = Vec::new();
@@ -134,7 +125,7 @@ pub fn gen_from_binding_to_core_cfg(typ: &TypeDef, core_import: &str, config: &C
                 continue;
             }
             let binding_name_field = config.binding_field_name_owned(&typ.name, &field.name);
-            if !field.optional && matches!(field.ty, TypeRef::Duration) {
+            if config.duration_field_is_optionalized(typ, field) {
                 let cast = if config.cast_large_ints_to_i64 { " as u64" } else { "" };
                 statements.push(format!(
                     "if let Some(__v) = val.{binding_name_field} {{ __result.{} = std::time::Duration::from_millis(__v{cast}); }}",
@@ -142,14 +133,7 @@ pub fn gen_from_binding_to_core_cfg(typ: &TypeDef, core_import: &str, config: &C
                 ));
                 continue;
             }
-            let field_is_optionalized_by_duration = config.option_duration_on_defaults
-                && typ.has_default
-                && !field.optional
-                && matches!(field.ty, TypeRef::Duration);
-            let field_is_config_optionalized =
-                config.field_is_optionalized(typ, field) || field_is_optionalized_by_duration;
-
-            let _field_is_genuinely_optional = config.option_duration_on_defaults && typ.has_default && field.optional;
+            let field_is_config_optionalized = config.field_is_optionalized(typ, field);
 
             let conversion = if field_is_config_optionalized {
                 field_conversion_to_core_cfg(&field.name, &field.ty, false, config)

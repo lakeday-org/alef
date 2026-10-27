@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve required legacy NAPI Duration fields in both conversion directions while retaining defaulted extension and PyO3 Duration behavior.
+
 ## [0.115.1] - 2026-10-27
 
 ### Fixed

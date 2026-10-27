@@ -11,31 +11,53 @@ mod sample_core {
         pub row: u32,
         pub label: Option<String>,
         pub annotations: Vec<String>,
+        pub timeout: std::time::Duration,
+        pub delay: std::time::Duration,
     }
 }
 fn main() {
     let binding = JsGridCell {
-        content: "kept".into(), row: 7, label: Some("label".into()), annotations: None,
+        content: "kept".into(), row: 7, label: Some("label".into()), annotations: None, timeout: 1250, delay: None,
     };
     let core: sample_core::GridCell = binding.into();
     assert_eq!(core.content, "kept");
     assert_eq!(core.row, 7);
     assert_eq!(core.label.as_deref(), Some("label"));
     assert!(core.annotations.is_empty());
+    assert_eq!(core.timeout.as_millis(), 1250);
+    assert!(core.delay.is_zero());
     let binding: JsGridCell = core.into();
     assert_eq!(binding.content, "kept");
     assert_eq!(binding.row, 7);
     assert_eq!(binding.label.as_deref(), Some("label"));
     assert_eq!(binding.annotations, Some(Vec::new()));
+    assert_eq!(binding.timeout, 1250);
+    assert_eq!(binding.delay, Some(0));
 }
 "#;
 
+fn legacy_duration_cell(has_default: bool) -> crate::core::ir::TypeDef {
+    let mut typ = legacy_cell(has_default);
+    for name in ["timeout", "delay"] {
+        typ.fields.push(crate::core::ir::FieldDef {
+            name: name.into(),
+            ty: crate::core::ir::TypeRef::Duration,
+            ..Default::default()
+        });
+    }
+    typ.version.legacy_constructor_fields.push("timeout".into());
+    typ
+}
+
 fn generated_round_trip(has_default: bool) -> String {
-    let typ = legacy_cell(has_default);
+    let typ = legacy_duration_cell(has_default);
     let config = ConversionConfig {
         type_name_prefix: "Js",
         optionalize_defaults: true,
         optionalize_bare_field_defaults: true,
+        option_duration_on_defaults: true,
+        cast_large_ints_to_i64: true,
+        cast_f32_to_f64: true,
         ..Default::default()
     };
     let rendered = super::super::gen_struct(
@@ -113,5 +135,21 @@ fn legacy_constructor_round_trip_compiles_and_preserves_fields() {
             "{}",
             String::from_utf8_lossy(&executed.stderr)
         );
+    }
+}
+
+#[test]
+fn duration_only_policy_preserves_defaulted_legacy_timeouts() {
+    let typ = legacy_duration_cell(true);
+    let timeout = typ.fields.iter().find(|f| f.name == "timeout").expect("legacy timeout");
+    let delay = typ.fields.iter().find(|f| f.name == "delay").expect("extension delay");
+    for (regular_defaults, legacy_optional) in [(false, true), (true, false)] {
+        let config = ConversionConfig {
+            option_duration_on_defaults: true,
+            optionalize_defaults: regular_defaults,
+            ..Default::default()
+        };
+        assert_eq!(config.duration_field_is_optionalized(&typ, timeout), legacy_optional);
+        assert!(config.duration_field_is_optionalized(&typ, delay));
     }
 }

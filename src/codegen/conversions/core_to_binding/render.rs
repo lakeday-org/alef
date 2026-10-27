@@ -185,11 +185,7 @@ pub fn gen_from_core_to_binding_cfg(
             base_conversion
         };
         let needs_some_wrap = !is_flattened_optional
-            && (config.field_is_optionalized(typ, field)
-                || (config.option_duration_on_defaults
-                    && typ.has_default
-                    && !field.optional
-                    && matches!(field.ty, TypeRef::Duration)));
+            && (config.field_is_optionalized(typ, field) || config.duration_field_is_optionalized(typ, field));
         let conversion = if needs_some_wrap {
             if let Some(expr) = base_conversion.strip_prefix(&format!("{}: ", field.name)) {
                 format!("{}: Some({})", field.name, expr)
