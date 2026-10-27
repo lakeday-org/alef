@@ -22,5 +22,5 @@ Adding a target language:
 
 1. Create `src/backends/<lang>/` and add it to `src/backends/mod.rs`.
 2. Implement `Backend`; use `crate::codegen` for shared helpers.
-3. Set `depends_on_ffi: true` in `BuildConfig` when binding via C FFI (Go, Java, C#).
-4. Register it in the CLI backend dispatch table.
+3. Set `build_dep: BuildDependency::Ffi` in its `BuildConfig` when binding via the C FFI (Go, Java, C#).
+4. Add a `Language` variant (`src/core/config/extras.rs`) and a `get_backend` arm in `src/cli/registry.rs`.
