@@ -95,13 +95,14 @@ define `alef:format` (`alef fmt`); elsewhere `task format` formats generated out
 - A pre-existing file without an alef marker stays un-owned until `alef adopt <path> --write`;
   `RUST_LOG=alef=debug` shows `refusing to write`.
 - Most diffs are `alef:hash:` churn; review `git diff --numstat | awk '$1>2 || $2>2'`.
-- `alef verify` content-verifies only files with an alef marker. It lists unmarked paths
-  (create-once seeds, user-owned files) as "present but NOT content-verified" and passes them, and
-  a drifted create-once seed (`frozen path(s) DRIFTED`) never fails the exit code.
+- `alef verify` content-verifies marked files and files it can byte-compare with a fresh render.
+  It lists the rest (create-once seeds, user-owned files) as "present but NOT content-verified"
+  and passes them, and a drifted create-once seed (`frozen path(s) DRIFTED`) never fails the
+  exit code.
 - Never run two `alef snippets check` passes at once in one repo; they share `.alef/snippets`
   session dirs.
-- Workflows install the latest alef unless a step sets `alef-version:`; compare `alef.toml`
-  `alef_version` with `alef --version`.
+- CI's `install-alef` installs the `alef.toml` `alef_version` pin (the newest release only when
+  unpinned); a step's `version:` overrides it. Compare the pin with `alef --version`.
 
 ## Versions
 
