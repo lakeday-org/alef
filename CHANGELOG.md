@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve sparse Node config inputs with container-level serde defaults even when legacy
+  constructor fields are recorded; keep required legacy fields on other DTOs and retain
+  nested defaults and supplied Duration values.
+- Update jsonschema to 0.60.2 for recursive-schema validation fixes and minijinja to 3.0.4.
+
 ## [0.115.1] - 2026-10-27
 
 ### Fixed
