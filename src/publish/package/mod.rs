@@ -262,11 +262,9 @@ fn find_built_artifact_impl(
     profile: BuildProfile,
     extra_dirs: &[PathBuf],
 ) -> Result<PathBuf> {
-    let cross_dir = workspace_root
-        .join("target")
-        .join(&target.triple)
-        .join(profile.dir_name());
-    let native_dir = workspace_root.join("target").join(profile.dir_name());
+    let target_dir = crate::core::cargo_target_dir::for_workspace_root(workspace_root);
+    let cross_dir = target_dir.join(&target.triple).join(profile.dir_name());
+    let native_dir = target_dir.join(profile.dir_name());
     for candidate_dir in [&cross_dir, &native_dir].into_iter().chain(extra_dirs.iter()) {
         for filename in filenames {
             let candidate = candidate_dir.join(*filename);
@@ -295,17 +293,19 @@ fn find_built_artifact_impl(
 
     match untrusted_deps_copy {
         Some(deps_path) => anyhow::bail!(
-            "{filenames_display} not found in target/{}/{profile}/ or target/{profile}/{extra_dirs_note}; an \
+            "{filenames_display} not found in {} or {}{extra_dirs_note}; an \
              unused deps/-only copy exists at {} — run `cargo build -p <crate>{}` (or `alef build{}`) to build \
              it as an explicit top-level target",
-            target.triple,
+            cross_dir.display(),
+            native_dir.display(),
             deps_path.display(),
             profile.cargo_flag(),
             profile.cargo_flag(),
         ),
         None => anyhow::bail!(
-            "{filenames_display} not found in target/{}/{profile}/ or target/{profile}/{extra_dirs_note}",
-            target.triple
+            "{filenames_display} not found in {} or {}{extra_dirs_note}",
+            cross_dir.display(),
+            native_dir.display()
         ),
     }
 }

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stage FFI libraries from Cargo’s effective target directory, honoring environment and config overrides and rejecting stale default-target artifacts.
 - Preserve false and explicit nil values in tagged Ruby variant hashes, with present symbol keys taking precedence over string keys.
 - Preserve nullable Ruby tagged-enum fields in RBS constructor parameters, verified with real Steep acceptance and rejection checks.
 - Marshal C# scalar policy arguments through the C ABI in both visitor and ordinary bridge-field calls.
