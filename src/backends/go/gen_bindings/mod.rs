@@ -9,6 +9,7 @@ mod service_api;
 pub(super) mod types;
 
 use binding_file::{find_options_bridge_function, format_go_code, gen_go_file, strip_trailing_whitespace};
+
 pub(crate) use functions::adapter_flattened_field;
 
 use crate::core::backend::{
@@ -19,6 +20,28 @@ use crate::core::ir::ApiSurface;
 use heck::ToShoutySnakeCase;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+
+pub(crate) fn is_visitor_scalar_param(param: &crate::core::ir::ParamDef) -> bool {
+    use crate::core::ir::TypeRef;
+    matches!(&param.ty, TypeRef::Primitive(_))
+        || matches!(&param.ty, TypeRef::Optional(inner) if matches!(inner.as_ref(), TypeRef::Primitive(_)))
+}
+
+pub(crate) fn visitor_scalar_param_to_c(param: &crate::core::ir::ParamDef) -> Option<String> {
+    if !is_visitor_scalar_param(param) {
+        return None;
+    }
+    Some(methods::gen_param_to_c(
+        param,
+        &methods::GoParamCtx {
+            err_return_prefix: "nil, ",
+            can_return_error: true,
+            ffi_prefix: "",
+            opaque_names: &std::collections::HashSet::new(),
+            ffi_param_enum_names: &std::collections::HashSet::new(),
+        },
+    ))
+}
 
 pub struct GoBackend;
 
@@ -236,11 +259,15 @@ impl Backend for GoBackend {
                 .map(|t| (t.name.as_str(), t))
                 .collect();
             let visitor_trait = trait_map.get(bridge_cfg.trait_name.as_str()).copied();
-            let visitor_function = find_options_bridge_function(api, bridge_cfg);
+            let mut visitor_api = api.clone();
+            visitor_api
+                .functions
+                .retain(|func| !ffi_exclude_functions.contains(&func.name));
+            let visitor_function = find_options_bridge_function(&visitor_api, bridge_cfg);
 
             let visitor_content = if let (Some(vt), Some(visitor_func)) = (visitor_trait, visitor_function) {
                 strip_trailing_whitespace(&crate::backends::go::gen_visitor::gen_visitor_file(
-                    api,
+                    &visitor_api,
                     &pkg_name,
                     &ffi_prefix,
                     &ffi_header,

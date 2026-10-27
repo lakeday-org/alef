@@ -675,3 +675,6 @@ mod adapter_wrapper_tests;
 mod tests;
 #[cfg(test)]
 mod visitor_capsule_tests;
+
+#[cfg(test)]
+mod visitor_policy_runtime_tests;

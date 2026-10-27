@@ -1,0 +1,46 @@
+package sample
+/*
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+typedef uint64_t KRZAlefHandle;
+typedef struct { int unused; } Callbacks;
+extern void goPolicyVisit(void);
+static int attached = 0;
+static Callbacks makeVisitorCallbacks(void *p) { Callbacks cb = {0}; return cb; }
+static KRZAlefHandle krz_render_options_from_json(char *json) { return 1; }
+static void krz_render_options_free(KRZAlefHandle h) { attached = 0; }
+static KRZAlefHandle krz_visitor_create(Callbacks *cb) { return 2; }
+static void krz_options_set_renderer(KRZAlefHandle options, KRZAlefHandle visitor) { attached = 1; }
+static KRZAlefHandle krz_render_with_policy(char *document, int32_t enabled, KRZAlefHandle options) {
+    if (attached) goPolicyVisit();
+    return 10 + enabled + 2 * attached;
+}
+static KRZAlefHandle krz_render(char *document, KRZAlefHandle options) {
+    return krz_render_with_policy(document, 1, options);
+}
+static void krz_render_output_free(KRZAlefHandle h) {}
+static char *krz_render_output_to_json(KRZAlefHandle h) {
+    char buffer[80];
+    snprintf(buffer, sizeof(buffer), "{\"enabled\":%s,\"visited\":%s}", (h - 10) % 2 ? "true" : "false", h >= 12 ? "true" : "false");
+    return strdup(buffer);
+}
+static void krz_free_string(char *p) { free(p); }
+*/
+import "C"
+import (
+    "encoding/json"
+    "fmt"
+    "runtime"
+    "unsafe"
+)
+type Visitor interface{}
+type RenderOptions struct { Renderer Visitor `json:"-"` }
+type RenderOutput struct { Enabled bool `json:"enabled"`; Visited bool `json:"visited"` }
+var callbackCount int
+//export goPolicyVisit
+func goPolicyVisit() { callbackCount++ }
+func registerVisitor(v Visitor) uintptr { return 0 }
+func unregisterVisitor(id uintptr) {}
+func lastError() error { return nil }

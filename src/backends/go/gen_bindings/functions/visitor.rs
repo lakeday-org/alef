@@ -6,7 +6,6 @@ use crate::backends::go::type_map::{alef_handle_c_type, go_optional_type, go_typ
 use crate::codegen::naming::{go_free_function_name, go_param_name, pascal_to_snake, to_go_name};
 use crate::core::config::TraitBridgeConfig;
 use crate::core::ir::{FunctionDef, TypeRef};
-use heck::ToSnakeCase;
 use std::collections::HashSet;
 
 fn capsule_param_decls(func: &FunctionDef) -> String {
@@ -185,6 +184,9 @@ fn render_visitor_c_args(out: &mut String, func: &FunctionDef, options_type: &st
                 },
             ));
             c_args.push(c_name);
+        } else if let Some(setup) = super::super::visitor_scalar_param_to_c(param) {
+            out.push_str(&setup);
+            c_args.push(c_name);
         } else {
             c_args.push(go_name);
         }
@@ -287,7 +289,7 @@ pub(in crate::backends::go::gen_bindings) fn gen_convert_with_visitor_wrapper(
         return_type_name,
         return_type_snake: pascal_to_snake(return_type_name),
     };
-    let helper_name = format!("{}WithVisitorHelper", func.name.to_snake_case());
+    let helper_name = crate::backends::go::gen_visitor::visitor_helper_name(&func.name);
     let return_go_type = go_optional_type(&func.return_type).into_owned();
 
     out.push_str(&render(

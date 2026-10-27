@@ -162,17 +162,7 @@ fn options_bridge_function_matches(func: &crate::core::ir::FunctionDef, bridge_c
     let Some(options_type) = bridge_cfg.options_type.as_deref() else {
         return false;
     };
-    func.params
-        .iter()
-        .any(|param| type_ref_named_type(&param.ty) == Some(options_type))
-}
-
-fn type_ref_named_type(ty: &TypeRef) -> Option<&str> {
-    match ty {
-        TypeRef::Named(name) => Some(name.as_str()),
-        TypeRef::Optional(inner) => type_ref_named_type(inner),
-        _ => None,
-    }
+    crate::backends::go::gen_visitor::supports_options_visitor_function(func, options_type)
 }
 
 /// Returns the host capsule config when `func` returns a configured capsule type by value

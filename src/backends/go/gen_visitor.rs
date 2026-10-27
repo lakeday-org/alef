@@ -34,6 +34,10 @@ use crate::core::{
 };
 use serde_json;
 
+mod helpers;
+use helpers::{helper_c_param_setup, helper_call_args, helper_params};
+pub(crate) use helpers::{supports_options_visitor_function, visitor_helper_name};
+
 /// Derive the cbindgen-generated C type name for a Rust FFI type.
 ///
 /// cbindgen prepends its shouty-snake-cased `[export] prefix` to the Rust struct name
@@ -380,9 +384,6 @@ pub fn gen_visitor_file(
         .as_deref()
         .expect("go options-field visitor bridge requires options_type");
     let options_type_snake = go_visitor_bridge_function_component(options_type);
-    let return_type = named_type_name(&bridge_func.return_type)
-        .expect("go options-field visitor bridge currently requires a named return type");
-    let return_type_snake = go_visitor_bridge_function_component(return_type);
     // NOTE: `TypeRef::Named` values (the options handle here) cross the FFI boundary as
     // alef's scalar `AlefHandle` (see `backends::ffi::type_map::c_return_optional`), never
     // as an opaque pointer to the options struct — so `cOptions` in
@@ -394,11 +395,6 @@ pub fn gen_visitor_file(
     let fn_options_set_visitor = format!("{ffi_prefix}_options_set_{options_field}");
     let fn_options_free = format!("{ffi_prefix}_{options_type_snake}_free");
     let fn_options_from_json = format!("{ffi_prefix}_{options_type_snake}_from_json");
-    let fn_convert = format!(
-        "{ffi_prefix}_{}",
-        go_visitor_bridge_function_component(&bridge_func.name)
-    );
-    let fn_result_free = format!("{ffi_prefix}_{return_type_snake}_free");
 
     let callbacks: Vec<_> = specs
         .iter()
@@ -522,44 +518,52 @@ pub fn gen_visitor_file(
         gen_trampoline(&mut out, spec, &context_c_type);
     }
 
-    let fn_result_to_json = fn_result_free.replace("_free", "_to_json");
-    let helper_name = format!(
-        "{}WithVisitorHelper",
-        go_visitor_bridge_function_component(&bridge_func.name)
-    );
-    let helper_params = helper_params(bridge_func);
-    let helper_setup = helper_c_param_setup(bridge_func, options_type);
-    let helper_call_args = helper_call_args(bridge_func, options_type);
-    let options_var = bridge_func
-        .params
-        .iter()
-        .find(|param| named_type_name(&param.ty) == Some(options_type))
-        .map(|param| crate::codegen::naming::go_param_name(&param.name))
-        .unwrap_or_else(|| "options".to_string());
-    out.push_str(&crate::backends::go::template_env::render(
-        "convert_with_visitor_helper.jinja",
-        crate::alef_context! {
-            helper_name => helper_name,
-            helper_params => helper_params,
-            helper_setup => helper_setup,
-            helper_call_args => helper_call_args,
-            options_var => options_var,
-            options_type => options_type,
-            conversion_options_type => conversion_options_type,
-            fn_options_from_json => fn_options_from_json,
-            fn_options_free => fn_options_free,
-            fn_visitor_create => fn_visitor_create,
-            fn_visitor_free => fn_visitor_free,
-            fn_options_set_visitor => fn_options_set_visitor,
-            visitor_handle_c_type => visitor_handle_c_type.clone(),
-            fn_convert => fn_convert,
-            fn_result_to_json => fn_result_to_json,
-            fn_result_free => fn_result_free,
-            result_type => return_type,
-        },
-    ));
-    out.push('\n');
-    out.push('\n');
+    for bridge_func in std::iter::once(bridge_func).chain(
+        api.functions
+            .iter()
+            .filter(|func| func.name != bridge_func.name && supports_options_visitor_function(func, options_type)),
+    ) {
+        let return_type = named_type_name(&bridge_func.return_type)
+            .expect("go options-field visitor bridge currently requires a named return type");
+        let return_type_snake = go_visitor_bridge_function_component(return_type);
+        let fn_convert = crate::backends::go::c_symbols::free_function_symbol(ffi_prefix, &bridge_func.name);
+        let fn_result_free = format!("{ffi_prefix}_{return_type_snake}_free");
+        let fn_result_to_json = format!("{ffi_prefix}_{return_type_snake}_to_json");
+        let helper_name = visitor_helper_name(&bridge_func.name);
+        let helper_params = helper_params(bridge_func);
+        let helper_setup = helper_c_param_setup(bridge_func, options_type);
+        let helper_call_args = helper_call_args(bridge_func, options_type);
+        let options_var = bridge_func
+            .params
+            .iter()
+            .find(|param| named_type_name(&param.ty) == Some(options_type))
+            .map(|param| crate::codegen::naming::go_param_name(&param.name))
+            .unwrap_or_else(|| "options".to_string());
+        out.push_str(&crate::backends::go::template_env::render(
+            "convert_with_visitor_helper.jinja",
+            crate::alef_context! {
+                helper_name => helper_name,
+                helper_params => helper_params,
+                helper_setup => helper_setup,
+                helper_call_args => helper_call_args,
+                options_var => options_var,
+                options_type => options_type,
+                conversion_options_type => conversion_options_type,
+                fn_options_from_json => fn_options_from_json,
+                fn_options_free => fn_options_free,
+                fn_visitor_create => fn_visitor_create,
+                fn_visitor_free => fn_visitor_free,
+                fn_options_set_visitor => fn_options_set_visitor,
+                visitor_handle_c_type => visitor_handle_c_type.clone(),
+                fn_convert => fn_convert,
+                fn_result_to_json => fn_result_to_json,
+                fn_result_free => fn_result_free,
+                result_type => return_type,
+            },
+        ));
+        out.push('\n');
+        out.push('\n');
+    }
 
     out
 }
@@ -876,63 +880,6 @@ fn named_type_name(ty: &TypeRef) -> Option<&str> {
         TypeRef::Optional(inner) => named_type_name(inner),
         _ => None,
     }
-}
-
-fn helper_params(func: &FunctionDef) -> String {
-    let mut params = func
-        .params
-        .iter()
-        .map(|param| {
-            let go_name = crate::codegen::naming::go_param_name(&param.name);
-            let go_type: String = if param.optional {
-                crate::backends::go::type_map::go_optional_type(&param.ty).into_owned()
-            } else if let TypeRef::Named(_) = &param.ty {
-                format!("*{}", crate::backends::go::type_map::go_type(&param.ty))
-            } else {
-                crate::backends::go::type_map::go_type(&param.ty).into_owned()
-            };
-            format!("{go_name} {go_type}")
-        })
-        .collect::<Vec<_>>();
-    params.push("visitor Visitor".to_string());
-    params.join(", ")
-}
-
-fn helper_c_param_setup(func: &FunctionDef, options_type: &str) -> String {
-    let mut out = String::new();
-    for param in &func.params {
-        if named_type_name(&param.ty) == Some(options_type) {
-            continue;
-        }
-        if matches!(param.ty, TypeRef::String | TypeRef::Path) {
-            let go_name = crate::codegen::naming::go_param_name(&param.name);
-            let c_name = crate::codegen::naming::go_param_name(&format!("c_{}", param.name));
-            out.push_str(&crate::backends::go::template_env::render(
-                "c_string_arg_setup.jinja",
-                crate::alef_context! {
-                    c_name => &c_name,
-                    go_name => &go_name,
-                },
-            ));
-        }
-    }
-    out
-}
-
-fn helper_call_args(func: &FunctionDef, options_type: &str) -> String {
-    func.params
-        .iter()
-        .map(|param| {
-            if named_type_name(&param.ty) == Some(options_type) {
-                "cOptions".to_string()
-            } else if matches!(param.ty, TypeRef::String | TypeRef::Path) {
-                crate::codegen::naming::go_param_name(&format!("c_{}", param.name))
-            } else {
-                crate::codegen::naming::go_param_name(&param.name)
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 #[cfg(test)]

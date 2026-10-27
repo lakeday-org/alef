@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Generate Go visitor helpers for every options-taking function and marshal scalar policy arguments through the C ABI on both ordinary and visitor calls.
+
 ## [0.115.3] - 2026-10-27
 
 ### Fixed

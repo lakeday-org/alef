@@ -1,6 +1,8 @@
 use alef::backends::go::gen_visitor::gen_visitor_file;
 use alef::core::config::{BridgeBinding, TraitBridgeConfig};
-use alef::core::ir::{ApiSurface, EnumDef, EnumVariant, FieldDef, FunctionDef, ParamDef, TypeDef, TypeRef};
+use alef::core::ir::{
+    ApiSurface, EnumDef, EnumVariant, FieldDef, FunctionDef, ParamDef, PrimitiveType, TypeDef, TypeRef,
+};
 
 /// Smoke test: gen_visitor_file produces output with the expected callback structure.
 /// The exact C callback struct name depends on `ffi_prefix`.
@@ -153,8 +155,22 @@ fn test_visitor_file_uses_configured_function_options_field_and_result() {
         version: Default::default(),
     };
 
+    let mut api = visitor_metadata_api("SyntaxContext", "WalkDecision", "Continue");
+    let base = bridge_function("render", "document", "settings", "RenderOptions", "RenderOutput");
+    let mut flagged = base.clone();
+    flagged.name = "render_with_policy".to_string();
+    flagged
+        .params
+        .insert(1, param("enabled", TypeRef::Primitive(PrimitiveType::Bool), false));
+    let mut scalar_result = base.clone();
+    scalar_result.name = "can_render".to_string();
+    scalar_result.return_type = TypeRef::Primitive(PrimitiveType::Bool);
+    let mut async_function = base.clone();
+    async_function.name = "render_async".to_string();
+    async_function.is_async = true;
+    api.functions = vec![base.clone(), flagged, scalar_result, async_function];
     let output = gen_visitor_file(
-        &visitor_metadata_api("SyntaxContext", "WalkDecision", "Continue"),
+        &api,
         "mypkg",
         "krz",
         "my_lib.h",
@@ -171,7 +187,7 @@ fn test_visitor_file_uses_configured_function_options_field_and_result() {
             Some("SyntaxContext"),
             Some("WalkDecision"),
         ),
-        &bridge_function("render", "document", "settings", "RenderOptions", "RenderOutput"),
+        &base,
     );
 
     assert!(output.contains(
@@ -185,6 +201,12 @@ fn test_visitor_file_uses_configured_function_options_field_and_result() {
     assert!(output.contains("defer C.krz_render_output_free(ptr)"));
     assert!(output.contains("jsonPtr := C.krz_render_output_to_json(ptr)"));
     assert!(!output.contains("convertWithVisitorHelper"));
+    assert_eq!(output.matches("func renderWithVisitorHelper(").count(), 1);
+    assert!(!output.contains("func canRenderWithVisitorHelper("));
+    assert!(!output.contains("func renderAsyncWithVisitorHelper("));
+    assert!(output.contains("func renderWithPolicyWithVisitorHelper(document string, enabled bool, settings *RenderOptions, visitor Visitor)"));
+    assert!(output.contains("var cEnabled C.int32_t"));
+    assert!(output.contains("ptr := C.krz_render_with_policy(cDocument, cEnabled, cOptions)"));
 }
 
 #[test]

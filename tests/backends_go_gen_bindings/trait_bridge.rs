@@ -138,7 +138,7 @@ fn test_options_field_visitor_wrapper_uses_bridge_config_not_convert_names() {
     let mut config = make_config_with_bridges(vec![bridge_cfg]);
     config.go.as_mut().unwrap().functional_options = vec![];
 
-    let api = ApiSurface {
+    let mut api = ApiSurface {
         unresolved_modules: Vec::new(),
         crate_name: "test-lib".to_string(),
         version: "1.0.0".to_string(),
@@ -270,6 +270,13 @@ fn test_options_field_visitor_wrapper_uses_bridge_config_not_convert_names() {
         unsupported_public_items: Vec::new(),
     };
 
+    let mut flagged = api.functions[0].clone();
+    flagged.name = "render_with_policy".to_string();
+    flagged
+        .params
+        .insert(1, make_trait_param("enabled", TypeRef::Primitive(PrimitiveType::Bool)));
+    api.functions.push(flagged);
+
     let files = GoBackend.generate_bindings(&api, &config).unwrap();
     let binding = files
         .iter()
@@ -292,6 +299,11 @@ fn test_options_field_visitor_wrapper_uses_bridge_config_not_convert_names() {
     assert!(!binding.contains("convertWithVisitorHelper"));
     assert!(!binding.contains("HTMConversionOptions"));
     assert!(!binding.contains("ConversionResult"));
+    assert!(
+        binding.contains("return renderWithPolicyWithVisitorHelper(document, enabled, settings, settings.Renderer)")
+    );
+    assert!(binding.contains("var cEnabled C.int32_t"));
+    assert!(binding.contains("ptr := C.krz_render_with_policy(cDocument, cEnabled, cOptions)"));
 }
 
 #[test]
