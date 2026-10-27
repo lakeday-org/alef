@@ -1,4 +1,5 @@
 project_doc_max_bytes = 65536
+model_reasoning_effort = "medium"
 
 [mcp_servers.playwright]
 args = ["-y", "@playwright/mcp@0.0.83"]

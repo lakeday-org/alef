@@ -15,6 +15,12 @@ builtins = [
 
 default_layers = ["plugins"]
 
+[header]
+style = 'minimal'
+
+[defaults]
+effort = 'medium'
+
 [[includes]]
 name = 'xberg-core'
 source = 'https://github.com/xberg-io/agent-conventions.git'
