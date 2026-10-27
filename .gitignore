@@ -72,11 +72,9 @@ erl_crash.dump
 .ai-rulez/local/
 .claude/agents/
 .claude/rules/backend-modules.md
-.claude/rules/c-ffi.md
 .claude/rules/centralized-naming.md
 .claude/rules/codegen-structure.md
 .claude/rules/csharp.md
-.claude/rules/dart.md
 .claude/rules/elixir.md
 .claude/rules/file-modularization.md
 .claude/rules/go.md
@@ -90,10 +88,7 @@ erl_crash.dump
 .claude/rules/r.md
 .claude/rules/ruby.md
 .claude/rules/rust.md
-.claude/rules/swift.md
 .claude/rules/typescript.md
-.claude/rules/wasm.md
-.claude/rules/zig.md
 .claude/skills/
 .codex/agents/
 .opencode/agents/
