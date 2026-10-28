@@ -13,7 +13,7 @@ from session_guard import supervise
 
 
 def main():
-    if sys.version_info < (3, 11):
+    if sys.version_info < (3, 11):  # noqa: UP036  # ~keep Runs under the runner's preinstalled python3, not the mise interpreter.
         raise RuntimeError("hosted preinstalled Python 3.11+ required for actual TOML configuration")
     root = Path(os.environ.get("GITHUB_WORKSPACE", str(Path(__file__).resolve().parents[2]))).resolve(strict=True)
     os.environ.setdefault("GITHUB_WORKSPACE", str(root))

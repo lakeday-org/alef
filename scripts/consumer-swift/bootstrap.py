@@ -4,9 +4,9 @@ import json
 import os
 import re
 import shutil
+import tomllib
 from pathlib import Path
 
-import tomllib
 from receipts import sha
 
 

@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -17,7 +18,6 @@ import native_receipts
 import negative
 import receipts
 import runtime
-import tomllib
 import tool_assets
 from contracts import immutable_ref, safe_test_census
 from strict_flags import strict_flags

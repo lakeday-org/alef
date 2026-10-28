@@ -6,10 +6,9 @@ import re
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
-
-import tomllib
 
 REPO = Path(__file__).resolve().parents[1]
 

@@ -1,10 +1,10 @@
 """Bootstrap ordering and fail-closed toolchain policy at the owned Gate boundary."""
 
+import tomllib
 import unittest
 from pathlib import Path
 
 import bootstrap
-import tomllib
 
 
 class IdentityReachedError(RuntimeError):
