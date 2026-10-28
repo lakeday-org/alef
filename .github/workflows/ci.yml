@@ -141,7 +141,7 @@ jobs:
         if: runner.os != 'Windows'
         uses: Goldziher/poly@v0
         with:
-          version: v0.24.0
+          version: v0.31.0
       - name: Set up JDK
         uses: actions/setup-java@v6
         with:
@@ -357,7 +357,7 @@ jobs:
         # `tests/ci_poly_pin_gate.rs` enforces both. ~keep
         uses: Goldziher/poly@v0
         with:
-          version: v0.24.0
+          version: v0.31.0
       # Both tools must be present *before* the lanes run. The lanes fail on a missing
       # tool rather than skipping, so this step exists to fail earlier and more legibly,
       # not to decide whether the gate runs. The poly assertions are deliberately strict
@@ -373,8 +373,8 @@ jobs:
           cargo sort --version
 
           installed_poly_version="$(poly --version | awk '{print $2}')"
-          if [ "$installed_poly_version" != "0.24.0" ]; then
-            echo "::error::expected poly 0.24.0 (pinned for the poly.toml added-large-files hook), got ${installed_poly_version:-<empty>}. Update the Goldziher/poly version: input above together with this check." >&2
+          if [ "$installed_poly_version" != "0.31.0" ]; then
+            echo "::error::expected poly 0.31.0 (pinned for the poly.toml added-large-files hook), got ${installed_poly_version:-<empty>}. Update the Goldziher/poly version: input above together with this check." >&2
             exit 1
           fi
           echo "poly ${installed_poly_version} matches the pinned version."
