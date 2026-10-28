@@ -83,7 +83,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
+          - macos-26
           - windows-latest
     runs-on: ${{ matrix.os }}
     env:

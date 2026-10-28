@@ -376,8 +376,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            bottle_tag: arm64_sequoia
+          - os: macos-26
+            bottle_tag: arm64_tahoe
             install_brew: false
           # ~keep The Intel macOS `sequoia` bottle is deliberately absent, not forgotten. From
           # 2026-09-01 Homebrew serves no `openssl@3` bottle for x86_64 macOS -- "We do not

@@ -242,7 +242,7 @@ fn release_publishes_the_intel_macos_archive_expected_by_install_alef() {
     );
     let target = matching[0];
     assert_eq!(target["label"].as_str(), Some("macos-x86_64"));
-    assert_eq!(target["runner"].as_str(), Some("macos-15-intel"));
+    assert_eq!(target["runner"].as_str(), Some("macos-26-intel"));
     assert_eq!(target["archive_ext"].as_str(), Some("tar.gz"));
     assert_eq!(
         archive_name_for(target),
