@@ -11,8 +11,9 @@ tasks:
   setup:
     desc: "Set up the development environment"
     cmds:
-      # Tools come from mise.toml and mise.lock; rust-toolchain.toml installs Rust on first use. ~keep
-      - mise install --locked
+      # Tools come from mise.toml and mise.lock; rust-toolchain.toml installs Rust on first use. Not --locked:
+      # bats has no Windows lock entry and cargo-sort none for linux-arm64. ~keep
+      - mise install
       - cargo install cargo-edit || true
       - task: governance:hooks:install
 
