@@ -31,17 +31,14 @@ jobs:
       RUST_BACKTRACE: "1"
     steps:
       - uses: actions/checkout@v7
-      - uses: xberg-io/actions/install-task@v1
+      - uses: xberg-io/actions/setup-mise@v1
         with:
-          version: "3.54.0"
+          install-args: task zig
       - uses: xberg-io/actions/setup-rust@v1
         with:
           use-sccache: "false"
           install-llvm-cov: "false"
           cache-key-prefix: zig-windows-diagnostics
-      - uses: xberg-io/actions/setup-zig@v1
-        with:
-          version: "0.17.0"
       - name: Qualify process accounting and failure controls
         run: task zig-diagnostics:controls
       - name: Build the diagnostic fixture

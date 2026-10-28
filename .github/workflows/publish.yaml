@@ -689,7 +689,10 @@ jobs:
 
       - name: Install Task for package verification
         if: needs.prepare.outputs.dry_run == 'true'
-        uses: xberg-io/actions/install-task@v1
+        uses: xberg-io/actions/setup-mise@v1
+        with:
+          install-args: task
+          config-ref: ${{ github.sha }}
 
       - name: Verify release crates without publishing
         if: needs.prepare.outputs.dry_run == 'true'
