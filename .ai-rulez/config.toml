@@ -70,3 +70,5 @@ include_outputs = false
 [rules]
 # ~keep Glob-scoped rules stay out of AGENTS.md: rule files for Claude, path-gated skills for Codex.
 scoped_fallback = "skill"
+# ~keep One fallback skill per directory keeps the Codex skill listing under its budget (AR964).
+scoped_fallback_group = "directory"

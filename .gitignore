@@ -68,6 +68,7 @@ poly.local.toml
 erl_crash.dump
 
 # BEGIN ai-rulez (DO NOT EDIT - managed by ai-rulez)
+.ai-rulez/.config.local.*
 .claude/agents/
 .claude/rules/backend-modules.md
 .claude/rules/centralized-naming.md
