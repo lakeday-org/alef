@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.115.6] - 2026-10-29
+
 ### Changed
 
 - Replace go-task with mise tasks: alef's own tasks keep their names under `mise run`, CI invokes them through mise, and `Taskfile.yml`, `.task/` and the `task` tool pin are gone.
