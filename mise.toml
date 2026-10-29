@@ -85,18 +85,6 @@ run = "cargo bench"
 description = "Type-check all crates"
 run = "cargo check --workspace"
 
-[tasks.format]
-description = "Format all code via poly"
-run = "poly fmt --fix ."
-
-[tasks."format:check"]
-description = "Check formatting via poly (CI)"
-run = "poly fmt --check ."
-
-[tasks.lint]
-description = "Run all linters via poly"
-run = "poly lint ."
-
 [tasks."lint:file-size"]
 description = "Enforce the 1,000-line file cap: over-cap files may shrink, never grow"
 run = "cargo test --test file_size_ratchet"
@@ -116,14 +104,6 @@ run = "python3 scripts/test_publish_verify.py"
 [tasks.clean]
 description = "Clean build artifacts"
 run = ["cargo clean", "rm -rf .alef/"]
-
-[tasks."governance:hooks:install"]
-description = "Provision machine preferences and install reviewed AI governance hooks"
-file = "https://raw.githubusercontent.com/xberg-io/toolchains/v1.5.0/tasks/governance/hooks-install.sh"
-
-[tasks."governance:check"]
-description = "Check materialized local governance outputs against shared sources"
-run = "ai-rulez generate --check --no-local --strict-config"
 
 [tasks."consumer-swift:verify"]
 description = "Qualify the pinned Xberg Swift consumer on an admitted hosted macOS executor"
@@ -146,3 +126,6 @@ run = "pwsh -NoProfile -File scripts/zig-diagnostics/test-controls.ps1"
 [tasks."zig-diagnostics:run"]
 description = "Sample Windows process identities while running eight cold/warm Zig consumer checks"
 run = "pwsh -NoProfile -File scripts/zig-diagnostics/run.ps1"
+
+[task_config]
+includes = ["mise-tasks", "mise-tasks/shared.toml"]
