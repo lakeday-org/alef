@@ -1,14 +1,14 @@
 [tasks.build]
 run = '''
-platform=""
-if command -v xcrun >/dev/null; then platform=$(xcrun --show-sdk-platform-path); fi
-swiftc -module-name Sample \
-{%- if os() == "macos" %} -F "$platform/Developer/Library/Frameworks" \
-  -I "$platform/Developer/usr/lib" -L "$platform/Developer/usr/lib" \
-  -lXCTestSwiftSupport -Xlinker -rpath -Xlinker "$platform/Developer/usr/lib" \
-  -Xlinker -rpath -Xlinker "$platform/Developer/Library/Frameworks"
-{%- endif %} \
-  probe.swift -o probe
+set --
+if [ "$(uname)" = Darwin ]; then
+  platform=$(xcrun --show-sdk-platform-path)
+  set -- -F "$platform/Developer/Library/Frameworks" \
+    -I "$platform/Developer/usr/lib" -L "$platform/Developer/usr/lib" \
+    -lXCTestSwiftSupport -Xlinker -rpath -Xlinker "$platform/Developer/usr/lib" \
+    -Xlinker -rpath -Xlinker "$platform/Developer/Library/Frameworks"
+fi
+swiftc -module-name Sample "$@" probe.swift -o probe
 '''
 
 [tasks.run]
