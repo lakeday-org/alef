@@ -126,6 +126,13 @@ SAMPLE_PATTERNS = {name: build_pattern(parts) for name, parts in DOWNSTREAM_SAMP
 INFRASTRUCTURE_PATTERNS = tuple(
     re.compile(re.escape(allowed), re.IGNORECASE) for allowed in ALEF_INFRASTRUCTURE_ALLOWLIST
 )
+# Shared shell infrastructure is allowed only as complete tokens; consumer names
+# elsewhere on the same line and similarly prefixed symbols must still be checked.
+SHARED_BATS_PATTERNS = (
+    re.compile(r"(?<![A-Za-z0-9_-])xberg-bats(?![A-Za-z0-9_-])"),
+    re.compile(r"(?<![A-Za-z0-9_-])xberg_assert_status(?![A-Za-z0-9_-])"),
+    re.compile(r"(?<![A-Za-z0-9_-])xberg_assert_output_contains(?![A-Za-z0-9_-])"),
+)
 DOMAIN_TYPE_PATTERNS = tuple(
     (name, re.compile(rf"(?<![A-Za-z0-9_]){name}(?![A-Za-z0-9_])")) for name in DOWNSTREAM_DOMAIN_TYPES
 )
@@ -233,7 +240,7 @@ def read_text(path: Path) -> str | None:
 
 def mask_allowed_infrastructure(line: str) -> str:
     masked = line
-    for pattern in INFRASTRUCTURE_PATTERNS:
+    for pattern in (*INFRASTRUCTURE_PATTERNS, *SHARED_BATS_PATTERNS):
         masked = pattern.sub("", masked)
     return masked
 

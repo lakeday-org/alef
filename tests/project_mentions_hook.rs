@@ -129,6 +129,57 @@ fn accepts_xberg_org_namespace_and_brand_domain() {
 }
 
 #[test]
+fn accepts_exact_shared_bats_library_and_assertion_tokens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let templates = dir.path().join("src/e2e/templates/homebrew");
+    fs::create_dir_all(&templates).expect("create templates");
+    let file = templates.join("suite.bats.jinja");
+    fs::write(
+        &file,
+        concat!(
+            "library = \"tests/lib/xberg-bats/load.bash\"\n",
+            "bats_load_library xberg-bats\n",
+            "xberg_assert_status 0\n",
+            "xberg_assert_output_contains expected\n",
+        ),
+    )
+    .expect("write fixture");
+
+    for args in [vec![], vec!["--strict"]] {
+        let output = run_hook_with_args(&args, &[&file]);
+        assert!(
+            output.status.success(),
+            "stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn shared_bats_tokens_do_not_hide_consumer_names_or_near_matches() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let templates = dir.path().join("src/e2e/templates/homebrew");
+    fs::create_dir_all(&templates).expect("create templates");
+    let file = templates.join("suite.bats.jinja");
+    fs::write(
+        &file,
+        "xberg_assert_status 0 # xberg\nxberg-bats-consumer\nxberg_assert_status_special\n",
+    )
+    .expect("write fixture");
+
+    for args in [vec![], vec!["--strict"]] {
+        let output = run_hook_with_args(&args, &[&file]);
+        assert!(!output.status.success(), "consumer literals must remain forbidden");
+        let stderr = String::from_utf8(output.stderr).expect("stderr must be utf8");
+        assert_eq!(
+            stderr.matches("forbidden project mention `xberg`").count(),
+            3,
+            "stderr: {stderr}"
+        );
+    }
+}
+
+#[test]
 fn reports_downstream_sample_pattern_mentions() {
     let dir = tempfile::tempdir().expect("tempdir");
     let backend_dir = dir.path().join("src").join("backends").join("sample");

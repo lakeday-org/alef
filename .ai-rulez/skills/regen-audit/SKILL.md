@@ -30,7 +30,7 @@ adds what only applies when the change is in alef.
 
 - Iterate with `mise run format:check`, `mise run lint` and `mise run test:run -- <test-filter>`.
 - For docs/template work, smoke test consumers with the local binary, then `git diff --check` there.
-- Consumers that exercise alef broadly sit in the polyrepo root: `crawlberg`, `html-to-markdown`, `liter-llm`, `tree-sitter-language-pack`; `xberg` when its config exercises the change. Pick the ones relevant to the changed surface.
+- Pick consumer repositories in the polyrepo root whose `alef.toml` exercises the changed surface; cover the relevant languages and features.
 - Never discard a consumer's uncommitted regeneration state.
 
 ## Triage each finding
