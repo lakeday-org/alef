@@ -1,0 +1,5 @@
+[tasks.checkstyle]
+run = "mvn -q checkstyle:check"
+
+[tasks.compile]
+run = "mvn -q -DskipTests compile"

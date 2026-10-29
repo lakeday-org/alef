@@ -1,0 +1,2 @@
+[tasks.lint]
+run = "cargo clippy --manifest-path binding/Cargo.toml --target wasm32-unknown-unknown -- -D warnings"

@@ -1,14 +1,13 @@
 use super::{CORE, bridge};
 use alef::snippets::validators::{CapturedStreams, run_command_streams};
 use std::path::Path;
-use std::process::Command;
 
 const BUILD_TIMEOUT_SECONDS: u64 = 600;
 const RUNTIME_TIMEOUT_SECONDS: u64 = 60;
 
 fn task(root: &Path, name: &str, arguments: &[&str]) -> CapturedStreams {
-    let mut command = Command::new("task");
-    command.current_dir(root).arg(name).args(arguments);
+    let mut command = super::mise_task::mise_run(root, name);
+    command.args(arguments);
     let timeout = if name == "test" {
         RUNTIME_TIMEOUT_SECONDS
     } else {
@@ -36,10 +35,7 @@ fn write_fixture(root: &Path) {
             "rust/Cargo.toml",
             include_str!("../fixtures/dart_stream_errors/bridge_Cargo.toml"),
         ),
-        (
-            "Taskfile.yml",
-            include_str!("../fixtures/dart_stream_errors/Taskfile.yml"),
-        ),
+        ("mise.toml", include_str!("../fixtures/dart_stream_errors/mise.toml")),
         (
             "pubspec.yaml",
             include_str!("../fixtures/dart_stream_errors/pubspec.yaml"),
@@ -118,8 +114,8 @@ pub(super) fn assert_disabled_transport_compiles(root: &Path, source: &str) {
         })
         .expect("generated records wire enum");
     std::fs::write(
-        root.join("Taskfile.yml"),
-        include_str!("../fixtures/dart_stream_errors/Taskfile.yml"),
+        root.join("mise.toml"),
+        include_str!("../fixtures/dart_stream_errors/mise.toml"),
     )
     .unwrap();
     std::fs::write(root.join("cfg_probe.rs"), wire.to_token_stream().to_string()).unwrap();

@@ -92,7 +92,7 @@ fn payload_reserved_properties_preserve_error_identity_and_metadata() {
 #[ignore = "requires wasm32 target, wasm-bindgen and Node"]
 fn wasm_payload_preserves_actual_thrown_error_display_and_payload() {
     let directory = tempfile::tempdir().unwrap();
-    for tool in ["task", "wasm-bindgen", "node"] {
+    for tool in [crate::test_support::mise_task::MISE, "wasm-bindgen", "node"] {
         which::which_in(tool, std::env::var_os("PATH"), directory.path()).unwrap();
     }
     let version = std::process::Command::new("wasm-bindgen")
@@ -130,9 +130,7 @@ fn verify_generated_error(directory: &std::path::Path, error: &ErrorDef, metadat
             crate::alef_context! { converter => converter },
         );
         std::fs::write(directory.join("lib.rs"), source).unwrap();
-        let output = std::process::Command::new("task")
-            .arg("verify")
-            .current_dir(directory)
+        let output = crate::test_support::mise_task::mise_run(directory, "verify")
             .env("RUSTC_WRAPPER", "")
             .env("RUSTC_WORKSPACE_WRAPPER", "")
             .env("ALEF_EXPECT_PAYLOAD_METADATA", if metadata { "1" } else { "0" })
@@ -161,11 +159,11 @@ fn write_harness(directory: &std::path::Path) {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.join("target"))
         .join("wasm-payload-probe");
-    let taskfile = crate::codegen::template_env::render(
-        "error_gen/wasm_error_payload_task.yml.jinja",
+    let tasks = crate::codegen::template_env::render(
+        "error_gen/wasm_error_payload_mise.toml.jinja",
         crate::alef_context! { target => target.display().to_string() },
     );
-    std::fs::write(directory.join("Taskfile.yml"), taskfile).unwrap();
+    std::fs::write(directory.join("mise.toml"), tasks).unwrap();
     std::fs::write(
         directory.join("probe.cjs"),
         include_str!("../../templates/error_gen/wasm_error_payload_probe.cjs"),

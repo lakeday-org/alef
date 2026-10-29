@@ -1,0 +1,35 @@
+[tasks.setup]
+dir = "{{config_root}}/packages/dart"
+run = "dart pub get"
+
+[tasks.generate]
+run = "flutter_rust_bridge_codegen generate --rust-root packages/dart/rust --rust-input crate --rust-output packages/dart/rust/src/frb_generated.rs --dart-root packages/dart --dart-output packages/dart/lib/src/display_sample_bridge_generated --no-add-mod-to-lib --no-web --no-deps-check --no-auto-upgrade-dependency --stop-on-error"
+
+[tasks.build]
+run = "cargo build --manifest-path packages/dart/rust/Cargo.toml --target-dir native-target"
+
+[tasks.analyze]
+dir = "{{config_root}}/packages/dart"
+run = "dart analyze check.dart"
+
+[tasks.test]
+dir = "{{config_root}}/packages/dart"
+run = "dart run check.dart"
+
+[tasks.prune]
+usage = 'arg "[paths]" var=#true'
+run = [
+  'eval "set -- ${usage_paths:-}"; poly fmt --fix "$@" || true',
+  'eval "set -- ${usage_paths:-}"; poly fmt --check "$@"',
+  'eval "set -- ${usage_paths:-}"; poly lint --fix --no-cache --no-workspace "$@" || true',
+  'eval "set -- ${usage_paths:-}"; poly lint --no-cache --no-workspace "$@"',
+]
+
+[tasks.constructor-control]
+dir = "{{config_root}}/packages/dart"
+run = "dart run check.dart constructors-only"
+
+[tasks.wrong-expectation]
+dir = "{{config_root}}/packages/dart"
+usage = 'arg "[args]" var=#true'
+run = 'eval "set -- ${usage_args:-}"; dart run check.dart "$@" wrong-expected'

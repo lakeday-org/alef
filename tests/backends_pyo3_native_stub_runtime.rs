@@ -9,6 +9,9 @@ use alef::e2e::config::E2eConfig;
 use std::path::Path;
 use std::process::{Command, Output};
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
+
 #[test]
 fn should_forward_instance_methods_to_public_dataclasses_and_keep_static_helpers_native() {
     let fixture = tempfile::tempdir().unwrap();
@@ -211,14 +214,11 @@ fn run_native(root: &Path, api: &ApiSurface, config: &ResolvedCrateConfig) {
     );
     write(
         root,
-        "sample-py/Taskfile.yml",
-        "version: '3'\ntasks:\n  test:\n    cmds:\n      - cargo clippy --offline --quiet --lib -- -D warnings\n      - cargo test --offline --quiet --lib\n",
+        "sample-py/mise.toml",
+        "[tasks.test]\nrun = [\"cargo clippy --offline --quiet --lib -- -D warnings\", \"cargo test --offline --quiet --lib\"]\n",
     );
     let target = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/pyo3-native-stub-probe");
-    let tested = Command::new("task")
-        .arg("--dir")
-        .arg(root.join("sample-py"))
-        .arg("test")
+    let tested = mise_task::mise_run(&root.join("sample-py"), "test")
         .env("CARGO_TARGET_DIR", target)
         .env("RUSTC_WRAPPER", "")
         .output()

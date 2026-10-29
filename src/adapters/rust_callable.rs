@@ -108,7 +108,11 @@ mod tests {
     fn check_dispatch_controls(source: &str) {
         let directory = tempfile::tempdir().unwrap();
         let executable = format!("probe{}", std::env::consts::EXE_SUFFIX);
-        std::fs::write(directory.path().join("Taskfile.yml"), format!("version: '3'\ntasks:\n  proof:\n    cmds:\n      - rustc --edition=2024 probe.rs -o {executable}\n      - ./{executable}\n")).unwrap();
+        std::fs::write(
+            directory.path().join("mise.toml"),
+            format!("[tasks.proof]\nrun = [\"rustc --edition=2024 probe.rs -o {executable}\", \"./{executable}\"]\n"),
+        )
+        .unwrap();
         for valid in [false, true] {
             let candidate = if valid {
                 source.to_string()
@@ -116,9 +120,7 @@ mod tests {
                 source.replace("<Engine as Events>::events(&inner)", "inner.events()")
             };
             std::fs::write(directory.path().join("probe.rs"), candidate).unwrap();
-            let output = std::process::Command::new("task")
-                .args(["proof"])
-                .current_dir(directory.path())
+            let output = crate::test_support::mise_task::mise_run(directory.path(), "proof")
                 .env("RUSTC_WRAPPER", "")
                 .env("RUSTC_WORKSPACE_WRAPPER", "")
                 .output()

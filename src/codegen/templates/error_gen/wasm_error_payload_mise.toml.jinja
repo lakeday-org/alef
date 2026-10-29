@@ -1,0 +1,9 @@
+[env]
+CARGO_TARGET_DIR = '{{ target }}'
+
+[tasks.verify]
+run = [
+  'cargo build --target-dir "{{ target }}" --target wasm32-unknown-unknown',
+  'wasm-bindgen "{{ target }}/wasm32-unknown-unknown/debug/error_payload_probe.wasm" --target nodejs --out-dir pkg',
+  "node probe.cjs",
+]

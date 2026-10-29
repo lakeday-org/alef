@@ -2,6 +2,9 @@ use alef::core::config::NewAlefConfig;
 use alef::e2e::codegen::{E2eCodegen, c::CCodegen, go::GoCodegen, rust::RustE2eCodegen};
 use alef::e2e::fixture::{Fixture, FixtureGroup};
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
+
 fn generate_mode(generator: &dyn E2eCodegen, extension: &str, streaming: bool) -> String {
     let config: NewAlefConfig = toml::from_str(
         r#"
@@ -123,13 +126,11 @@ fn nonstream_error_paths_should_still_assert_the_call_error() {
 
 fn run_task(directory: &std::path::Path, command: &str) {
     std::fs::write(
-        directory.join("Taskfile.yml"),
-        format!("version: '3'\ntasks:\n  probe:\n    cmds:\n      - {command}\n"),
+        directory.join("mise.toml"),
+        format!("[tasks.probe]\nrun = {}\n", toml::Value::String(command.into())),
     )
     .unwrap();
-    let output = alef::core::tool_command("task")
-        .arg("probe")
-        .current_dir(directory)
+    let output = mise_task::mise_run(directory, "probe")
         .env("RUSTC_WRAPPER", "")
         .env("CARGO_INCREMENTAL", "0")
         .env("CARGO_BUILD_JOBS", "2")

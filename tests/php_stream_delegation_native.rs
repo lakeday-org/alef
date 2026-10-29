@@ -6,6 +6,9 @@ use quote::ToTokens;
 use std::path::Path;
 use std::process::{Command, Output};
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
+
 fn generated_stream_source() -> String {
     let config: NewAlefConfig = toml::from_str(
         r#"
@@ -172,16 +175,15 @@ tokio = { version = "1", features = ["rt-multi-thread"] }
 "#,
     )
     .unwrap();
-    std::fs::write(path.join("Taskfile.yml"),
-        "version: '3'\ntasks:\n  check:\n    cmds: [cargo check --offline]\n  build:\n    cmds: [cargo build --offline]\n").unwrap();
+    std::fs::write(
+        path.join("mise.toml"),
+        "[tasks.check]\nrun = \"cargo check --offline\"\n[tasks.build]\nrun = \"cargo build --offline\"\n",
+    )
+    .unwrap();
 }
 
 fn cargo_task(path: &Path, task: &str) -> Output {
-    Command::new("task")
-        .current_dir(path)
-        .arg("--dir")
-        .arg(path)
-        .arg(task)
+    mise_task::mise_run(path, task)
         .env("CARGO_TARGET_DIR", path.join("target"))
         .output()
         .unwrap()

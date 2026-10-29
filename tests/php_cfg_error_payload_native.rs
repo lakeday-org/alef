@@ -3,6 +3,9 @@ use alef::core::ir::{ApiSurface, ErrorDef, ErrorVariant, FieldDef, PrimitiveType
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
+
 #[test]
 #[ignore = "requires PHP development headers and the PHP executable"]
 fn should_compile_and_throw_shared_errors_with_cfg_features_disabled_and_enabled() {
@@ -106,8 +109,8 @@ ext-php-rs = "=0.16.3"
     )
     .unwrap();
     std::fs::write(
-        root.join("Taskfile.yml"),
-        "version: '3'\ntasks:\n  build:\n    cmds:\n      - cargo build --offline {{.CLI_ARGS}}\n",
+        root.join("mise.toml"),
+        "[tasks.build]\nrun = \"cargo build --offline\"\n",
     )
     .unwrap();
 }
@@ -116,8 +119,7 @@ fn build_extension(root: &Path, enabled: bool) -> PathBuf {
     let target = std::env::var_os("ALEF_PHP_CFG_NATIVE_TARGET_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("target"));
-    let mut command = Command::new("task");
-    command.arg("--dir").arg(root).arg("build");
+    let mut command = mise_task::mise_run(root, "build");
     if enabled {
         command.args(["--", "--features", "http"]);
     }

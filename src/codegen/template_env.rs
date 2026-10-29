@@ -306,8 +306,8 @@ static TEMPLATES: &[(&str, &str)] = &[
         include_str!("templates/error_gen/wasm_error_payload_probe.rs.jinja"),
     ),
     (
-        "error_gen/wasm_error_payload_task.yml.jinja",
-        include_str!("templates/error_gen/wasm_error_payload_task.yml.jinja"),
+        "error_gen/wasm_error_payload_mise.toml.jinja",
+        include_str!("templates/error_gen/wasm_error_payload_mise.toml.jinja"),
     ),
     (
         "error_gen/wasm_error_property_probe.rs.jinja",

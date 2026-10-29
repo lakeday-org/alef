@@ -4,6 +4,8 @@
 //! against a scripted stand-in for the native library, so the errors the native layer reports in
 //! the middle of a stream reach the same code the shipped binding runs.
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
 #[path = "backends_java_blocker_regressions/support.rs"]
 mod support;
 
@@ -175,8 +177,8 @@ fn generated_stream_methods_pass_checkstyle_method_length() {
 fn write_style_fixture(root: &std::path::Path) {
     for (name, source) in [
         (
-            "Taskfile.yml",
-            include_str!("fixtures/java_stream_method_length/Taskfile.yml"),
+            "mise.toml",
+            include_str!("fixtures/java_stream_method_length/mise.toml"),
         ),
         ("pom.xml", include_str!("fixtures/java_stream_method_length/pom.xml")),
         (
@@ -237,9 +239,7 @@ fn checkstyle(root: &std::path::Path) -> alef::snippets::validators::CapturedStr
 }
 
 fn fixture_task(root: &std::path::Path, target: &str) -> alef::snippets::validators::CapturedStreams {
-    let executable = which::which_in("task", std::env::var_os("PATH"), root).expect("Task executable");
-    let mut command = std::process::Command::new(executable);
-    command.arg(target).current_dir(root);
+    let mut command = mise_task::mise_run(root, target);
     alef::snippets::validators::run_command_streams(&mut command, 600).expect("run actual Checkstyle")
 }
 

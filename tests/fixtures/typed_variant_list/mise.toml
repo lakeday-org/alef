@@ -1,0 +1,32 @@
+[vars]
+sep = '{% if os() == "windows" %};{% else %}:{% endif %}'
+
+[tasks.csharp]
+run = "dotnet run --project Probe.csproj"
+
+[tasks.kotlin]
+run = [
+  "mvn -q dependency:build-classpath -Dmdep.outputFile=classpath.txt",
+  'kotlinc *.kt -cp "$KOTLIN_TEST_JAR{{vars.sep}}$JACKSON_CLASSPATH" -include-runtime -d probe.jar',
+  'java -cp "probe.jar{{vars.sep}}$KOTLIN_TEST_JAR{{vars.sep}}$JACKSON_CLASSPATH" MainKt',
+]
+
+[tasks.kotlin-java]
+run = [
+  "mvn -q dependency:build-classpath -Dmdep.outputFile=classpath.txt",
+  'javac -cp "$JACKSON_CLASSPATH" -d java-classes $JAVA_SOURCES',
+  'kotlinc *.kt -cp "java-classes{{vars.sep}}$KOTLIN_TEST_JAR{{vars.sep}}$JACKSON_CLASSPATH" -include-runtime -d probe.jar',
+  'java -cp "probe.jar{{vars.sep}}java-classes{{vars.sep}}$KOTLIN_TEST_JAR{{vars.sep}}$JACKSON_CLASSPATH" MainKt',
+]
+
+[tasks.dependencies]
+run = "mvn -q dependency:build-classpath -Dmdep.outputFile=classpath.txt"
+
+[tasks.dart-setup]
+run = "dart pub get"
+
+[tasks.dart-generate]
+run = "flutter_rust_bridge_codegen generate --rust-root rust --rust-input crate --rust-output rust/src/frb_generated.rs --dart-root . --dart-output lib/bridge --no-add-mod-to-lib --no-web --no-deps-check --no-auto-upgrade-dependency --stop-on-error"
+
+[tasks.dart]
+run = "dart test probe_test.dart --reporter expanded"

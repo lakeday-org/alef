@@ -2,6 +2,9 @@ use alef::publish::package::{BuildProfile, find_built_artifact};
 use alef::publish::platform::RustTarget;
 use std::path::{Path, PathBuf};
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
+
 fn isolated_from_ambient_target_directory(test_name: &str) -> bool {
     if std::env::var("ALEF_STAGING_CONFIG_CHILD").as_deref() == Ok(test_name) {
         return true;
@@ -116,13 +119,11 @@ fn stages_real_cargo_library_from_external_output_for_each_ffi_consumer() {
     contents.push_str("\n[lib]\ncrate-type = ['cdylib']\n");
     std::fs::write(&manifest, contents).unwrap();
     std::fs::write(
-        root.join("Taskfile.yml"),
-        "version: '3'\ntasks:\n  build:\n    cmds: ['cargo build --offline']\n",
+        root.join("mise.toml"),
+        "[tasks.build]\nrun = \"cargo build --offline\"\n",
     )
     .unwrap();
-    let built = std::process::Command::new("task")
-        .arg("build")
-        .current_dir(&root)
+    let built = mise_task::mise_run(&root, "build")
         .env("CARGO_TARGET_DIR", &external)
         .output()
         .unwrap();

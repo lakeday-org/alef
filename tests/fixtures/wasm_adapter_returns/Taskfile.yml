@@ -1,5 +1,0 @@
-version: "3"
-tasks:
-  lint:
-    cmds:
-      - cargo clippy --manifest-path binding/Cargo.toml --target wasm32-unknown-unknown -- -D warnings

@@ -1,0 +1,3 @@
+[tasks.lint]
+quiet = true
+run = "ktlint --log-level=none --reporter=json GeneratedTest.kt"

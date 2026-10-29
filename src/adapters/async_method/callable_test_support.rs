@@ -45,14 +45,14 @@ pub(crate) fn verify_dispatch(calls: &[(String, u32)], tuple_receiver: bool) {
     let source = include_str!("callable_native_probe.rs.txt").replace("__CHECKS__", &checks);
     let directory = tempfile::tempdir().unwrap();
     let executable = format!("probe{}", std::env::consts::EXE_SUFFIX);
-    let taskfile = format!(
+    let tasks = format!(
         concat!(
-            "version: '3'\ntasks:\n  proof:\n    cmds:\n",
-            "      - rustc --edition=2024 probe.rs -o {executable}\n      - ./{executable}\n"
+            "[tasks.proof]\n",
+            "run = [\"rustc --edition=2024 probe.rs -o {executable}\", \"./{executable}\"]\n"
         ),
         executable = executable,
     );
-    std::fs::write(directory.path().join("Taskfile.yml"), taskfile).unwrap();
+    std::fs::write(directory.path().join("mise.toml"), tasks).unwrap();
     check_dispatch_controls(&source, directory.path());
 }
 
@@ -68,9 +68,7 @@ fn check_dispatch_controls(source: &str, directory: &std::path::Path) {
             source.replace("< Engine as Events > :: events", "Engine::events")
         };
         std::fs::write(directory.join("probe.rs"), candidate).unwrap();
-        let result = std::process::Command::new("task")
-            .arg("proof")
-            .current_dir(directory)
+        let result = crate::test_support::mise_task::mise_run(directory, "proof")
             .env("RUSTC_WRAPPER", "")
             .env("RUSTC_WORKSPACE_WRAPPER", "")
             .output()

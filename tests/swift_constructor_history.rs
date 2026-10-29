@@ -2,6 +2,8 @@ use alef::core::backend::{Backend, GeneratedFile};
 use alef::core::config::{NewAlefConfig, ResolvedCrateConfig};
 use alef::core::ir::ApiSurface;
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
 #[path = "swift_constructor_history/native.rs"]
 mod native;
 

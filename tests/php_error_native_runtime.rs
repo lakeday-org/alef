@@ -2,6 +2,9 @@ use alef::codegen::error_gen::{gen_php_error_converter, gen_php_error_types};
 use alef::core::ir::{ApiSurface, ErrorDef, ErrorVariant, FieldDef, PrimitiveType, TypeRef};
 use std::process::Command;
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
+
 #[test]
 #[ignore = "requires PHP development headers and the PHP executable"]
 fn should_throw_generated_php_exception_with_message_and_payload() {
@@ -92,17 +95,14 @@ ext-php-rs = "=0.16.3"
     )
     .unwrap();
     std::fs::write(
-        fixture.join("Taskfile.yml"),
-        "version: '3'\ntasks:\n  build:\n    cmds:\n      - cargo build --offline\n",
+        fixture.join("mise.toml"),
+        "[tasks.build]\nrun = \"cargo build --offline\"\n",
     )
     .unwrap();
     let target = std::env::var_os("ALEF_PHP_NATIVE_TARGET_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| fixture.join("target"));
-    let build = Command::new("task")
-        .args(["--dir"])
-        .arg(fixture)
-        .arg("build")
+    let build = mise_task::mise_run(fixture, "build")
         .env("CARGO_TARGET_DIR", &target)
         .output()
         .unwrap();

@@ -5,6 +5,9 @@ use alef::core::ir::DefaultValue;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
+
 #[test]
 #[ignore = "requires PHP development headers and PHP"]
 fn should_preserve_legacy_php_constructor_without_serde() {
@@ -121,17 +124,14 @@ serde_json = "1"
     )
     .unwrap();
     std::fs::write(
-        directory.join("Taskfile.yml"),
-        "version: '3'\ntasks:\n  build:\n    cmds:\n      - cargo build --offline\n",
+        directory.join("mise.toml"),
+        "[tasks.build]\nrun = \"cargo build --offline\"\n",
     )
     .unwrap();
     let target = std::env::var_os("ALEF_PHP_NATIVE_TARGET_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| directory.join("target"));
-    let output = Command::new("task")
-        .arg("--dir")
-        .arg(directory)
-        .arg("build")
+    let output = mise_task::mise_run(directory, "build")
         .env("CARGO_TARGET_DIR", &target)
         .output()
         .unwrap();

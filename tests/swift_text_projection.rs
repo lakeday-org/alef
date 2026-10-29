@@ -3,6 +3,9 @@ use alef::core::backend::Backend;
 use alef::core::config::NewAlefConfig;
 use alef::core::ir::{ApiSurface, EnumDef, EnumVariant, FieldDef, PrimitiveType, TypeDef, TypeRef};
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
+
 fn surface() -> ApiSurface {
     ApiSurface {
         crate_name: "sample".into(),
@@ -297,8 +300,8 @@ fn generated_text_wrappers_and_assertions_preserve_exact_values() {
     );
     std::fs::write(root.join("probe.swift"), source).unwrap();
     std::fs::write(
-        root.join("Taskfile.yml"),
-        include_str!("fixtures/swift_text_projection/Taskfile.yml"),
+        root.join("mise.toml"),
+        include_str!("fixtures/swift_text_projection/mise.toml"),
     )
     .unwrap();
     let compiled = native_task(root, "build", &[]);
@@ -311,7 +314,7 @@ fn generated_text_wrappers_and_assertions_preserve_exact_values() {
         good.stderr
     );
     assert!(good.stdout.contains("swift_text_projection_checks=90"));
-    let wrong = native_task(root, "run", &["MODE=wrong-text"]);
+    let wrong = native_task(root, "run", &[("MODE", "wrong-text")]);
     assert!(!wrong.success, "wrong text must fail an actual generated assertion");
     assert!(
         format!("{}\n{}", wrong.stdout, wrong.stderr).contains("XCTAssertEqual failed"),
@@ -321,13 +324,14 @@ fn generated_text_wrappers_and_assertions_preserve_exact_values() {
     );
 }
 
-fn native_task(root: &std::path::Path, task: &str, args: &[&str]) -> alef::snippets::validators::CapturedStreams {
-    let executable = which::which_in("task", std::env::var_os("PATH"), root).expect("Task executable");
-    let mut command = std::process::Command::new(executable);
+fn native_task(
+    root: &std::path::Path,
+    task: &str,
+    variables: &[(&str, &str)],
+) -> alef::snippets::validators::CapturedStreams {
+    let mut command = mise_task::mise_run(root, task);
     command
-        .arg(task)
-        .args(args)
-        .current_dir(root)
+        .envs(variables.iter().copied())
         .env("RUSTC_WRAPPER", "")
         .env("RUSTC_WORKSPACE_WRAPPER", "")
         .env("CARGO_TARGET_DIR", root.join("target"));
@@ -384,10 +388,7 @@ fn write_native_dependencies(root: &std::path::Path) {
             include_str!("fixtures/swift_text_projection/ffi_Cargo.toml"),
         ),
         ("ffi/src/lib.rs", include_str!("fixtures/swift_text_projection/ffi.rs")),
-        (
-            "Taskfile.yml",
-            include_str!("fixtures/swift_text_projection/Taskfile.yml"),
-        ),
+        ("mise.toml", include_str!("fixtures/swift_text_projection/mise.toml")),
     ] {
         let path = root.join(name);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();

@@ -1,0 +1,14 @@
+[tasks.rust]
+run = "cargo build --workspace"
+
+[tasks.materialize]
+run = '"$TEST_BINARY" --exact backends::swift::gen_rust_crate::structured_text_tests::native_structured_text_bridge_preserves_parts --ignored --nocapture'
+
+[tasks.swift]
+run = "swift run --package-path . Probe"
+
+[tasks.suite]
+run = "swift test --package-path ."
+
+[tasks.suite-replay]
+run = "swift test --package-path . --skip-build"

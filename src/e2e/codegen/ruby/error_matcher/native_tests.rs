@@ -9,11 +9,9 @@ fn task(directory: &Path, target: &str) -> Output {
 }
 
 fn task_args(directory: &Path, target: &str, arguments: &[&str]) -> Output {
-    Command::new(executable("task", directory))
-        .arg(target)
+    crate::test_support::mise_task::mise_run(directory, target)
         .arg("--")
         .args(arguments)
-        .current_dir(directory)
         .env("CARGO_TARGET_DIR", directory.join("target"))
         .env("RUSTC_WRAPPER", "")
         .env("RUSTC_WORKSPACE_WRAPPER", "")
@@ -102,8 +100,8 @@ fn prepare_native(path: &Path, errors: &[crate::core::ir::ErrorDef]) {
     )
     .expect("manifest");
     std::fs::write(
-        path.join("Taskfile.yml"),
-        include_str!("../../../../../tests/fixtures/ruby_error_matcher/Taskfile.yml"),
+        path.join("mise.toml"),
+        include_str!("../../../../../tests/fixtures/ruby_error_matcher/mise.toml"),
     )
     .expect("tasks");
     let api = crate::codegen::binding_projection::project_owned(ApiSurface {

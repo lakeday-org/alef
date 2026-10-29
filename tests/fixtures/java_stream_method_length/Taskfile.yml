@@ -1,8 +1,0 @@
-version: "3"
-tasks:
-  checkstyle:
-    cmds:
-      - mvn -q checkstyle:check
-  compile:
-    cmds:
-      - mvn -q -DskipTests compile

@@ -1,3 +1,5 @@
+#[path = "support/mise_task.rs"]
+mod mise_task;
 #[path = "backends_dart_stream_errors/native.rs"]
 mod native;
 

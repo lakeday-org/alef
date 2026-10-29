@@ -1,0 +1,14 @@
+[tasks.rust]
+run = "cargo build --workspace"
+
+[tasks.dependencies]
+run = "mvn -q dependency:build-classpath -Dmdep.outputFile=classpath.txt"
+
+[tasks.kotlin-compile]
+run = 'kotlinc *.kt -cp "$ALEF_PROBE_CLASSPATH" -include-runtime -d probe.jar'
+
+[tasks.kotlin-run]
+run = 'java -Djava.library.path=native-target/debug -cp "probe.jar{% if os() == "windows" %};{% else %}:{% endif %}$ALEF_PROBE_CLASSPATH" sample.MainKt'
+
+[tasks.kotlin]
+run = [{ task = "kotlin-compile" }, { task = "kotlin-run" }]

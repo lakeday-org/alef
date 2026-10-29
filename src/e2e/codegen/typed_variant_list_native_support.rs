@@ -2,7 +2,6 @@ use crate::core::backend::Backend;
 use crate::core::config::{NewAlefConfig, ResolvedCrateConfig};
 use crate::core::ir::ApiSurface;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 pub(crate) fn run(language: &str, enum_elements: bool, assertions: &str) {
     let directory = tempfile::Builder::new()
@@ -23,8 +22,8 @@ pub(crate) fn run(language: &str, enum_elements: bool, assertions: &str) {
     let config = config.resolve().unwrap().remove(0);
     write(
         root,
-        "Taskfile.yml",
-        include_str!("../../../tests/fixtures/typed_variant_list/Taskfile.yml"),
+        "mise.toml",
+        include_str!("../../../tests/fixtures/typed_variant_list/mise.toml"),
     );
     match language {
         "csharp" => csharp(root, &api, &config, enum_elements, assertions),
@@ -41,17 +40,14 @@ pub(crate) fn run(language: &str, enum_elements: bool, assertions: &str) {
     }
 }
 
-fn task(root: &Path, target: &str, vars: &[String]) -> String {
-    let executable = which::which_in("task", std::env::var_os("PATH"), root).expect("Task executable");
-    let mut command = Command::new(executable);
+fn task(root: &Path, target: &str, vars: &[(&str, String)]) -> String {
+    let mut command = crate::test_support::mise_task::mise_run(root, target);
     command
-        .arg(target)
-        .args(vars)
-        .current_dir(root)
+        .envs(vars.iter().map(|(name, value)| (name, value)))
         .env("RUSTC_WRAPPER", "")
         .env("RUSTC_WORKSPACE_WRAPPER", "")
         .env("CARGO_TARGET_DIR", root.join("target"));
-    let output = crate::snippets::validators::run_command_streams(&mut command, 600).expect("run native Task");
+    let output = crate::snippets::validators::run_command_streams(&mut command, 600).expect("run native mise task");
     assert!(
         output.success,
         "{root:?} {target}:\n{}\n{}",
@@ -132,8 +128,8 @@ fn kotlin(root: &Path, api: &ApiSurface, config: &ResolvedCrateConfig, enums: bo
     task(root, "dependencies", &[]);
     let classpath = std::fs::read_to_string(root.join("classpath.txt")).unwrap();
     let mut vars = vec![
-        format!("JACKSON_CLASSPATH={}", classpath.trim()),
-        format!("KOTLIN_TEST_JAR={}", kotlin_test_jar(root).display()),
+        ("JACKSON_CLASSPATH", classpath.trim().to_string()),
+        ("KOTLIN_TEST_JAR", kotlin_test_jar(root).display().to_string()),
     ];
     let target = if android {
         bindings(
@@ -146,13 +142,13 @@ fn kotlin(root: &Path, api: &ApiSurface, config: &ResolvedCrateConfig, enums: bo
         "kotlin"
     } else {
         let files = bindings(root, api, config, &crate::backends::java::JavaBackend, "java");
-        vars.push(format!(
-            "JAVA_SOURCES={}",
+        vars.push((
+            "JAVA_SOURCES",
             files
                 .iter()
                 .map(|file| file.display().to_string())
                 .collect::<Vec<_>>()
-                .join(" ")
+                .join(" "),
         ));
         "kotlin-java"
     };

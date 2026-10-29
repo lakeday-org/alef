@@ -1,0 +1,5 @@
+[tasks.build]
+run = '{% if os() == "macos" %}cargo rustc --lib -- -C link-arg=-undefined -C link-arg=dynamic_lookup{% else %}cargo build{% endif %}'
+
+[tasks.test]
+run = "ruby matcher_spec.rb"

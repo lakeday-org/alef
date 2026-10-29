@@ -123,12 +123,9 @@ fn actual_text_projected_android_producer_and_full_dispatch_agree() {
 }
 
 fn native_task(root: &Path, target: &str, classpath: &str, case: &str) -> crate::snippets::validators::CapturedStreams {
-    let executable = which::which_in("task", std::env::var_os("PATH"), root).unwrap();
-    let mut command = std::process::Command::new(executable);
+    let mut command = crate::test_support::mise_task::mise_run(root, target);
     command
-        .arg(target)
-        .arg(format!("CLASSPATH={classpath}"))
-        .current_dir(root)
+        .env("ALEF_PROBE_CLASSPATH", classpath)
         .env("CARGO_TARGET_DIR", root.join("native-target"))
         .env("RUSTC_WRAPPER", "")
         .env("RUSTC_WORKSPACE_WRAPPER", "")
@@ -179,8 +176,8 @@ fn prepare_native(root: &Path, api: &ApiSurface, config: &ResolvedCrateConfig) {
             include_str!("../../../../tests/fixtures/android_structured_text/core_Cargo.toml"),
         ),
         (
-            "Taskfile.yml",
-            include_str!("../../../../tests/fixtures/android_structured_text/Taskfile.yml"),
+            "mise.toml",
+            include_str!("../../../../tests/fixtures/android_structured_text/mise.toml"),
         ),
         (
             "pom.xml",

@@ -250,16 +250,13 @@ fn native_target(root: &Path) -> std::path::PathBuf {
 }
 
 fn native_task(root: &Path, name: &str, case: &str, materialize: bool) -> crate::snippets::validators::CapturedStreams {
-    let executable = which::which_in("task", std::env::var_os("PATH"), root).unwrap();
-    let mut command = std::process::Command::new(executable);
+    let mut command = crate::test_support::mise_task::mise_run(root, name);
     command
-        .arg(name)
-        .current_dir(root)
         .env("CARGO_TARGET_DIR", native_target(root))
         .env("RUSTC_WRAPPER", "")
         .env("RUSTC_WORKSPACE_WRAPPER", "")
         .env("ALEF_STRUCTURED_TEXT_CASE", case)
-        .arg(format!("TEST_BINARY={}", std::env::current_exe().unwrap().display()));
+        .env("TEST_BINARY", std::env::current_exe().unwrap());
     if materialize {
         command.env("ALEF_STRUCTURED_TEXT_MATERIALIZE", root);
     }
@@ -284,8 +281,8 @@ fn prepare_native(root: &Path, api: &ApiSurface, config: &ResolvedCrateConfig) {
     );
     write(
         root,
-        "Taskfile.yml",
-        include_str!("../../../../tests/fixtures/swift_structured_text/Taskfile.yml"),
+        "mise.toml",
+        include_str!("../../../../tests/fixtures/swift_structured_text/mise.toml"),
     );
     write(
         root,

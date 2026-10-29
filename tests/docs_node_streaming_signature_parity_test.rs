@@ -30,6 +30,9 @@ use alef::core::config::new_config::NewAlefConfig;
 use alef::core::config::{AdapterConfig, AdapterPattern, Language, ResolvedCrateConfig};
 use alef::core::ir::{ApiSurface, FieldDef, MethodDef, ParamDef, ReceiverKind, TypeDef, TypeRef};
 
+#[path = "support/mise_task.rs"]
+mod mise_task;
+
 fn resolved_config() -> ResolvedCrateConfig {
     let toml = r#"
 [workspace]
@@ -294,8 +297,8 @@ fn native_probe_directory() -> tempfile::TempDir {
     )
     .unwrap();
     std::fs::write(
-        directory.path().join("Taskfile.yml"),
-        "version: '3'\ntasks:\n  proof:\n    cmds:\n      - cargo check --quiet --offline\n",
+        directory.path().join("mise.toml"),
+        "[tasks.proof]\nrun = \"cargo check --quiet --offline\"\n",
     )
     .unwrap();
     directory
@@ -312,9 +315,7 @@ fn check_native_controls(directory: &std::path::Path, source: &str, alias: bool)
             )
         };
         std::fs::write(directory.join("src/lib.rs"), candidate).unwrap();
-        let output = std::process::Command::new("task")
-            .arg("proof")
-            .current_dir(directory)
+        let output = mise_task::mise_run(directory, "proof")
             .env("RUSTC_WRAPPER", "")
             .env("RUSTC_WORKSPACE_WRAPPER", "")
             .env("CARGO_TARGET_DIR", directory.join("target"))

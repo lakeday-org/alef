@@ -22,8 +22,8 @@ fn prepare(root: &Path) {
             include_str!("../fixtures/swift_constructor_history/ffi.rs"),
         ),
         (
-            "Taskfile.yml",
-            include_str!("../fixtures/swift_constructor_history/Taskfile.yml"),
+            "mise.toml",
+            include_str!("../fixtures/swift_constructor_history/mise.toml"),
         ),
     ] {
         write(root, name, content);
@@ -46,22 +46,19 @@ fn build_stage(root: &Path, legacy: bool, arity: usize, history: &[Vec<&str>]) -
     std::fs::read_to_string(root.join("packages/swift/rust/swift-generated/Fixture/Fixture.h")).unwrap()
 }
 
-fn task(root: &Path, name: &str, arguments: &[&str]) -> alef::snippets::validators::CapturedStreams {
-    let executable = which::which("task").expect("native fixture requires Task");
+fn task(root: &Path, name: &str, variables: &[(&str, &str)]) -> alef::snippets::validators::CapturedStreams {
     let target = std::env::var_os("CARGO_TARGET_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| root.join("target"));
-    let mut command = std::process::Command::new(executable);
+    let mut command = super::mise_task::mise_run(root, name);
     command
-        .arg(name)
-        .args(arguments)
-        .current_dir(root)
+        .envs(variables.iter().copied())
         .env("RUSTC_WRAPPER", "")
         .env("RUSTC_WORKSPACE_WRAPPER", "")
         .env("CARGO_TARGET_DIR", &target);
     let result =
         alef::snippets::validators::run_command_streams(&mut command, 180).expect("run Swift constructor fixture");
-    let suffix = if arguments.is_empty() { "" } else { "-negative" };
+    let suffix = if variables.is_empty() { "" } else { "-negative" };
     write(
         root,
         &format!("{name}{suffix}.log"),
@@ -168,7 +165,7 @@ fn verify_swift(root: &Path, legacy: bool, zero: bool) {
         result.stderr
     );
     write(root, &format!("{expected}-checks-positive.log"), &result.stdout);
-    let wrong = task(root, "run", &["MODE=wrong-default"]);
+    let wrong = task(root, "run", &[("MODE", "wrong-default")]);
     assert!(
         !wrong.success && wrong.stderr.contains("Precondition failed: includeDetails"),
         "{}\n{}",

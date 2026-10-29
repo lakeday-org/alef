@@ -180,16 +180,13 @@ fn native_target(root: &Path) -> PathBuf {
 }
 
 fn run(root: &Path, task: &str, case: &str, materialize: bool) -> crate::snippets::validators::CapturedStreams {
-    let executable = which::which_in("task", std::env::var_os("PATH"), root).unwrap();
-    let mut command = std::process::Command::new(executable);
+    let mut command = crate::test_support::mise_task::mise_run(root, task);
     command
-        .arg(task)
-        .current_dir(root)
         .env("CARGO_TARGET_DIR", native_target(root))
         .env("RUSTC_WRAPPER", "")
         .env("RUSTC_WORKSPACE_WRAPPER", "")
         .env("ALEF_OWNED_VALUES_CASE", case)
-        .arg(format!("TEST_BINARY={}", std::env::current_exe().unwrap().display()));
+        .env("TEST_BINARY", std::env::current_exe().unwrap());
     if materialize {
         command.env("ALEF_SWIFT_OWNED_MATERIALIZE", root);
     }
@@ -212,8 +209,8 @@ fn prepare(root: &Path, api: &ApiSurface, config: &ResolvedCrateConfig) {
             include_str!("../../../../tests/fixtures/swift_owned_values/core_Cargo.toml"),
         ),
         (
-            "Taskfile.yml",
-            include_str!("../../../../tests/fixtures/swift_owned_values/Taskfile.yml"),
+            "mise.toml",
+            include_str!("../../../../tests/fixtures/swift_owned_values/mise.toml"),
         ),
         (
             "Package.swift",

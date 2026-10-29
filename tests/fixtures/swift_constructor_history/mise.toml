@@ -1,0 +1,17 @@
+[tasks.rust-build]
+run = "cargo build --manifest-path packages/swift/rust/Cargo.toml --jobs 1"
+
+[tasks.bridge-build]
+run = "swiftc -I native -module-name RustBridge -parse-as-library -whole-module-optimization -emit-module -emit-module-path native/RustBridge.swiftmodule -emit-object native/RustBridge.swift packages/swift/Sources/RustBridge/ZSwift*.swift -o native/RustBridge.o"
+
+[tasks.facade-build]
+run = "swiftc -I native -module-name Fixture -parse-as-library -whole-module-optimization -emit-module -emit-module-path native/Fixture.swiftmodule -emit-object packages/swift/Sources/Fixture/Fixture.swift -o native/Fixture.o"
+
+[tasks.link]
+run = 'swiftc -I native native/probe.swift native/Fixture.o native/RustBridge.o "$CARGO_TARGET_DIR/debug/libfixture_swift.a" -o native/probe'
+
+[tasks.run]
+run = "./native/probe ${MODE:-}"
+
+[tasks.negative-typecheck]
+run = "swiftc -I native -typecheck native/negative.swift"

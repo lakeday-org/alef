@@ -4,7 +4,9 @@ use alef::core::backend::Backend;
 use alef::core::config::{NewAlefConfig, ResolvedCrateConfig};
 use alef::core::ir::ApiSurface;
 use std::path::Path;
-use std::process::Command;
+
+#[path = "support/mise_task.rs"]
+mod mise_task;
 
 fn surface(root: &Path) -> (ApiSurface, ResolvedCrateConfig) {
     let source = root.join("lib.rs");
@@ -59,12 +61,10 @@ fn should_compile_and_preserve_python_payload_with_core_feature_off_and_on() {
                 .display()
                 .to_string()
         });
-        let task = format!(
-            "version: '3'\ntasks:\n  test:\n    cmds:\n      - cargo test --offline --quiet --lib --no-default-features {features}\n"
-        );
-        write(root.path(), "sample-py/Taskfile.yml", &task);
-        let result = Command::new("task")
-            .args(["--dir", root.path().join("sample-py").to_str().unwrap(), "test"])
+        let task =
+            format!("[tasks.test]\nrun = \"cargo test --offline --quiet --lib --no-default-features {features}\"\n");
+        write(root.path(), "sample-py/mise.toml", &task);
+        let result = mise_task::mise_run(&root.path().join("sample-py"), "test")
             .env("CARGO_TARGET_DIR", target)
             .env("RUSTC_WRAPPER", "")
             .output()

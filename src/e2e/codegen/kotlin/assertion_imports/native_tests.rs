@@ -2,8 +2,7 @@ use std::path::Path;
 
 fn unused_imports(root: &Path, source: &str) -> Vec<String> {
     std::fs::write(root.join("GeneratedTest.kt"), source).unwrap();
-    let mut command = std::process::Command::new("task");
-    command.arg("lint").arg("--silent").current_dir(root);
+    let mut command = crate::test_support::mise_task::mise_run(root, "lint");
     let output = crate::snippets::validators::run_command_streams(&mut command, 60).unwrap();
     let report: serde_json::Value = serde_json::from_str(&output.stdout)
         .unwrap_or_else(|error| panic!("ktlint JSON: {error}: {}\n{}", output.stdout, output.stderr));
@@ -35,8 +34,8 @@ fn native_ktlint_checks_discriminated_imports_in_full_generated_tests() {
     let root = directory.path();
     for (name, contents) in [
         (
-            "Taskfile.yml",
-            include_str!("../../../../../tests/fixtures/kotlin_assertion_imports/Taskfile.yml"),
+            "mise.toml",
+            include_str!("../../../../../tests/fixtures/kotlin_assertion_imports/mise.toml"),
         ),
         (
             ".editorconfig",

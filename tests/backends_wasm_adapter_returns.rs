@@ -4,7 +4,9 @@ use alef::core::config::{AdapterConfig, AdapterPattern, NewAlefConfig, ResolvedC
 use alef::core::ir::ApiSurface;
 use alef::snippets::validators::run_command_streams;
 use std::path::Path;
-use std::process::Command;
+
+#[path = "support/mise_task.rs"]
+mod mise_task;
 
 const CORE: &str = include_str!("fixtures/wasm_adapter_returns/core.rs");
 
@@ -119,18 +121,14 @@ fn write_native_fixture(root: &Path, source: &str) {
             "binding/Cargo.toml",
             include_str!("fixtures/wasm_adapter_returns/bridge_Cargo.toml"),
         ),
-        (
-            "Taskfile.yml",
-            include_str!("fixtures/wasm_adapter_returns/Taskfile.yml"),
-        ),
+        ("mise.toml", include_str!("fixtures/wasm_adapter_returns/mise.toml")),
     ] {
         std::fs::write(root.join(path), contents).unwrap();
     }
 }
 
 fn lint(root: &Path) -> alef::snippets::validators::CapturedStreams {
-    let mut command = Command::new("task");
-    command.current_dir(root).arg("lint");
+    let mut command = mise_task::mise_run(root, "lint");
     run_command_streams(&mut command, 300).unwrap()
 }
 

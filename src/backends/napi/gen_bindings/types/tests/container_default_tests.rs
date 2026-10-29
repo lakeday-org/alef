@@ -155,7 +155,7 @@ fn assert_success(output: &Output) {
 }
 
 #[test]
-#[ignore = "requires Cargo NAPI dependencies, Node, TypeScript and Task"]
+#[ignore = "requires Cargo NAPI dependencies, Node, TypeScript and mise"]
 fn container_default_sparse_typescript_and_native_node() {
     let dir = tempfile::tempdir().expect("owned native fixture");
     let dir = dir.path();
@@ -164,8 +164,8 @@ fn container_default_sparse_typescript_and_native_node() {
     std::fs::write(dir.join("Cargo.toml"), include_str!("container_default_manifest.toml")).expect("native manifest");
     std::fs::write(dir.join("build.rs"), "fn main() { napi_build::setup(); }\n").expect("build script");
     std::fs::write(
-        dir.join("Taskfile.yml"),
-        "version: '3'\ntasks:\n  build:\n    cmds:\n      - cargo build --offline\n",
+        dir.join("mise.toml"),
+        "[tasks.build]\nrun = \"cargo build --offline\"\n",
     )
     .expect("build task");
     let dts = declarations(&fixture())
@@ -173,7 +173,10 @@ fn container_default_sparse_typescript_and_native_node() {
     std::fs::write(dir.join("index.d.ts"), dts).expect("declarations");
     std::fs::write(dir.join("check.ts"), include_str!("container_default_probe.ts")).expect("TypeScript probe");
     let typescript = run(dir, "tsc", &["--strict", "--noEmit", "--skipLibCheck", "check.ts"]);
-    let built = run(dir, "task", &["build"]);
+    let built = crate::test_support::mise_task::mise_run(dir, "build")
+        .env_remove("CARGO_TARGET_DIR")
+        .output()
+        .expect("run native fixture tool");
     assert_success(&built);
     let library = format!(
         "target/debug/{}sparse_probe{}",

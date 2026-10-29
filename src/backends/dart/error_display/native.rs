@@ -10,10 +10,8 @@ use std::path::Path;
 mod pruning;
 
 fn task(root: &Path, name: &str, arguments: &[&str]) -> std::process::Output {
-    let output = std::process::Command::new("task")
-        .arg(name)
+    let output = crate::test_support::mise_task::mise_run(root, name)
         .args(arguments)
-        .current_dir(root)
         .env("RUSTC_WRAPPER", "")
         .env("RUSTC_WORKSPACE_WRAPPER", "")
         .env("CARGO_TARGET_DIR", root.join("frb-target"))
@@ -69,8 +67,8 @@ fn prepare(root: &Path) -> ResolvedCrateConfig {
         std::fs::write(path, file.content).unwrap();
     }
     std::fs::write(
-        root.join("Taskfile.yml"),
-        include_str!("../../../../tests/fixtures/dart_error_display/Taskfile.yml"),
+        root.join("mise.toml"),
+        include_str!("../../../../tests/fixtures/dart_error_display/mise.toml"),
     )
     .unwrap();
     std::fs::write(

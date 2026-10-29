@@ -89,11 +89,7 @@ fn write_native_fixture(directory: &std::path::Path) {
         include_str!("../../../tests/fixtures/magnus_optional_string/check.rb"),
     )
     .unwrap();
-    std::fs::write(
-        directory.join("Taskfile.yml"),
-        "version: '3'\ntasks:\n  build:\n    cmds: ['cargo build']\n",
-    )
-    .unwrap();
+    std::fs::write(directory.join("mise.toml"), "[tasks.build]\nrun = \"cargo build\"\n").unwrap();
     if cfg!(target_os = "macos") {
         std::fs::write(
             directory.join("build.rs"),
@@ -113,14 +109,12 @@ fn ruby_native_target(ruby_binary: &std::path::Path) -> Option<&'static str> {
 }
 
 fn build_native_fixture(directory: &std::path::Path, ruby_binary: &std::path::Path, target: Option<&str>) {
-    let mut command = std::process::Command::new("task");
+    let mut command = crate::test_support::mise_task::mise_run(directory, "build");
     command
-        .arg("build")
         .env("RUBY", ruby_binary)
         .env("CARGO_INCREMENTAL", "0")
         .env("CARGO_TARGET_DIR", directory.join("target"))
-        .env_remove("CARGO_BUILD_TARGET")
-        .current_dir(directory);
+        .env_remove("CARGO_BUILD_TARGET");
     // ~keep RubyInstaller uses MinGW even when Alef's test executable was compiled with MSVC.
     if let Some(target) = target {
         command.env("CARGO_BUILD_TARGET", target);
