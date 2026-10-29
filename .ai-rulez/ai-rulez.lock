@@ -4,7 +4,7 @@
 version = 1
 ai_rulez_version = '5.9.2'
 scope = 'all'
-tree = 'sha256:7a418140e047c98090d377044368981f2fee936ceaeb7aa1d941e95a52c77b2e'
+tree = 'sha256:970679ee04aae657d6d061cf451623d53d8ac988f36261358349ae86018539ac'
 
 [[include]]
 name = 'xberg-cicd'
@@ -148,7 +148,7 @@ digest = 'sha256:772854a122a129565f974e6c5ae84ef1169f7bc4f3a2068bfdc56b548c16169
 name = 'regen-audit'
 source = '.ai-rulez/skills/regen-audit/SKILL.md'
 commit = ''
-digest = 'sha256:54a025ac68591151b32a79b7c6380423d9f814162bb08a7ad6f883b8939f9c6b'
+digest = 'sha256:be7840e40931336ef4acc35727ac995691047693a7ad7e8c8184450268e1895b'
 
 [[served]]
 name = 'release-procedure'
@@ -273,7 +273,7 @@ digest = 'sha256:f011dde132edde0f3c5b434c1b266f2d7b6d70bcf333d3dab7307d109262e9d
 kind = 'skill'
 id = 'regen-audit'
 path = 'skills/regen-audit'
-digest = 'sha256:9bb8353bd951e8ced36a7e89bfdf3bd6950acc44fd596d979b923130351d16a9'
+digest = 'sha256:7eb72545ef2121f0c027bf177c2623a0838e518253e8bc6adcf264a15e2564da'
 
 [[item]]
 kind = 'skill'
