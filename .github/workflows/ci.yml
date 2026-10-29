@@ -38,6 +38,8 @@ jobs:
           install-args: bats
       - name: Check shared Bats library
         run: mise run test:lib:check
+      - name: Publish verification task controls
+        run: mise run gate:publish-verify
       - uses: xberg-io/actions/run-bats@v1
         with:
           path: scripts/tests
