@@ -38,10 +38,6 @@ run = ["cargo upgrade --incompatible", { task = "update" }]
 description = "Build all crates"
 run = "cargo build --workspace"
 
-[tasks."build:release"]
-description = "Build release binary"
-run = "cargo build --release -p alef"
-
 [tasks.test]
 description = "Run all tests"
 # Derived from `cargo metadata`, not a hard-coded `target/`, so a custom `CARGO_TARGET_DIR` or
@@ -59,11 +55,6 @@ run = 'cargo {% if os() == "macos" %}--config profile.test.package.alef.opt-leve
 description = "Compile and verify emitted Swift callback link policy"
 run = "mise run test:run -- --lib swift_callback_link_tests -- --ignored --test-threads=1"
 
-[tasks."test:bats"]
-description = "Run shell regression suites"
-env = { BATS_LIB_PATH = "{{config_root}}/tests/lib" }
-run = "bats scripts/tests"
-
 [tasks."test:lib:sync"]
 description = "Synchronize the pinned shared Bats library"
 run = "python3 scripts/sync_bats_lib.py"
@@ -79,23 +70,11 @@ description = "Report how many toolchain-dependent fixtures the last test run ac
 # zero-execution run has to be fatal. ~keep
 run = "./scripts/toolchain-census.sh"
 
-[tasks."test:release"]
-description = "Run all tests in release mode (catches release-only optimizer/lifetime issues)"
-run = "cargo test --release --workspace"
-
 [tasks."gate:generated-output"]
 description = "Run the consumer toolchain gate (clippy, cargo sort, poly fmt) over an emitted tree"
 run = [
   "cargo test --test generated_output_downstream_gate -- --nocapture",
   "cargo test --test generated_output_downstream_gate -- --ignored --nocapture --test-threads=1",
-]
-
-[tasks."gate:generated-output:text"]
-description = "Generated-output gate, text lanes only (cargo sort + poly fmt + cargo manifest bytes; compiles nothing)"
-run = [
-  "cargo test --test generated_output_downstream_gate -- --ignored --nocapture --test-threads=1 cargo_sort",
-  "cargo test --test generated_output_downstream_gate -- --ignored --nocapture --test-threads=1 poly_fmt",
-  "cargo test --test generated_output_downstream_gate -- --ignored --nocapture --test-threads=1 cargo_manifest_byte",
 ]
 
 [tasks.bench]
@@ -105,10 +84,6 @@ run = "cargo bench"
 [tasks.check]
 description = "Type-check all crates"
 run = "cargo check --workspace"
-
-[tasks.fmt]
-description = "Format all code via poly"
-run = "poly fmt --fix ."
 
 [tasks.format]
 description = "Format all code via poly"
@@ -120,10 +95,6 @@ run = "poly fmt --check ."
 
 [tasks.lint]
 description = "Run all linters via poly"
-run = "poly lint ."
-
-[tasks."lint:check"]
-description = "Run check-only linting via poly (CI)"
 run = "poly lint ."
 
 [tasks."lint:file-size"]
