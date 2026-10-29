@@ -146,6 +146,10 @@ run = "python3 scripts/test_publish_verify.py"
 description = "Clean build artifacts"
 run = ["cargo clean", "rm -rf .alef/"]
 
+[tasks."governance:hooks:install"]
+description = "Provision machine preferences and install reviewed AI governance hooks"
+file = "https://raw.githubusercontent.com/xberg-io/toolchains/v1.4.0/tasks/governance/hooks-install.sh"
+
 [tasks."governance:check"]
 description = "Check materialized local governance outputs against shared sources"
 run = "ai-rulez generate --check --no-local --strict-config"
