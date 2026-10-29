@@ -78,12 +78,12 @@ repo (all pass `--skip-snippet-validation`; crawlberg omits `--skip-compile`):
   not run it there.
 - `mise run alef:verify` checks that generated output is fresh; fast regeneration does not run it.
 - `mise run e2e:generate`, then `mise run e2e:test`, is the e2e loop.
-- `mise run build:all` builds the core plus the bindings.
+- `mise run build` builds the Rust core only; `alef build` builds the language bindings.
 
-Only some repos define `alef:build`, `build:bindings`, `test:bindings`, `e2e:build`, `e2e:all` and
-`e2e:verify` (none of them exist in liter-llm), and only crawlberg and tree-sitter-language-pack
-define `alef:format` (`alef fmt`); elsewhere `mise run format` formats generated output. Check
-`mise tasks ls`.
+Only some repos define `alef:build` (`alef build`) and `test:bindings` (not liter-llm), `e2e:build`
+(crawlberg, xberg) and `e2e:verify` (crawlberg, liter-llm, xberg), and only crawlberg and
+tree-sitter-language-pack define `alef:format` (`alef fmt`); elsewhere `mise run format` formats
+generated output. Check `mise tasks ls`.
 
 ## Regeneration Is an Audit
 
