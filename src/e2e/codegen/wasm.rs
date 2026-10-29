@@ -427,7 +427,7 @@ impl E2eCodegen for WasmCodegen {
         }
 
         // Registry-mode test_apps/ runners (e.g. a consumer's
-        // `mise run smoke:wasm` step) invoke a fixed `pnpm exec vitest run
+        // `mise run` smoke task) invoke a fixed `pnpm exec vitest run
         // tests/smoke.test.ts` smoke target by convention. Emit a minimal
         // smoke test file whenever no `smoke` fixture category is present
         // so the runner does not error on a missing path.

@@ -56,16 +56,13 @@ pub(super) fn render_run_tests(
     );
     let _ = writeln!(
         out,
-        "# tears it down on exit. Without this the `mise run test-apps:smoke:brew` entry"
+        "# tears it down on exit. Without this, running `bash run_tests.sh` directly or"
     );
     let _ = writeln!(
         out,
-        "# point — which just calls `bash run_tests.sh` — fails at the require-check"
+        "# from a `mise run` task fails at the require-check above, because nothing"
     );
-    let _ = writeln!(
-        out,
-        "# above because nothing else in the smoke task spawns a mock-server."
-    );
+    let _ = writeln!(out, "# else on that path spawns a mock-server.");
     let _ = writeln!(out, "if [ -z \"${{MOCK_SERVER_URL:-}}\" ]; then");
     // ALEF_E2E_MOCK_SERVER is the runner's resolved path (via `cargo metadata`, following
     // CARGO_TARGET_DIR/.cargo/config.toml overrides); MOCK_SERVER_BIN remains a manual
