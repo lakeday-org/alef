@@ -13,6 +13,7 @@ fn published_alef_crate_allowlists_runtime_files() {
     assert_eq!(
         actual_includes,
         [
+            "tests/lib/xberg-bats/load.bash",
             "Cargo.lock",
             "LICENSE",
             "README.md",
