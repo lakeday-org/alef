@@ -78,6 +78,15 @@ pub fn serde_enum_repr(enum_def: &EnumDef) -> SerdeEnumRepr {
     }
 }
 
+/// Whether Magnus exposes this tagged variant as a native payload object instead of a Hash.
+pub(crate) fn magnus_typed_newtype_payload(enum_def: &EnumDef, variant: &EnumVariant, types: &[TypeDef]) -> bool {
+    enum_def.serde_tag.is_some()
+        && variant.fields.len() == 1
+        && variant.fields[0].name == "_0"
+        && matches!(&variant.fields[0].ty, TypeRef::Named(name)
+            if types.iter().any(|typ| typ.name == *name && !typ.is_opaque && !typ.is_trait))
+}
+
 /// The discriminator key a backend synthesizes when it lowers a data-carrying IR enum to a
 /// tagged object even though serde put no tag on the wire ([`SerdeEnumRepr::External`]).
 ///

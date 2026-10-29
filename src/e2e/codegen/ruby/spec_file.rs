@@ -116,6 +116,7 @@ pub(super) fn render_spec_file(
             .with_display_as_text_fields(e2e_config.effective_fields_display_as_text(fixture_call).clone())
             .with_ir_enum_map(FieldResolver::ir_enum_fields(type_defs, enums), call_root_type.clone())
             .with_ruby_hash_serialized_enum_names(super::enum_variant_access::hash_serialized_enum_names(enums))
+            .with_ruby_typed_variant_payloads(type_defs, enums)
             .with_ir_result_fields(FieldResolver::ir_result_field_facts(type_defs, "ruby"), call_root_type)
             .with_ir_fields(ir_reachable_fields, ir_known_excluded_fields, ir_optional_fields);
             let field_resolver = &fixture_call_resolver;

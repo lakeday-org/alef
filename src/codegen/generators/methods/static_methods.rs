@@ -256,6 +256,7 @@ pub fn gen_static_method(
     };
 
     let mut out = String::with_capacity(1024);
+    out.push_str(&super::python_export_name_attr(&method.name, cfg));
     if total_params > 7 {
         out.push_str("    #[allow(clippy::too_many_arguments)]\n");
     }

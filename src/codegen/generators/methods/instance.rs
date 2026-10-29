@@ -574,7 +574,7 @@ pub fn gen_method(
         String::new()
     };
 
-    crate::codegen::template_env::render(
+    let signature = crate::codegen::template_env::render(
         "generators/methods/method_signature.jinja",
         crate::alef_context! {
             has_too_many_arguments => total_params > 7,
@@ -590,5 +590,6 @@ pub fn gen_method(
             ret => ret,
             body => body,
         },
-    )
+    );
+    format!("{}{signature}", super::python_export_name_attr(&method.name, cfg))
 }

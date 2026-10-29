@@ -1,23 +1,7 @@
-//! Which Ruby shape `backends::magnus` lowers each IR enum to, and therefore whether a fixture
-//! field path that steps *into* an enum's variant payload names anything the Ruby binding
-//! actually exposes.
+//! Ruby tagged-enum assertion access, matching Magnus's native payload and Hash lowerings.
 //!
-//! ~keep This replaces two literal guards (`f.contains("metadata.format.")` and
-//! `f == "metadata.format"`) that carried the reason "Magnus serializes FormatMetadata to JSON,
-//! so variants are unavailable in Ruby". The path was one consumer crate's own field name
-//! hard-coded into a project-agnostic generator: an identically shaped hash-serialized enum
-//! under any other field name was not recognised at all (rendering a property chain against a
-//! Ruby `Hash`, e.g. `NoMethodError`), while a field that merely happened to share the literal
-//! name `metadata.format` was skipped whatever it actually resolved to.
-//!
-//! The real condition is the enum's Ruby *lowering* — a property of the enum's own IR shape
-//! (`backends::magnus::gen_bindings::classes::gen_enum::gen_enum`'s `has_data` check) — resolved
-//! by walking the fixture path through the crate's own IR, exactly as `php/enum_variant_access.rs`
-//! does for PHP's three-way split. Magnus's lowering is simpler than PHP's: a data-carrying enum
-//! (any variant with at least one field, tagged or not) always serializes through
-//! `serde_json::to_value` into a plain Ruby `Hash` (see `enum_magnus.rs.jinja`'s `IntoValue` impl
-//! for the `has_data` branch); a unit-variant-only enum always becomes a `Symbol`. There is no
-//! third, member-bearing shape the way PHP's flat `#[php_class]` is.
+//! Native tagged newtypes expose a variant predicate and `value` object. Other data variants
+//! retain serde Hash navigation; both paths require IR proof of the variant and payload field.
 
 use std::collections::HashSet;
 
@@ -26,11 +10,8 @@ use heck::ToUpperCamelCase;
 use crate::core::ir::EnumDef;
 use crate::e2e::field_access::FieldResolver;
 
-/// Names of every enum this crate declares that Magnus lowers to a plain Ruby `Hash` rather than
-/// a `Symbol` — restated from `gen_enum`'s own `has_data` predicate
-/// (`enum_def.variants.iter().any(|v| !v.fields.is_empty())`), which that module cannot export
-/// because `backends::magnus::gen_bindings` is private to `backends::magnus`.
-/// `should_match_the_binding_backends_partition` below pins the two agree.
+/// Data-carrying enums requiring payload-aware assertions rather than Symbol comparisons.
+/// Native typed variants are distinguished separately by the binding's shared lowering predicate.
 pub(super) fn hash_serialized_enum_names(enums: &[EnumDef]) -> HashSet<String> {
     enums
         .iter()
@@ -44,12 +25,9 @@ pub(super) fn hash_serialized_enum_names(enums: &[EnumDef]) -> HashSet<String> {
 pub(super) enum RubyEnumAccess {
     /// Nothing to refuse: the path crosses no enum, or every enum on it is a `Symbol`.
     Available,
-    /// The path lands exactly on a hash-serialized enum. A real `Hash` value exists, but the
-    /// serialization differs between languages and doesn't preserve `Display` formatting, so a
-    /// plain string/equality comparison against it is not meaningful.
+    /// The path lands on a data enum whose aggregate representation cannot be compared as a scalar.
     SerializedAsHash,
-    /// The path steps PAST a hash-serialized enum into a variant payload segment. No native
-    /// accessor exists on the Ruby side for that segment; the whole subtree is a `Hash`.
+    /// The path crosses a data enum and requires representation-specific payload navigation.
     VariantAccessorUnavailable,
 }
 
@@ -76,7 +54,8 @@ pub(super) fn classify(field_resolver: &FieldResolver, field: &str) -> RubyEnumA
 /// Render the one Ruby-accessible tagged-enum payload shape Alef can prove from the IR: a path
 /// crosses a known single-payload variant and names one plain field on that payload.
 ///
-/// ~keep How many Hash levels sit between the discriminator and the payload field depends on what
+/// Native typed payloads use the binding's predicate and `value` accessor. For remaining Hash
+/// payloads, how many levels sit between the discriminator and the payload field depends on what
 /// `backends::magnus` emitted, and there are three cases.
 ///
 /// `enum_magnus.rs.jinja` restates every single-payload variant as a Rust STRUCT variant
@@ -126,6 +105,19 @@ pub(super) fn variant_field_accessor(field_resolver: &FieldResolver, field: &str
         if field_resolver.is_declared_field_of_type(payload_type, payload_field) != Some(true) {
             return None;
         }
+        if field_resolver.ruby_variant_has_typed_payload(&enum_type, &variant) {
+            let predicate = crate::codegen::naming::pascal_to_snake(&variant);
+            let enum_value = field_resolver.accessor(&prefix, "ruby", result_var);
+            return Some(format!(
+                concat!(
+                    "{enum_value}.then {{ |enum_value| raise \"unexpected tagged enum variant\" ",
+                    "unless enum_value.{predicate}?; enum_value.value.{payload_field} }}"
+                ),
+                enum_value = enum_value,
+                predicate = predicate,
+                payload_field = payload_field,
+            ));
+        }
         let (serde_tag, wire_variant) = field_resolver.tagged_enum_wire_discriminator(&enum_type, &variant)?;
         let content_key = field_resolver.tagged_enum_content_key(&enum_type);
         let flattened = content_key.is_none() && field_resolver.union_variant_payload_is_tuple(&enum_type, &variant);
@@ -174,10 +166,7 @@ mod tests {
         TypeRef::Named(name.to_string())
     }
 
-    /// A neutral fixture crate carrying the two Ruby enum lowerings:
-    ///
-    /// * `EncodingDetails` — a data-carrying (internally tagged) enum, lowered to a `Hash`.
-    /// * `DocumentKind` — unit variants only, lowered to a `Symbol`.
+    /// The fixture covers native tagged newtypes, Hash payloads and unit/Symbol variants.
     ///
     /// `metadata` deliberately carries a plain `String` field named `format` — the exact literal
     /// spelling the old guard matched on — so a test can prove that name alone no longer triggers
@@ -283,6 +272,7 @@ mod tests {
         )
         .with_ir_enum_map(map, Some("ProcessingResult".to_string()))
         .with_ruby_hash_serialized_enum_names(hash_serialized_enum_names(&enums))
+        .with_ruby_typed_variant_payloads(&type_defs, &enums)
         .with_ir_result_fields(
             FieldResolver::ir_result_field_facts(&type_defs, "ruby"),
             Some("ProcessingResult".to_string()),
@@ -379,31 +369,32 @@ mod tests {
         out
     }
 
-    /// End to end through `render_assertion` itself (not just `classify`), under a field name
-    /// that is nothing like the old literal `metadata.format` — proving the real entry point, not
-    /// just the classifier in isolation, reaches the flattened Symbol-keyed Hash payload.
     #[test]
-    fn render_assertion_reaches_a_hash_serialized_variant_field_under_any_name() {
+    fn should_access_a_typed_ruby_variant_through_its_native_payload() {
         let out = render("summary.encoding.spreadsheet.sheet_count");
-        assert!(out.contains("result.summary.encoding.then { |enum_hash|"), "got: {out}");
+        assert!(out.contains("enum_value.spreadsheet?"), "{out}");
+        assert!(out.contains("enum_value.value.sheet_count"), "{out}");
+        assert!(!out.contains(".fetch("), "{out}");
+    }
+
+    /// A serde-renamed variant still uses its Rust-derived native predicate.
+    #[test]
+    fn render_assertion_reaches_a_native_variant_field_under_any_name() {
+        let out = render("summary.encoding.spreadsheet.sheet_count");
         assert!(
-            out.contains("enum_hash.fetch(\"type'kind\".to_sym) == \"sheet'kind\""),
+            out.contains("result.summary.encoding.then { |enum_value|"),
             "got: {out}"
         );
-        assert!(out.contains("enum_hash.fetch('sheet_count'.to_sym)"), "got: {out}");
+        assert!(out.contains("enum_value.spreadsheet?"), "got: {out}");
+        assert!(out.contains("enum_value.value.sheet_count"), "got: {out}");
         assert!(!out.contains("fetch('_0'.to_sym)"), "got: {out}");
         assert!(!out.contains("# skipped:"), "got: {out}");
     }
 
-    /// THE REGRESSION, in the direction it actually shipped: `backends::magnus` puts
-    /// `#[serde(flatten)]` on a TUPLE variant's field when the enum is internally tagged, so the
-    /// payload lands beside the discriminator and there is no wrapper Hash to hop through. Emitting
-    /// the hop anyway raises `KeyError: key not found: :_0` against the real binding, which is what
-    /// a downstream Ruby suite did with flattened tuple variants.
     #[test]
     fn render_assertion_omits_the_wrapper_hop_for_a_flattened_tuple_variant() {
         let out = render("summary.encoding.spreadsheet.sheet_count");
-        assert!(out.contains("enum_hash.fetch('sheet_count'.to_sym)"), "got: {out}");
+        assert!(out.contains("enum_value.value.sheet_count"), "got: {out}");
         assert!(!out.contains("fetch('_0'.to_sym)"), "got: {out}");
     }
 
@@ -419,16 +410,11 @@ mod tests {
         );
     }
 
-    /// An adjacently-tagged enum (`tag` + `content`) nests its payload under the CONFIGURED
-    /// `content` key, not the IR field name — serde puts an adjacently-tagged payload there
-    /// unconditionally, regardless of the field's own name. This must win over the `_0` fallback.
+    /// Native payload objects do not depend on serde's configured content key.
     #[test]
-    fn render_assertion_hops_through_the_configured_content_key_for_adjacently_tagged_enums() {
+    fn render_assertion_uses_the_native_payload_for_adjacently_tagged_enums() {
         let out = render("summary.adjacent.wrapped.value");
-        assert!(
-            out.contains("enum_hash.fetch('body'.to_sym).fetch('value'.to_sym)"),
-            "got: {out}"
-        );
+        assert!(out.contains("enum_value.value.value"), "got: {out}");
         assert!(!out.contains("fetch('_0'.to_sym)"), "got: {out}");
     }
 
@@ -447,10 +433,22 @@ mod tests {
             out.contains("raise \"unexpected tagged enum variant\" unless"),
             "got: {out}"
         );
-        assert!(
-            out.contains("fetch(\"type'kind\".to_sym) == \"sheet'kind\""),
-            "got: {out}"
-        );
+        assert!(out.contains("enum_value.spreadsheet?"), "got: {out}");
+    }
+
+    #[test]
+    fn should_keep_hash_access_for_opaque_and_trait_payloads() {
+        for (opaque, is_trait) in [(true, false), (false, true)] {
+            let (mut types, enums) = ir();
+            let payload = types.iter_mut().find(|typ| typ.name == "SpreadsheetDetails").unwrap();
+            payload.is_opaque = opaque;
+            payload.is_trait = is_trait;
+            let resolver = resolver().with_ruby_typed_variant_payloads(&types, &enums);
+            let out =
+                super::variant_field_accessor(&resolver, "summary.encoding.spreadsheet.sheet_count", "result").unwrap();
+            assert!(out.contains("enum_hash.fetch('sheet_count'.to_sym)"), "{out}");
+            assert!(!out.contains("enum_value.value"), "{out}");
+        }
     }
 
     #[test]

@@ -360,10 +360,19 @@ pub fn gen_stubs(
     let coercible_dtos = crate::backends::pyo3::gen_bindings::wire_schema::coercible_dto_names(api, config);
 
     let core_import = config.core_import_name();
+    let features = crate::codegen::cfg::enabled_features_for_language(config, crate::core::config::Language::Python);
+    let features = features.iter().map(String::as_str).collect();
     for enum_def in &api.enums {
         let is_host_enum = crate::codegen::cfg::is_host_owned_rust_path(&core_import, &enum_def.rust_path);
+        let mut declared_enum = enum_def.clone();
+        declared_enum.variants.retain(|variant| {
+            !matches!(
+                crate::codegen::conversions::enum_variant_declaration(variant, is_host_enum, Some(&features)),
+                crate::codegen::conversions::VariantDeclaration::Drop
+            )
+        });
         body_lines.push(gen_enum_stub(
-            enum_def,
+            &declared_enum,
             emit_docstrings,
             &coercible_dtos,
             is_host_enum,

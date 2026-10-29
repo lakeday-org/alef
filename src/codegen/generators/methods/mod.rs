@@ -11,3 +11,14 @@ pub use instance::gen_method;
 pub use opaque::{gen_opaque_constructor, gen_opaque_impl_block};
 pub use static_methods::gen_static_method;
 pub use trait_names::is_trait_method_name;
+
+fn python_export_name_attr(name: &str, cfg: &super::RustBindingConfig<'_>) -> String {
+    if cfg.method_block_attr != Some("pymethods") {
+        return String::new();
+    }
+    let exported = crate::core::keywords::python_ident(name);
+    if exported == name {
+        return String::new();
+    }
+    format!("    #[pyo3(name = \"{exported}\")]\n")
+}

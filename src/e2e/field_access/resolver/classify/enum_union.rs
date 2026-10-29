@@ -222,12 +222,13 @@ impl FieldResolver {
         Some(!self.java_wrapper_enum_names.contains(&name))
     }
 
-    /// Whether Ruby's Magnus binding backend lowers the enum type backing `field`'s leaf segment
-    /// to a plain `Hash` (per `ruby_hash_serialized_enum_names`) rather than a `Symbol`. `None`
-    /// when the IR does not positively resolve `field` to a concrete enum type at all (unresolved
-    /// root type, a path segment the IR does not recognize, or a field classified as enum only
-    /// via the hand-maintained `fields_enum` config) — the caller decides its own fallback for
-    /// "unknown" rather than this method guessing.
+    pub(crate) fn ruby_variant_has_typed_payload(&self, enum_type: &str, variant: &str) -> bool {
+        self.ruby_typed_variant_payloads
+            .contains(&(enum_type.to_string(), variant.to_string()))
+    }
+
+    /// Whether the resolved Ruby enum needs data-payload navigation rather than Symbol access.
+    /// `None` means the IR cannot resolve the field to a concrete enum.
     pub fn ruby_enum_serialized_as_hash(&self, field: &str) -> Option<bool> {
         let name = self.ir_enum_type_name(field)?;
         Some(self.ruby_hash_serialized_enum_names.contains(&name))

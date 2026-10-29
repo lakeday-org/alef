@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drive native test fixtures through `mise run` with a fixture-scoped, trusted `mise.toml` that never merges a parent config.
 - Generated comments and docs name `mise run <task>` instead of `task <task>`.
 
+### Fixed
+
+- Export Python keyword methods under the names declared by their stubs and omit unreachable foreign enum members from stubs.
+- Generate Ruby tagged-enum assertions through native variant payloads when Magnus emits typed objects, retaining Hash access for other shapes.
+
 ## [0.115.5] - 2026-10-27
 
 ### Changed

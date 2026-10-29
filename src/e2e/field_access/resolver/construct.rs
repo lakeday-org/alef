@@ -107,6 +107,7 @@ impl FieldResolver {
             napi_flattened_newtype_variants: HashMap::new(),
             java_wrapper_enum_names: HashSet::new(),
             ruby_hash_serialized_enum_names: HashSet::new(),
+            ruby_typed_variant_payloads: HashSet::new(),
             ir_collection_map: IrCollectionMap::default(),
             non_string_scalar_collection_fields: HashMap::new(),
             ir_result_field_map: IrResultFieldMap::default(),
@@ -156,6 +157,7 @@ impl FieldResolver {
             napi_flattened_newtype_variants: HashMap::new(),
             java_wrapper_enum_names: HashSet::new(),
             ruby_hash_serialized_enum_names: HashSet::new(),
+            ruby_typed_variant_payloads: HashSet::new(),
             ir_collection_map: IrCollectionMap::default(),
             non_string_scalar_collection_fields: HashMap::new(),
             ir_result_field_map: IrResultFieldMap::default(),
@@ -363,12 +365,29 @@ impl FieldResolver {
         self
     }
 
-    /// Attach the set of IR enum type names Ruby's Magnus binding backend lowers to a plain
-    /// `Hash` rather than a `Symbol`. Ruby e2e codegen is the only caller; every other backend's
-    /// resolver leaves this empty. See `ruby_hash_serialized_enum_names`'s field doc for the
-    /// source of truth.
+    /// Attach Ruby's data-carrying enum names for payload-aware fixture assertions.
     pub fn with_ruby_hash_serialized_enum_names(mut self, names: HashSet<String>) -> Self {
         self.ruby_hash_serialized_enum_names = names;
+        self
+    }
+
+    pub(crate) fn with_ruby_typed_variant_payloads(
+        mut self,
+        types: &[crate::core::ir::TypeDef],
+        enums: &[crate::core::ir::EnumDef],
+    ) -> Self {
+        self.ruby_typed_variant_payloads = enums
+            .iter()
+            .flat_map(|definition| {
+                definition
+                    .variants
+                    .iter()
+                    .filter(|variant| {
+                        crate::codegen::serde_enum_repr::magnus_typed_newtype_payload(definition, variant, types)
+                    })
+                    .map(|variant| (definition.name.clone(), variant.name.clone()))
+            })
+            .collect();
         self
     }
 

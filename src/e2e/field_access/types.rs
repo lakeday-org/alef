@@ -159,15 +159,11 @@ pub struct FieldResolver {
     /// payload assertion in a consumer's Ruby suite raised `KeyError`) — closing it for node by
     /// reading the SAME authority the binding reads, instead of re-deriving the decision. ~keep
     pub(super) napi_flattened_newtype_variants: HashMap<String, HashSet<String>>,
-    /// Names of IR enum types `backends::magnus` (Ruby) lowers to a plain Ruby `Hash` via
-    /// `serde_json::to_value` inside `IntoValue`, rather than a `Symbol` — i.e.
-    /// `backends::magnus::gen_bindings::classes::gen_enum::gen_enum`'s own `has_data` predicate
-    /// (`enum_def.variants.iter().any(|v| !v.fields.is_empty())`). Populated once per crate IR,
-    /// from `e2e::codegen::ruby::enum_variant_access::hash_serialized_enum_names`, via
-    /// `with_ruby_hash_serialized_enum_names`. Empty for every non-Ruby resolver and for any Ruby
-    /// resolver built before that IR data was wired in, in which case
-    /// `ruby_enum_serialized_as_hash` answers `None` for every field — never a false skip.
+    /// Data-carrying Ruby enums requiring payload-aware assertions rather than Symbol comparisons.
+    /// Individual variants may expose native payload objects or serde Hashes.
     pub(super) ruby_hash_serialized_enum_names: HashSet<String>,
+    /// Tagged variants whose Magnus representation carries a native payload object.
+    pub(super) ruby_typed_variant_payloads: HashSet<(String, String)>,
     /// IR-derived collection-field classification (`crate_type -> field -> {is-Vec, next
     /// type}`), anchored at the call's declared result type. Populated via
     /// `with_ir_collection_map`; empty when a codegen call site hasn't wired IR data in, in
