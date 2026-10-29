@@ -692,7 +692,7 @@ jobs:
         uses: xberg-io/actions/setup-mise@v1
         with:
           # publish:verify needs only mise itself and the Rust toolchain; install no mise tool. ~keep
-          install-args: --dry-run
+          install: "false"
           config-ref: ${{ github.sha }}
 
       - name: Verify release crates without publishing
