@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Node capsule shims call `napi_create_external` and `napi_type_tag_object` through `napi::sys` instead of an extern block linked to `node`, which made Windows addons import `node.dll` and fail to load under Node.js. Crates with capsule type tags need napi's `napi8` feature.
+
 ## [0.115.6] - 2026-10-29
 
 ### Changed
