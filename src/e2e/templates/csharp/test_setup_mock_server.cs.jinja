@@ -1,7 +1,7 @@
 
         // Spawn the mock-server binary before any test loads, mirroring the
         // Ruby spec_helper / Python conftest pattern. Honors a pre-set
-        // MOCK_SERVER_URL (e.g. set by `task` or CI) only if reachable.
+        // MOCK_SERVER_URL (e.g. set by a mise task or CI) only if reachable.
         // If preset URL fails TCP connect within 100ms, treat it as stale
         // (e.g., .mock-server.env from previous run) and spawn fresh.
         var preset = Environment.GetEnvironmentVariable("MOCK_SERVER_URL");

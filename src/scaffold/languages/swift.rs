@@ -1759,9 +1759,9 @@ import TreeSitterLanguagePack
 import SwiftTreeSitter
 
 // Requires the native `tree-sitter-language-pack-swift` + `ts-pack-core-ffi` Rust crates to
-// be built and wired via `scripts/setup-swift-bridge.sh` (see `task swift:build` /
-// `task swift:test`), compiled with TSLP_LINK_MODE=static and TSLP_LANGUAGES=mojo,nim,norg
-// (see .task/swift.yml). Every test below that needs a real grammar (parsing, root-node
+// be built and wired via `scripts/setup-swift-bridge.sh` (see `mise run swift:build` /
+// `mise run swift:test`), compiled with TSLP_LINK_MODE=static and TSLP_LANGUAGES=mojo,nim,norg.
+// Every test below that needs a real grammar (parsing, root-node
 // kind, `process()`) uses "nim", one of those three statically-compiled languages, so this
 // suite needs no network access and no warm download cache. "python"/"rust"/"markdown"
 // appear only as literal data values in the pure language-detection tests below, which
@@ -1827,7 +1827,7 @@ final class BundledQueryTests: XCTestCase {
     }
 }
 
-/// Registry checks against "nim", which `task swift:test` compiles in statically
+/// Registry checks against "nim", which `mise run swift:test` compiles in statically
 /// (TSLP_LANGUAGES=mojo,nim,norg), so these never touch the network.
 final class RegistryTests: XCTestCase {
     func testHasLanguageIsTrueForStaticallyCompiledLanguage() {

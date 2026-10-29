@@ -543,7 +543,7 @@ pub(super) fn render_test_file(
 ///
 /// Emitted inside an `async` `setUpAll`; the harness lives at
 /// `app_harness.dart` relative to `Directory.current`, which points to the test_app /
-/// e2e suite root because the Taskfile / harness invokes `dart test` from there.
+/// e2e suite root because the task runner / harness invokes `dart test` from there.
 /// `Platform.script` is unusable here because `dart test` stages test files to a tmpdir
 /// (`/var/folders/.../T/dart_test.kernel.<random>/test.dart_<n>.dill`); relative
 /// resolves against that URI escape the source tree entirely.

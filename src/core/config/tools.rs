@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use super::extras::Language;
 
 /// Default Rust dev tools installed by `alef setup rust`.
-/// Mirrors the polyrepo's `task setup` so binding generators get a consistent
+/// Mirrors the polyrepo's `mise run setup` so binding generators get a consistent
 /// developer environment out of the box.
 pub const DEFAULT_RUST_DEV_TOOLS: &[&str] = &[
     "cargo-edit",

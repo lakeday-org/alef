@@ -164,7 +164,7 @@ fn mock_server_binary_path(
 /// test-app `run` command.
 ///
 /// The mock-server crate is the alef-generated `<e2e.output>/rust` project, built
-/// in release (mirroring sample_project's Taskfile `e2e:build`); its built binary's path
+/// in release (mirroring sample_project's `e2e:build` task); its built binary's path
 /// is resolved via `cargo metadata` (see [`mock_server_binary_path`]) rather than assumed,
 /// since `CARGO_TARGET_DIR` and workspace membership can move it elsewhere. On
 /// startup the binary prints `MOCK_SERVER_URL=http://127.0.0.1:<port>` (and, when

@@ -292,7 +292,7 @@ impl E2eCodegen for WasmCodegen {
         // repo-root `pnpm-workspace.yaml`, where polyglot repos commonly
         // exclude `e2e/wasm` (it depends on a `wasm-pack build` artifact that
         // is absent on fresh checkouts). The CLI flag `--ignore-workspace`
-        // would also work, but it forces every caller (Taskfile, CI step) to
+        // would also work, but it forces every caller (mise task, CI step) to
         // pass it; making `e2e/wasm/` self-rooted keeps the generated suite
         // self-contained.
         // `allowBuilds` opts native-build scripts of common transitive deps
@@ -427,7 +427,7 @@ impl E2eCodegen for WasmCodegen {
         }
 
         // Registry-mode test_apps/ runners (e.g. a consumer's
-        // `task smoke:wasm` step) invoke a fixed `pnpm exec vitest run
+        // `mise run smoke:wasm` step) invoke a fixed `pnpm exec vitest run
         // tests/smoke.test.ts` smoke target by convention. Emit a minimal
         // smoke test file whenever no `smoke` fixture category is present
         // so the runner does not error on a missing path.

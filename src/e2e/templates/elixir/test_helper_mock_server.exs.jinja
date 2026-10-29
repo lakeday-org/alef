@@ -1,7 +1,7 @@
 {#- Mock-server startup block for Elixir e2e tests
    Spawns mock-server binary and sets MOCK_SERVER_URL and per-fixture env vars
    NOTE: E2E_ALLOW_PRIVATE_NETWORK must be set BEFORE this block runs,
-   ideally in the Taskfile env: or via System.put_env in test_helper.exs BEFORE
+   ideally in the mise task's env or via System.put_env in test_helper.exs BEFORE
    the Rustler NIF loads (which happens on first fixture compilation).
 -#}
 # Spawn mock-server binary and set MOCK_SERVER_URL for all tests.
@@ -11,7 +11,7 @@
 #    Parse any MOCK_SERVERS JSON and set each MOCK_SERVER_<FIXTURE_ID> env var
 #    so tests reading `MOCK_SERVER_<UPPER>` find the dedicated per-fixture URL.
 #    Do NOT spawn our own server.
-# 2. Standalone mode (direct `mix test` / `task elixir:smoke`): Build the
+# 2. Standalone mode (direct `mix test` / `mise run elixir:smoke`): Build the
 #    mock-server binary if it is missing, then spawn it, capture its URL, and
 #    let it run for the duration of the test suite.
 mock_server_bin = Path.expand("../../rust/target/release/mock-server", __DIR__)

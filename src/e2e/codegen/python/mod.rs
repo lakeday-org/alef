@@ -158,7 +158,7 @@ impl super::E2eCodegen for PythonE2eCodegen {
         }
 
         // Registry-mode test_apps/ runners (e.g. a consumer's
-        // `task smoke:python` step) invoke a fixed `uv run pytest
+        // `mise run smoke:python` step) invoke a fixed `uv run pytest
         // tests/test_smoke.py` smoke target by convention. Emit a minimal
         // smoke test whenever no `smoke` fixture category is present so the
         // runner does not error on a missing path.

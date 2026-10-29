@@ -56,7 +56,7 @@ pub(super) fn render_run_tests(
     );
     let _ = writeln!(
         out,
-        "# tears it down on exit. Without this the `task test-apps:smoke:brew` entry"
+        "# tears it down on exit. Without this the `mise run test-apps:smoke:brew` entry"
     );
     let _ = writeln!(
         out,

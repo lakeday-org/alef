@@ -49,8 +49,8 @@ languages = ["python"]
 
 [workspace.generated_header]
 issues_url = "https://docs.example.invalid/alef"
-regenerate_command = "task generate"
-verify_command = "task verify"
+regenerate_command = "mise run generate"
+verify_command = "mise run verify"
 
 [[crates]]
 name = "demo"
@@ -62,8 +62,8 @@ sources = ["src/lib.rs"]
 
     let h = header_for_config(CommentStyle::DoubleSlash, &resolved);
 
-    assert!(h.contains("// To regenerate: task generate"));
-    assert!(h.contains("// To verify freshness: task verify"));
+    assert!(h.contains("// To regenerate: mise run generate"));
+    assert!(h.contains("// To verify freshness: mise run verify"));
     assert!(h.contains("// Issues & docs: https://docs.example.invalid/alef"));
 }
 
