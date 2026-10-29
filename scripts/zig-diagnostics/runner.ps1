@@ -10,7 +10,7 @@ while (-not (Test-Path -LiteralPath (Join-Path $Directory 'observer-ready'))) {
     Start-Sleep -Milliseconds 50
 }
 if ($Mode -eq 'Harness') {
-    & task test:run -- --lib snippets::validators::zig::diagnostic_tests::qualify_cold_and_warm_real_consumer_cases -- --ignored --exact --nocapture --test-threads=1
+    & mise run test:run -- --lib snippets::validators::zig::diagnostic_tests::qualify_cold_and_warm_real_consumer_cases -- --ignored --exact --nocapture --test-threads=1
     exit $LASTEXITCODE
 }
 $info = [System.Diagnostics.ProcessStartInfo]::new()

@@ -29,12 +29,14 @@ jobs:
           XBERG_REF: ${{ inputs.xberg_ref }}
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3 gate/scripts/consumer-swift/entry.py --bootstrap-task
+      # The steps of alef's consumer-swift:verify mise task. The bootstrapped go-task binary drives
+      # the pinned Xberg consumer, whose own tasks are still go-task at that commit. ~keep
       - name: Qualify real consumer under guarded Task stages
         env:
           ALEF_REF: ${{ inputs.alef_ref }}
           XBERG_REF: ${{ inputs.xberg_ref }}
           PYTHONDONTWRITEBYTECODE: "1"
-        run: task --dir gate consumer-swift:verify
+        run: python3 gate/scripts/consumer-swift/entry.py --controls && python3 gate/scripts/consumer-swift/entry.py
       - name: Preserve bounded evidence
         if: always()
         uses: actions/upload-artifact@v7

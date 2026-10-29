@@ -3,9 +3,10 @@
 [settings]
 lockfile = true
 lockfile_platforms = ["linux-x64", "linux-arm64", "macos-arm64", "windows-x64"]
+# CI installs only the tools a job needs; `mise run` must not install the rest behind its back. ~keep
+task.run_auto_install = false
 
 [tools]
-task = "3.54.0"
 "github:Goldziher/poly" = "0.31.2"
 "github:Goldziher/ai-rulez" = "5.9.2"
 python = "3.13.18"
@@ -18,3 +19,155 @@ bats = "1.14.0"
 cargo-deny = "0.20.2"
 "github:bnjbvr/cargo-machete" = "0.9.2"
 "github:DevinR528/cargo-sort" = "2.1.4"
+
+[tasks.setup]
+description = "Set up the development environment"
+# Tools come from mise.toml and mise.lock; rust-toolchain.toml installs Rust on first use. Not --locked:
+# bats has no Windows lock entry and cargo-sort none for linux-arm64. ~keep
+run = ["mise install", "cargo install cargo-edit || true", { task = "governance:hooks:install" }]
+
+[tasks.update]
+description = "Update dependencies"
+run = ["cargo update", "gau --update ."]
+
+[tasks.upgrade]
+description = "Upgrade dependencies to latest (including incompatible) then update"
+run = ["cargo upgrade --incompatible", { task = "update" }]
+
+[tasks.build]
+description = "Build all crates"
+run = "cargo build --workspace"
+
+[tasks."build:release"]
+description = "Build release binary"
+run = "cargo build --release -p alef"
+
+[tasks.test]
+description = "Run all tests"
+# Derived from `cargo metadata`, not a hard-coded `target/`, so a custom `CARGO_TARGET_DIR` or
+# `.cargo/config.toml` `build.target-dir` resets the same directory `test:census` (via
+# `scripts/toolchain-census.sh`'s own default) reads back below. ~keep
+run = ['rm -rf "$(scripts/toolchain-census-dir.sh)"', { task = "test:run" }, { task = "test:census" }]
+
+[tasks."test:run"]
+description = "Run Rust tests with platform-specific test profile settings"
+# Apple's compact-unwind offsets overflow for the unoptimized unit-test executable. Optimize only
+# alef's test profile to shrink it while retaining panic unwinding. Arguments are appended. ~keep
+run = 'cargo {% if os() == "macos" %}--config profile.test.package.alef.opt-level=1 {% endif %}test --workspace'
+
+[tasks."gate:swift-callback-policy"]
+description = "Compile and verify emitted Swift callback link policy"
+run = "mise run test:run -- --lib swift_callback_link_tests -- --ignored --test-threads=1"
+
+[tasks."test:bats"]
+description = "Run shell regression suites"
+env = { BATS_LIB_PATH = "{{config_root}}/tests/lib" }
+run = "bats scripts/tests"
+
+[tasks."test:lib:sync"]
+description = "Synchronize the pinned shared Bats library"
+run = "python3 scripts/sync_bats_lib.py"
+
+[tasks."test:lib:check"]
+description = "Check the shared Bats library against its pinned source"
+run = "python3 scripts/sync_bats_lib.py --check"
+
+[tasks."test:census"]
+description = "Report how many toolchain-dependent fixtures the last test run actually executed"
+# No `--require` locally: a contributor without Go or Swift installed should see the ratio, not a
+# failure. CI passes `--require` for the toolchains its runner installs, which is where a
+# zero-execution run has to be fatal. ~keep
+run = "./scripts/toolchain-census.sh"
+
+[tasks."test:release"]
+description = "Run all tests in release mode (catches release-only optimizer/lifetime issues)"
+run = "cargo test --release --workspace"
+
+[tasks."gate:generated-output"]
+description = "Run the consumer toolchain gate (clippy, cargo sort, poly fmt) over an emitted tree"
+run = [
+  "cargo test --test generated_output_downstream_gate -- --nocapture",
+  "cargo test --test generated_output_downstream_gate -- --ignored --nocapture --test-threads=1",
+]
+
+[tasks."gate:generated-output:text"]
+description = "Generated-output gate, text lanes only (cargo sort + poly fmt + cargo manifest bytes; compiles nothing)"
+run = [
+  "cargo test --test generated_output_downstream_gate -- --ignored --nocapture --test-threads=1 cargo_sort",
+  "cargo test --test generated_output_downstream_gate -- --ignored --nocapture --test-threads=1 poly_fmt",
+  "cargo test --test generated_output_downstream_gate -- --ignored --nocapture --test-threads=1 cargo_manifest_byte",
+]
+
+[tasks.bench]
+description = "Run codegen benchmarks (criterion)"
+run = "cargo bench"
+
+[tasks.check]
+description = "Type-check all crates"
+run = "cargo check --workspace"
+
+[tasks.fmt]
+description = "Format all code via poly"
+run = "poly fmt --fix ."
+
+[tasks.format]
+description = "Format all code via poly"
+run = "poly fmt --fix ."
+
+[tasks."format:check"]
+description = "Check formatting via poly (CI)"
+run = "poly fmt --check ."
+
+[tasks.lint]
+description = "Run all linters via poly"
+run = "poly lint ."
+
+[tasks."lint:check"]
+description = "Run check-only linting via poly (CI)"
+run = "poly lint ."
+
+[tasks."lint:file-size"]
+description = "Enforce the 1,000-line file cap: over-cap files may shrink, never grow"
+run = "cargo test --test file_size_ratchet"
+
+[tasks."lint:file-size:tighten"]
+description = "Rewrite tests/file_size_baseline.txt from the working tree (run after splitting a file)"
+# `--ignored` is load-bearing while the ratchet's tests carry #[ignore]: without it this task
+# reports `test result: ok. 0 passed; 4 ignored` and rewrites nothing, which is indistinguishable
+# from a successful regeneration (alef#482). ~keep
+env = { UPDATE_FILE_SIZE_BASELINE = "1" }
+run = "cargo test --test file_size_ratchet -- --ignored --nocapture"
+
+[tasks."gate:publish-verify"]
+description = "Verify package task arguments and archive guards with synthetic Cargo output"
+run = "python3 scripts/test_publish_verify.py"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = ["cargo clean", "rm -rf .alef/"]
+
+[tasks."governance:check"]
+description = "Check materialized local governance outputs against shared sources"
+run = "ai-rulez generate --check --no-local --strict-config"
+
+[tasks."consumer-swift:verify"]
+description = "Qualify the pinned Xberg Swift consumer on an admitted hosted macOS executor"
+env = { PYTHONDONTWRITEBYTECODE = "1" }
+run = [{ task = "consumer-swift:controls" }, "python3 scripts/consumer-swift/entry.py"]
+
+[tasks."consumer-swift:controls"]
+description = "Run all 45 hosted consumer harness controls with resource and process cleanup guards"
+env = { PYTHONDONTWRITEBYTECODE = "1" }
+run = "python3 scripts/consumer-swift/entry.py --controls"
+
+[tasks."zig-diagnostics:prepare"]
+description = "Build the exact Windows Zig diagnostic fixture before process sampling"
+run = "mise run test:run -- --lib snippets::validators::zig::diagnostic_tests::qualify_cold_and_warm_real_consumer_cases --no-run"
+
+[tasks."zig-diagnostics:controls"]
+description = "Qualify Windows Zig diagnostic process accounting and receipt guards"
+run = "pwsh -NoProfile -File scripts/zig-diagnostics/test-controls.ps1"
+
+[tasks."zig-diagnostics:run"]
+description = "Sample Windows process identities while running eight cold/warm Zig consumer checks"
+run = "pwsh -NoProfile -File scripts/zig-diagnostics/run.ps1"

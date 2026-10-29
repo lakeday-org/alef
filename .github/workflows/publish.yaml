@@ -687,16 +687,17 @@ jobs:
           use-sccache: "false"
           install-llvm-cov: "false"
 
-      - name: Install Task for package verification
+      - name: Install mise for package verification
         if: needs.prepare.outputs.dry_run == 'true'
         uses: xberg-io/actions/setup-mise@v1
         with:
-          install-args: task
+          # publish:verify needs only mise itself and the Rust toolchain; install no mise tool. ~keep
+          install-args: --dry-run
           config-ref: ${{ github.sha }}
 
       - name: Verify release crates without publishing
         if: needs.prepare.outputs.dry_run == 'true'
-        run: task publish:verify -- "${{ needs.prepare.outputs.version }}"
+        run: mise run publish:verify "${{ needs.prepare.outputs.version }}"
 
       - name: Publish to crates.io
         if: needs.prepare.outputs.dry_run != 'true'

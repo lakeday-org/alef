@@ -26,8 +26,8 @@
 //! But per the same commit's whole point, a silent skip is exactly the failure mode this repo
 //! treats as its dominant defect, so the skip is never silent: it prints a `SKIPPED:` line naming
 //! the host and the escape hatch, and it appends a row to this run's toolchain-census TSV so
-//! `task test:census` (which already sums every `*.tsv` under the census directory after
-//! `cargo test --workspace`, see `Taskfile.yml`) reports it by name instead of it vanishing into
+//! `mise run test:census` (which already sums every `*.tsv` under the census directory after
+//! `cargo test --workspace`, see `mise.toml`) reports it by name instead of it vanishing into
 //! an undifferentiated green run. [`REQUIRE_ENV`] is the opt-in that promotes the skip to a hard
 //! failure, for a CI leg a maintainer knows must support the mapping -- unset by default, exactly
 //! like the three `ALEF_REQUIRE_*` variables it mirrors.

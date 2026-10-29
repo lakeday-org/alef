@@ -35,9 +35,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: xberg-io/actions/setup-mise@v1
         with:
-          install-args: task bats
+          install-args: bats
       - name: Check shared Bats library
-        run: task test:lib:check
+        run: mise run test:lib:check
       - uses: xberg-io/actions/run-bats@v1
         with:
           path: scripts/tests
@@ -92,13 +92,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Bats has no Windows build in mise.lock; the Windows leg skips the Bats runtime tests. ~keep
-      - name: Install Task, uv and Bats
+      - name: Install uv and Bats
         uses: xberg-io/actions/setup-mise@v1
         with:
-          install-args: ${{ runner.os == 'Windows' && 'task uv' || 'task uv bats' }}
+          install-args: ${{ runner.os == 'Windows' && 'uv' || 'uv bats' }}
       - name: Hosted Swift consumer harness controls
         if: runner.os == 'macOS'
-        run: task consumer-swift:controls
+        run: mise run consumer-swift:controls
       - name: Preserve hosted Swift harness control receipts
         if: always() && runner.os == 'macOS'
         uses: actions/upload-artifact@v7
@@ -289,18 +289,18 @@ jobs:
         # `backends_wasm_gen_bindings_test` masked a second, unrelated failure in
         # `ci_poly_pin_gate` across two releases that way -- the log showed one red test and
         # looked complete. Run every target and report every failure. ~keep
-        run: task test:run -- --no-fail-fast
+        run: mise run test:run -- --no-fail-fast
       - name: Verify emitted Swift callback policy
         if: runner.os == 'macOS'
         timeout-minutes: 10
-        run: task gate:swift-callback-policy
+        run: mise run gate:swift-callback-policy
       # Every Elixir escaping oracle is #[ignore]d, so the step above runs none of them and
       # still exits 0. They evaluate generated Elixir through the real interpreter -- the only
       # checks in this repo that do -- so dropping `--ignored` or the filter here retires them
       # silently. `elixir_oracle::gate` reads THIS step's actual `run:` line (not the block, and
       # not this comment, which contains both needles) and fails if either goes missing.
       - name: Run the Elixir escaping oracles
-        run: task test:run -- --lib elixir_oracle -- --ignored --nocapture
+        run: mise run test:run -- --lib elixir_oracle -- --ignored --nocapture
       # Counts what the two steps above actually executed, per toolchain, and fails when a
       # toolchain this leg installed executed zero fixtures.
       #

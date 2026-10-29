@@ -158,7 +158,7 @@ class Gate:
 
     def build_cli(self):
         invocations = self.phase("alef", self.alef, self.alef / "target")
-        self.command("build-current-alef", ["task", "build:release"], self.alef, 4 * 1024**3, 1800)
+        self.command("build-current-alef", ["cargo", "build", "--release", "-p", "alef"], self.alef, 4 * 1024**3, 1800)
         candidates = []
         for directory in invocations.iterdir():
             for line in (directory / "stdout.log").read_text().splitlines():

@@ -44,6 +44,13 @@ use workflow_job_block_support::workflow_job_block;
 /// The workflow whose `test` job is the only thing that runs the integration binaries.
 const CI_WORKFLOW: &str = ".github/workflows/ci.yml";
 
+/// The mise config defining the `test:run` task the [`CI_WORKFLOW`] `test` job invokes.
+const MISE_CONFIG: &str = "mise.toml";
+
+/// `test:run`'s whole command; the darwin-only `--config` shrinks the unit-test binary only.
+const TEST_RUN_COMMAND: &str =
+    "cargo {% if os() == \"macos\" %}--config profile.test.package.alef.opt-level=1 {% endif %}test --workspace";
+
 /// The job key in [`CI_WORKFLOW`] that runs the Rust test suite.
 const TEST_JOB: &str = "test";
 
@@ -284,9 +291,9 @@ fn ci_workflow_runs_the_integration_test_suite() {
         )
     });
 
-    let taskfile = std::fs::read_to_string(repo_root().join("Taskfile.yml")).expect("read Taskfile");
+    let tasks = std::fs::read_to_string(repo_root().join(MISE_CONFIG)).expect("read mise.toml");
     assert!(
-        whole_suite_is_selected(&workflow, &taskfile),
+        whole_suite_is_selected(&workflow, &tasks),
         "{CI_WORKFLOW}'s `{TEST_JOB}` job must run the whole test suite — one of {WHOLE_SUITE_INVOCATIONS:?}. \
          A narrowed invocation such as `cargo test --lib` or `--bins` skips every test binary \
          under tests/ and still exits 0, so the integration suite would stop running with no \
@@ -294,21 +301,24 @@ fn ci_workflow_runs_the_integration_test_suite() {
     );
 }
 
-fn whole_suite_is_selected(workflow: &str, taskfile: &str) -> bool {
+fn whole_suite_is_selected(workflow: &str, tasks: &str) -> bool {
     let Ok(workflow) = serde_saphyr::from_str::<serde_json::Value>(workflow) else {
         return false;
     };
-    let Ok(taskfile) = serde_saphyr::from_str::<serde_json::Value>(taskfile) else {
+    let Ok(tasks) = tasks.parse::<toml::Table>() else {
         return false;
     };
-    let task = &taskfile["tasks"]["test:run"];
-    let task_runs_suite = task["cmds"].as_array().is_some_and(|commands| {
-        commands.len() == 1 && commands[0].as_str() == Some("cargo {{.TEST_CONFIG}} test --workspace {{.CLI_ARGS}}")
-    }) && task["vars"]["TEST_CONFIG"].as_str()
-        == Some("{{if eq OS \"darwin\"}}--config profile.test.package.alef.opt-level=1{{end}}");
+    // mise appends the `mise run test:run -- <arguments>` arguments to this single command.
+    let task_runs_suite = tasks
+        .get("tasks")
+        .and_then(|tasks| tasks.get("test:run"))
+        .and_then(toml::Value::as_table)
+        .and_then(|task| task.get("run"))
+        .and_then(toml::Value::as_str)
+        == Some(TEST_RUN_COMMAND);
     workflow["jobs"][TEST_JOB]["steps"].as_array().is_some_and(|steps| {
         steps.iter().filter_map(|step| step["run"].as_str()).any(|command| {
-            if let Some(arguments) = command.strip_prefix("task test:run -- ") {
+            if let Some(arguments) = command.strip_prefix("mise run test:run -- ") {
                 task_runs_suite && unfiltered_arguments(arguments)
             } else {
                 WHOLE_SUITE_INVOCATIONS
@@ -328,43 +338,49 @@ fn unfiltered_arguments(arguments: &str) -> bool {
 #[test]
 fn whole_suite_selection_rejects_narrowed_or_unresolved_task_commands() {
     let workflow = std::fs::read_to_string(repo_root().join(CI_WORKFLOW)).expect("read workflow");
-    let taskfile = std::fs::read_to_string(repo_root().join("Taskfile.yml")).expect("read Taskfile");
-    assert!(whole_suite_is_selected(&workflow, &taskfile));
-    for (label, workflow, taskfile) in [
+    let tasks = std::fs::read_to_string(repo_root().join(MISE_CONFIG)).expect("read mise.toml");
+    assert!(whole_suite_is_selected(&workflow, &tasks));
+    let original = (workflow.clone(), tasks.clone());
+    for (label, workflow, tasks) in [
         (
             "narrowed task",
             workflow.clone(),
-            taskfile.replace("test --workspace", "test --workspace --lib"),
+            tasks.replace("test --workspace'", "test --workspace --lib'"),
         ),
         (
             "missing task",
             workflow.clone(),
-            taskfile.replace("  test:run:", "  missing:run:"),
+            tasks.replace("[tasks.\"test:run\"]", "[tasks.\"missing:run\"]"),
         ),
         (
             "narrowed CLI",
             workflow.replace("-- --no-fail-fast", "-- --lib"),
-            taskfile.clone(),
+            tasks.clone(),
         ),
         (
             "named filter",
             workflow.replace("-- --no-fail-fast", "-- one_test"),
-            taskfile.clone(),
+            tasks.clone(),
         ),
         (
             "narrowed config",
             workflow.clone(),
-            taskfile.replace("--config profile.test", "--lib --config profile.test"),
+            tasks.replace("--config profile.test", "--lib --config profile.test"),
         ),
         (
             "comment only",
             format!(
                 "# cargo test --workspace\n{}",
-                workflow.replace("task test:run -- --no-fail-fast", "cargo test --lib")
+                workflow.replace("mise run test:run -- --no-fail-fast", "cargo test --lib")
             ),
-            taskfile.clone(),
+            tasks.clone(),
         ),
     ] {
-        assert!(!whole_suite_is_selected(&workflow, &taskfile), "accepted {label}");
+        assert_ne!(
+            (&workflow, &tasks),
+            (&original.0, &original.1),
+            "mutant {label} changed nothing"
+        );
+        assert!(!whole_suite_is_selected(&workflow, &tasks), "accepted {label}");
     }
 }

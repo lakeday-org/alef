@@ -6,8 +6,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/ci-zig-windows-diagnostics.yaml
-      - .task/zig-diagnostics.yml
-      - Taskfile.yml
+      - mise.toml
       - scripts/zig-diagnostics/**
       - src/snippets/validators/zig.rs
       - src/snippets/validators/zig/**
@@ -33,18 +32,18 @@ jobs:
       - uses: actions/checkout@v7
       - uses: xberg-io/actions/setup-mise@v1
         with:
-          install-args: task zig
+          install-args: zig
       - uses: xberg-io/actions/setup-rust@v1
         with:
           use-sccache: "false"
           install-llvm-cov: "false"
           cache-key-prefix: zig-windows-diagnostics
       - name: Qualify process accounting and failure controls
-        run: task zig-diagnostics:controls
+        run: mise run zig-diagnostics:controls
       - name: Build the diagnostic fixture
-        run: task zig-diagnostics:prepare
+        run: mise run zig-diagnostics:prepare
       - name: Capture eight real cold and warm compiler checks
-        run: task zig-diagnostics:run
+        run: mise run zig-diagnostics:run
       - name: Preserve process samples, controls and compiler receipts
         if: always()
         uses: actions/upload-artifact@v7

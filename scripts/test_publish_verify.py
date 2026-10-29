@@ -1,4 +1,4 @@
-"""Canonical Task invocation and archive guards using explicitly synthetic Cargo output."""
+"""Canonical mise task invocation and archive guards using explicitly synthetic Cargo output."""
 
 import json
 import os
@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+TASK = Path("mise-tasks/publish/verify.sh")
 
 
 def require_single_job(argv, target):
@@ -52,20 +53,25 @@ def invoke_package_fixture(repo, mode="three", wrong_jobs=False):
             "PACKAGE_CONTROL_VERSION": version,
             "CARGO_NET_OFFLINE": "true",
         }
-        command = ["task", "--exit-code", "publish:verify", "--", version]
+        command = ["mise", "run", "publish:verify", version]
+        cwd = repo
         if wrong_jobs:
-            source = (repo / "Taskfile.yml").read_text()
-            task = source[source.index("  publish:verify:\n") : source.index("  set-version:\n")]
+            task = (repo / TASK).read_text()
             assert len(re.findall(r" -j[12]\n", task)) == 1
             task = re.sub(r" -j[12]\n", " -j3\n", task)
-            task = task.replace("  publish:verify:\n", "  publish:verify:\n    dir: " + str(repo) + "\n", 1)
-            shadow = root / "Taskfile.yml"
-            shadow.write_text("version: '3'\ntasks:\n" + task)
-            command = ["task", "--exit-code", "--taskfile", str(shadow), "publish:verify", "--", version]
+            header = "#MISE description="
+            task = task.replace(header, "#MISE dir=" + json.dumps(str(repo)) + "\n" + header, 1)
+            cwd = root / "shadow"
+            (cwd / TASK).parent.mkdir(parents=True)
+            (cwd / TASK).write_text(task)
+            (cwd / TASK).chmod(0o755)
+            (cwd / "mise.toml").write_text("")
+            environment["MISE_TRUSTED_CONFIG_PATHS"] = str(cwd)
+            environment["MISE_CEILING_PATHS"] = str(root)
         result = subprocess.run(
-            command, cwd=repo, env=environment, capture_output=True, text=True, timeout=15, check=False
+            command, cwd=cwd, env=environment, capture_output=True, text=True, timeout=15, check=False
         )
-        assert captured.is_file(), "canonical Task did not invoke the controlled Cargo boundary"
+        assert captured.is_file(), "canonical task did not invoke the controlled Cargo boundary"
         argv = json.loads(captured.read_text())
         target = Path(argv[argv.index("--target-dir") + 1])
         assert target.is_absolute()

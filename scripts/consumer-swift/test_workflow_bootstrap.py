@@ -14,7 +14,10 @@ def require_bootstrap_before_task(workflow):
         for i, step in enumerate(steps)
         if "run: python3 gate/scripts/consumer-swift/entry.py --bootstrap-task\n" in step
     ]
-    tasks = [i for i, step in enumerate(steps) if "run: task --dir gate consumer-swift:verify\n" in step]
+    verify = (
+        "run: python3 gate/scripts/consumer-swift/entry.py --controls && python3 gate/scripts/consumer-swift/entry.py\n"
+    )
+    tasks = [i for i, step in enumerate(steps) if verify in step]
     if len(bootstrap) != 1 or len(tasks) != 1 or bootstrap[0] >= tasks[0]:
         raise ValueError("verified Task bootstrap must precede its actual Task invocation")
     if "ref: ${{ github.sha }}\n" not in steps[0] or "path: gate\n" not in steps[0]:

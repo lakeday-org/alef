@@ -4,7 +4,7 @@ use std::process::Command;
 const FILTER: &str = "swift_callback_link_tests";
 const TASK: &str = "gate:swift-callback-policy";
 const STEP: &str = "Verify emitted Swift callback policy";
-const TASK_COMMAND: &str = "task test:run -- --lib swift_callback_link_tests -- --ignored --test-threads=1";
+const TASK_COMMAND: &str = "mise run test:run -- --lib swift_callback_link_tests -- --ignored --test-threads=1";
 const EXPECTED: [&str; 2] = [
     "backends::swift::gen_rust_crate::cargo::swift_callback_link_tests::should_allow_only_actual_swift_callbacks_in_apple_cdylibs",
     "backends::swift::gen_rust_crate::cargo::swift_callback_link_tests::should_validate_actual_emitted_swift_callback_exports",
@@ -122,27 +122,32 @@ fn validate_wiring(workflow: &str, tasks: &str) -> Result<(), &'static str> {
     let expected = [
         "if: runner.os == 'macOS'",
         "timeout-minutes: 10",
-        "run: task gate:swift-callback-policy",
+        "run: mise run gate:swift-callback-policy",
     ];
     if actual != expected {
-        return Err("policy step must contain only its macOS condition, bounded timeout and named Task run");
+        return Err("policy step must contain only its macOS condition, bounded timeout and named task run");
     }
-    let task = named_block(tasks, &format!("  {TASK}:"), 2).ok_or("missing named policy Task")?;
-    let actual_task = fields(&task);
-    if actual_task
-        .iter()
-        .any(|line| !line.starts_with("desc: ") && *line != "cmds:" && *line != format!("- {TASK_COMMAND}"))
-        || actual_task.iter().filter(|line| **line == "cmds:").count() != 1
+    let config: toml::Table = tasks.parse().map_err(|_| "mise config must parse as TOML")?;
+    let task = config
+        .get("tasks")
+        .and_then(|tasks| tasks.get(TASK))
+        .and_then(toml::Value::as_table)
+        .ok_or("missing named policy task")?;
+    if task.keys().any(|key| key != "description" && key != "run") {
+        return Err("policy task must not have skipping, ignored failure or unknown directives");
+    }
+    let commands = match task.get("run") {
+        Some(toml::Value::String(command)) => vec![command.as_str()],
+        Some(toml::Value::Array(commands)) => commands.iter().filter_map(toml::Value::as_str).collect(),
+        _ => Vec::new(),
+    };
+    if commands != [TASK_COMMAND]
+        || task
+            .get("run")
+            .and_then(toml::Value::as_array)
+            .is_some_and(|run| run.len() != 1)
     {
-        return Err("policy Task must not have skipping, ignored failure or unknown directives");
-    }
-    let commands = task
-        .iter()
-        .map(|line| line.trim())
-        .filter_map(|line| line.strip_prefix("- "))
-        .collect::<Vec<_>>();
-    if commands != [TASK_COMMAND] {
-        return Err("policy Task must run only the exact ignored two-test selector through test:run");
+        return Err("policy task must run only the exact ignored two-test selector through test:run");
     }
     Ok(())
 }
@@ -151,12 +156,12 @@ fn validate_wiring(workflow: &str, tasks: &str) -> Result<(), &'static str> {
 fn should_wire_the_named_task_into_the_qualified_existing_ci_job() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let workflow = std::fs::read_to_string(root.join(".github/workflows/ci.yml")).expect("read CI workflow");
-    let tasks = std::fs::read_to_string(root.join("Taskfile.yml")).expect("read Taskfile");
+    let tasks = std::fs::read_to_string(root.join("mise.toml")).expect("read mise.toml");
     assert_eq!(validate_wiring(&workflow, &tasks), Ok(()));
 }
 
-const VALID_WORKFLOW: &str = "jobs:\n  test:\n    steps:\n      - name: Verify emitted Swift callback policy\n        if: runner.os == 'macOS'\n        timeout-minutes: 10\n        run: task gate:swift-callback-policy\n  neighbour:\n    steps:\n      - run: unrelated\n";
-const VALID_TASKS: &str = "tasks:\n  gate:swift-callback-policy:\n    desc: Compile emitted Swift callback policy\n    cmds:\n      - task test:run -- --lib swift_callback_link_tests -- --ignored --test-threads=1\n  neighbour:\n    cmds:\n      - unrelated\n";
+const VALID_WORKFLOW: &str = "jobs:\n  test:\n    steps:\n      - name: Verify emitted Swift callback policy\n        if: runner.os == 'macOS'\n        timeout-minutes: 10\n        run: mise run gate:swift-callback-policy\n  neighbour:\n    steps:\n      - run: unrelated\n";
+const VALID_TASKS: &str = "[tasks.\"gate:swift-callback-policy\"]\ndescription = \"Compile emitted Swift callback policy\"\nrun = \"mise run test:run -- --lib swift_callback_link_tests -- --ignored --test-threads=1\"\n\n[tasks.neighbour]\nrun = \"unrelated\"\n";
 
 #[test]
 fn should_accept_the_actual_supported_step_and_task_shape() {
@@ -166,6 +171,12 @@ fn should_accept_the_actual_supported_step_and_task_shape() {
         "      - name: Target without run\n      - name: Verify",
     );
     assert_eq!(validate_wiring(&preceding, VALID_TASKS), Ok(()));
+    let listed = VALID_TASKS.replace(
+        &format!("run = \"{TASK_COMMAND}\""),
+        &format!("run = [\"{TASK_COMMAND}\"]"),
+    );
+    assert_ne!(listed, VALID_TASKS);
+    assert_eq!(validate_wiring(VALID_WORKFLOW, &listed), Ok(()));
 }
 
 #[test]
@@ -175,10 +186,10 @@ fn should_reject_workflow_mutants_even_when_comments_or_neighbours_hold_the_comm
         VALID_WORKFLOW.replace("  test:\n", "  test:\n    continue-on-error: true\n"),
         VALID_WORKFLOW.replace(STEP, "Wrong step"),
         VALID_WORKFLOW.replace(
-            "run: task gate:swift-callback-policy",
-            "# run: task gate:swift-callback-policy",
+            "run: mise run gate:swift-callback-policy",
+            "# run: mise run gate:swift-callback-policy",
         ),
-        VALID_WORKFLOW.replace("run: task gate:swift-callback-policy", "run: task unrelated"),
+        VALID_WORKFLOW.replace("run: mise run gate:swift-callback-policy", "run: mise run unrelated"),
         VALID_WORKFLOW.replace("if: runner.os == 'macOS'", "if: runner.os == 'Linux'"),
         VALID_WORKFLOW.replace("        timeout-minutes: 10\n", ""),
         VALID_WORKFLOW.replace("timeout-minutes: 10", "timeout-minutes: 0"),
@@ -195,24 +206,28 @@ fn should_reject_workflow_mutants_even_when_comments_or_neighbours_hold_the_comm
 #[test]
 fn should_reject_task_mutants_without_borrowing_comment_or_neighbour_commands() {
     let mutants = [
-        VALID_TASKS.replace("  gate:swift-callback-policy:", "  other-task:"),
+        VALID_TASKS.replace("[tasks.\"gate:swift-callback-policy\"]", "[tasks.other-task]"),
         VALID_TASKS.replace("--ignored ", ""),
         VALID_TASKS.replace(FILTER, "typo_callback_filter"),
         VALID_TASKS.replace("--lib ", ""),
         VALID_TASKS.replace("--test-threads=1", "--test-threads=8"),
-        VALID_TASKS.replace("      - task test:run", "      # - task test:run"),
-        VALID_TASKS.replace("    cmds:\n", "    ignore_error: true\n    cmds:\n"),
+        VALID_TASKS.replace("run = \"mise run test:run", "# run = \"mise run test:run"),
+        VALID_TASKS.replace(
+            "\nrun = \"mise",
+            "\nsources = [\"Cargo.toml\"]\noutputs = [\"target\"]\nrun = \"mise",
+        ),
+        VALID_TASKS.replace(
+            &format!("run = \"{TASK_COMMAND}\""),
+            &format!("run = [\"{TASK_COMMAND}\", \"true\"]"),
+        ),
         VALID_TASKS
-            .replace("      - unrelated", &format!("      - {TASK_COMMAND}"))
-            .replace(
-                &format!("      - {TASK_COMMAND}\n  neighbour:"),
-                "      - task unrelated\n  neighbour:",
-            ),
+            .replace("run = \"unrelated\"", &format!("run = \"{TASK_COMMAND}\""))
+            .replacen(&format!("run = \"{TASK_COMMAND}\""), "run = \"mise run unrelated\"", 1),
     ];
     for (index, mutant) in mutants.iter().enumerate() {
         assert!(
             validate_wiring(VALID_WORKFLOW, mutant).is_err(),
-            "accepted Task mutant {index}"
+            "accepted task mutant {index}"
         );
     }
 }

@@ -20,7 +20,7 @@ def main() -> None:
     destination = pathlib.Path(__file__).resolve().parent.parent / "tests/lib/xberg-bats/load.bash"
     if arguments.check:
         if not destination.is_file() or destination.read_bytes() != expected:
-            raise SystemExit("Shared Bats helper drifted; run task test:lib:sync")
+            raise SystemExit("Shared Bats helper drifted; run mise run test:lib:sync")
         print("Checked 1 vendored Bats helper against the pinned source")
     else:
         destination.parent.mkdir(parents=True, exist_ok=True)

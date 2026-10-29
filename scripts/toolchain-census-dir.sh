@@ -6,7 +6,7 @@
 # produced them, which already follows `CARGO_TARGET_DIR` and any `.cargo/config.toml`
 # `build.target-dir` (see `census_file()` there). Everything that resets or reads that directory
 # has to resolve the same path or it silently examines an empty one: `scripts/toolchain-census.sh`
-# (its `--dir` default), the Taskfile `test` task's pre-run reset, and
+# (its `--dir` default), the mise `test` task's pre-run reset, and
 # `.github/workflows/ci.yml`'s "Clear the toolchain fixture census" step all shell out to this
 # script instead of assuming `target/toolchain-census` themselves.
 #

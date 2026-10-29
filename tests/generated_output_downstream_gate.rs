@@ -51,12 +51,12 @@
 //!
 //! # Why the heavy tests are `#[ignore]`
 //!
-//! `cargo sort` and `poly` are installed by `task setup` and by the gate's CI job, but
+//! `cargo sort` and `poly` are installed by `mise run setup` and by the gate's CI job, but
 //! not by the three-OS `cargo test --workspace` matrix (poly has no Windows tap at all).
 //! A hard-failing tool probe in the default suite would break that matrix on every
 //! platform, and the predictable repair is to delete the gate.
 //!
-//! So the lanes are `#[ignore]`d and run explicitly, by `task gate:generated-output` and
+//! So the lanes are `#[ignore]`d and run explicitly, by `mise run gate:generated-output` and
 //! by the `generated-output-gate` CI job. That trades one risk for another — an ignored
 //! test is invisible, and a CI job can be deleted in a one-line diff — so the trade is
 //! closed by [`ci_workflow_runs_the_generated_output_gate`], which is *not* ignored,
@@ -255,7 +255,7 @@ const CARGO_SORT: GateTool = GateTool {
     display: "cargo sort",
     probe: &["sort", "--version"],
     check_args: &["sort", "--check"],
-    install_hint: "cargo install cargo-sort (or `task setup`)",
+    install_hint: "cargo install cargo-sort (or `mise run setup`)",
 };
 
 const POLY: GateTool = GateTool {
@@ -263,7 +263,7 @@ const POLY: GateTool = GateTool {
     display: "poly",
     probe: &["--version"],
     check_args: &["fmt", "--check", "."],
-    install_hint: "brew install goldziher/tap/poly (or `task setup`)",
+    install_hint: "brew install goldziher/tap/poly (or `mise run setup`)",
 };
 
 // `POLY_FMT_LANE_EXCLUSIONS` and `poly_fmt_check_args` live in the `poly_fmt_exclusions`
@@ -901,7 +901,7 @@ fn any_failed(outcomes: &[LaneOutcome]) -> bool {
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "needs cargo-sort; run via `task gate:generated-output` or the CI gate job"]
+#[ignore = "needs cargo-sort; run via `mise run gate:generated-output` or the CI gate job"]
 fn emitted_tree_passes_cargo_sort() {
     resolve_tools(&[&CARGO_SORT]);
     let tree = emit_tree(Sabotage::None);
@@ -914,7 +914,7 @@ fn emitted_tree_passes_cargo_sort() {
 }
 
 #[test]
-#[ignore = "needs poly; run via `task gate:generated-output` or the CI gate job"]
+#[ignore = "needs poly; run via `mise run gate:generated-output` or the CI gate job"]
 fn emitted_tree_passes_poly_fmt() {
     resolve_tools(&[&POLY]);
     let tree = emit_tree(Sabotage::None);
@@ -927,7 +927,7 @@ fn emitted_tree_passes_poly_fmt() {
 }
 
 #[test]
-#[ignore = "regenerates a full emitted tree via the alef binary; run via `task gate:generated-output` \
+#[ignore = "regenerates a full emitted tree via the alef binary; run via `mise run gate:generated-output` \
             or the CI gate job"]
 fn emitted_tree_passes_cargo_manifest_byte_lane() {
     let tree = emit_tree(Sabotage::None);
@@ -958,7 +958,7 @@ fn emitted_tree_passes_clippy() {
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "needs cargo-sort; run via `task gate:generated-output` or the CI gate job"]
+#[ignore = "needs cargo-sort; run via `mise run gate:generated-output` or the CI gate job"]
 fn cargo_sort_lane_catches_a_misordered_table() {
     resolve_tools(&[&CARGO_SORT]);
     let clean = emit_tree(Sabotage::None);
@@ -979,7 +979,7 @@ fn cargo_sort_lane_catches_a_misordered_table() {
 }
 
 #[test]
-#[ignore = "needs poly; run via `task gate:generated-output` or the CI gate job"]
+#[ignore = "needs poly; run via `mise run gate:generated-output` or the CI gate job"]
 fn poly_fmt_lane_catches_a_wide_toml_array_indent() {
     resolve_tools(&[&POLY]);
     let clean = emit_tree(Sabotage::None);
@@ -1003,7 +1003,7 @@ fn poly_fmt_lane_catches_a_wide_toml_array_indent() {
 /// nothing but indentation must fail the gate -- and, to prove that gap was real and not
 /// already covered, `cargo sort --check` must still pass the exact same sabotaged tree.
 #[test]
-#[ignore = "needs cargo-sort; run via `task gate:generated-output` or the CI gate job"]
+#[ignore = "needs cargo-sort; run via `mise run gate:generated-output` or the CI gate job"]
 fn cargo_manifest_byte_lane_catches_indentation_only_drift() {
     resolve_tools(&[&CARGO_SORT]);
 
@@ -1171,28 +1171,28 @@ fn ci_workflow_runs_the_generated_output_gate() {
 #[test]
 fn task_and_ci_serialize_ignored_generated_output_lanes() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let taskfile_path = repo_root.join("Taskfile.yml");
-    let taskfile = std::fs::read_to_string(&taskfile_path)
-        .unwrap_or_else(|error| panic!("read {}: {error}", taskfile_path.display()));
+    let tasks_path = repo_root.join("mise.toml");
+    let tasks =
+        std::fs::read_to_string(&tasks_path).unwrap_or_else(|error| panic!("read {}: {error}", tasks_path.display()));
     let workflow_path = repo_root.join(".github/workflows/ci.yml");
     let workflow = std::fs::read_to_string(&workflow_path)
         .unwrap_or_else(|error| panic!("read {}: {error}", workflow_path.display()));
 
-    let ignored_task_invocations: Vec<&str> = taskfile
+    let ignored_task_invocations: Vec<&str> = tasks
         .lines()
         .filter(|line| line.contains("generated_output_downstream_gate") && line.contains("--ignored"))
         .collect();
     assert_eq!(
         ignored_task_invocations.len(),
         4,
-        "unexpected Taskfile gate invocation count"
+        "unexpected mise.toml gate invocation count"
     );
     assert!(
         ignored_task_invocations
             .iter()
             .all(|line| line.contains("--test-threads=1")),
         "{} must serialize every ignored generated-output invocation",
-        taskfile_path.display()
+        tasks_path.display()
     );
 
     let serialized_ci_invocation =
