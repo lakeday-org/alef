@@ -476,26 +476,32 @@ mod tests {
     /// consumer would restamp on every alef release — the exact cost the stripped
     /// `alef_version` pin exists to avoid. These are frozen expected values, so they fail on
     /// any drift rather than re-deriving whatever the code currently does.
-    /// Regenerated 2026-08-27 for the CODEGEN_FORMAT_VERSION 2 -> 3 bump, which
-    /// `compute_inputs_hash` folds in -- that is the ONE legitimate reason these move.
+    /// Frozen for CODEGEN_FORMAT_VERSION 4: the 3 -> 4 bump invalidated generated
+    /// Brew fixtures when they moved to Bats. A deliberate format bump is the one
+    /// legitimate reason these vectors move.
     /// Any other drift is the bug this test exists to catch. ~keep
     #[test]
     fn embedded_inputs_hash_is_unaffected_by_cache_key_identity() {
+        assert_eq!(
+            crate::core::template_versions::precommit::CODEGEN_FORMAT_VERSION,
+            "4",
+            "a deliberate format bump requires refreshing these frozen vectors"
+        );
         let cases: [(&str, &[u8], &str); 3] = [
             (
                 "sources-abc",
                 b"[workspace]\nlanguages = [\"node\"]\n",
-                "5bec01d0c5156f7339c8e1dd14b9245fbf791933156ec252cab9bce3ae8e0e39",
+                "40c7a481a1852615fd2988a45ee7676afedde35698cd067f891c3b549eb52002",
             ),
             (
                 "sources-abc",
                 b"",
-                "6236d147c8bf5653a1aef09d70abdd3ecb1f0cb2e27056b0f03d277c3310bc00",
+                "7a4fe1a1f3529771dcca8639c70f7481ef90177383aede2ae41eab9c9bb0e4fe",
             ),
             (
                 "",
                 b"[workspace]\n",
-                "8ada6034d43c7dbb07d46e8194b70cc5cc9ad4c3db53342d1bc80d76d7487f2f",
+                "ee56ec5f51eb93a9e45e4e1ab95a915a7a467e2ecf6a569c942b41ed1b0a45c8",
             ),
         ];
         for (sources_hash, toml_bytes, expected) in cases {
