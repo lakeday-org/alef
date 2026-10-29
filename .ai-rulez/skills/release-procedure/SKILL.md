@@ -1,7 +1,7 @@
 ---
 type: Playbook
 title: Release Procedure
-description: "Cut, tag and publish an alef release: CHANGELOG roll-up, task set-version, lint, release commit, push, tag, gh release create, crates.io verification. Use when asked for an alef release, version bump or hotfix tag."
+description: "Cut, tag and publish an alef release: CHANGELOG roll-up, mise run set-version, lint, release commit, push, tag, gh release create, crates.io verification. Use when asked for an alef release, version bump or hotfix tag."
 disable-model-invocation: true
 x-ai-rulez:
   kind: skill
@@ -19,7 +19,7 @@ Every step has a check; do not skip one.
 
 - `gh release create` is what publishes: `Publish` triggers on `release: types: [published]`; a bare tag push runs nothing (v0.55.2 and v0.55.3 were tagged without a release and never reached crates.io).
 - Three crates publish at the same version, in order: `alef-component-abi`, `alef-component-runtime`, `alef`. Check each registry version before retrying a partial publish.
-- Versions change only via `task set-version -- X.Y.Z`, never by hand.
+- Versions change only via `mise run set-version X.Y.Z`, never by hand.
 - `chore(release): X.Y.Z` carries only the version bump and changelog roll; fixes land in their own commits first, each with a regression test.
 - No AI attribution in commit, tag or release text.
 
@@ -36,7 +36,7 @@ Every step has a check; do not skip one.
 
 ## 2. Version
 
-`task set-version -- X.Y.Z` rewrites `Cargo.toml`, both component manifests and their dependency pins, `alef.toml` `alef_version`, `src/core/template_versions.rs::ALEF_REV`, regenerates `schemas/alef.schema.json`, and runs `cargo update`. Verify:
+`mise run set-version X.Y.Z` rewrites `Cargo.toml`, both component manifests and their dependency pins, `alef.toml` `alef_version`, `src/core/template_versions.rs::ALEF_REV`, regenerates `schemas/alef.schema.json`, and runs `cargo update`. Verify:
 
 ```bash
 grep -E '^version' Cargo.toml crates/alef-component-abi/Cargo.toml crates/alef-component-runtime/Cargo.toml
@@ -90,4 +90,4 @@ done
 ## 7. After
 
 - Bump consumer pins in separate follow-up PRs.
-- Optional: `cargo install --path . --force`, then `task clean` (`cargo clean` + `rm -rf .alef/`).
+- Optional: `cargo install --path . --force`, then `mise run clean` (`cargo clean` + `rm -rf .alef/`).

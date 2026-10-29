@@ -1,6 +1,6 @@
 ---
 name: alef
-description: "Alef Rust-to-polyglot binding generation: alef.toml, bindings, READMEs, API/CLI/MCP docs and e2e suites, safe command order, generated-output rules. Use when configuring Alef, running task alef:* or e2e:*, bumping versions, or debugging stale output."
+description: "Alef Rust-to-polyglot binding generation: alef.toml, bindings, READMEs, API/CLI/MCP docs and e2e suites, safe command order, generated-output rules. Use when configuring Alef, running mise run alef:* or e2e:*, bumping versions, or debugging stale output."
 license: MIT
 metadata:
   author: xberg-io
@@ -25,7 +25,7 @@ Use this skill in a repo that uses Alef.
 
 ## Standard Consumer Workflow
 
-From a repo that uses Alef, read its Taskfile first and use its `alef:*`, README and docs
+From a repo that uses Alef, read its mise tasks first and use its `alef:*`, README and docs
 commands when available. For direct CLI use, this sequence refreshes the configured surfaces:
 
 ```bash
@@ -73,17 +73,17 @@ cargo run -q --manifest-path <polyrepo-root>/alef/Cargo.toml -- all --clean
 Every consumer repo defines these tasks; read each before running it, since the flags differ by
 repo (all pass `--skip-snippet-validation`; crawlberg omits `--skip-compile`):
 
-- `task alef:generate` regenerates all Alef-managed output. In crawlberg (no `--skip-compile`) it
+- `mise run alef:generate` regenerates all Alef-managed output. In crawlberg (no `--skip-compile`) it
   also compiles the Swift bridge and the FFI header gate, so a subagent without build scope must
   not run it there.
-- `task alef:verify` checks that generated output is fresh; fast regeneration does not run it.
-- `task e2e:generate`, then `task e2e:test`, is the e2e loop.
-- `task build:all` builds the core plus the bindings.
+- `mise run alef:verify` checks that generated output is fresh; fast regeneration does not run it.
+- `mise run e2e:generate`, then `mise run e2e:test`, is the e2e loop.
+- `mise run build:all` builds the core plus the bindings.
 
 Only some repos define `alef:build`, `build:bindings`, `test:bindings`, `e2e:build`, `e2e:all` and
 `e2e:verify` (none of them exist in liter-llm), and only crawlberg and tree-sitter-language-pack
-define `alef:format` (`alef fmt`); elsewhere `task format` formats generated output. Check
-`task --list`.
+define `alef:format` (`alef fmt`); elsewhere `mise run format` formats generated output. Check
+`mise tasks ls`.
 
 ## Regeneration Is an Audit
 

@@ -8,7 +8,7 @@
 //! published (`src/scaffold/languages/*.rs`, `src/codegen/component_producer.rs` all emit
 //! `env!("CARGO_PKG_VERSION")`, i.e. the root crate's own version, as the pin).
 //!
-//! `task set-version -- X.Y.Z` is what is supposed to keep the four in lockstep; this test
+//! `mise run set-version X.Y.Z` is what is supposed to keep the four in lockstep; this test
 //! is the regression guard for that invariant, independent of whether `set-version` was
 //! actually run.
 

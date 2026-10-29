@@ -1,7 +1,7 @@
 //! `alef verify` has to say, on a tree it reports clean, that the dependency versions in the
 //! manifests it owns are alef's and not the consumer's.
 //!
-//! The loss the finding warns about is silent and delayed: the consumer's `task upgrade`
+//! The loss the finding warns about is silent and delayed: the consumer's `mise run upgrade`
 //! succeeds, CI may go green on it, and the revert lands on whoever next runs `alef all`. A
 //! notice that only appears on a failing run would never be seen, so this prints on a clean
 //! one -- which is exactly why it must not touch the exit code. Both halves are asserted

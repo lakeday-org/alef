@@ -28,7 +28,7 @@ adds what only applies when the change is in alef.
 
 ## Checks and downstream smoke test
 
-- Iterate with `task format:check`, `task lint` and `task test:run -- <test-filter>`.
+- Iterate with `mise run format:check`, `mise run lint` and `mise run test:run -- <test-filter>`.
 - For docs/template work, smoke test consumers with the local binary, then `git diff --check` there.
 - Consumers that exercise alef broadly sit in the polyrepo root: `crawlberg`, `html-to-markdown`, `liter-llm`, `tree-sitter-language-pack`; `xberg` when its config exercises the change. Pick the ones relevant to the changed surface.
 - Never discard a consumer's uncommitted regeneration state.

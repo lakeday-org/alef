@@ -344,7 +344,7 @@ const KNOWN_UNMARKED_VERSION_CONSTS: &[UnmarkedVersionConst] = &[
     UnmarkedVersionConst {
         name: "ALEF_REV",
         reason: UnmarkedReason::NotAVersion,
-        detail: "alef's own release tag; set only by `task set-version`, never by Renovate",
+        detail: "alef's own release tag; set only by `mise run set-version`, never by Renovate",
     },
     UnmarkedVersionConst {
         name: "CODEGEN_FORMAT_VERSION",

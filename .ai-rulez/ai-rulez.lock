@@ -4,7 +4,7 @@
 version = 1
 ai_rulez_version = '5.9.2'
 scope = 'all'
-tree = 'sha256:ebc2c6f5ff539ba78d478a2546f4fd683ecfebd495250f9c54c1427cec1ea7c2'
+tree = 'sha256:c684817d2d9b74db5789ee678be33addb4a005c1a97c9b72b24e91ca59f1c1c4'
 
 [[include]]
 name = 'xberg-cicd'
@@ -46,7 +46,7 @@ digest = 'sha256:e90c5be4a990678e8adb92b66af2a54bb2e4c1efbed08aee978b47f90e0b4b4
 name = 'alef'
 source = 'skills/alef'
 commit = ''
-digest = 'sha256:e37e33cf53dda8b110d796621943347322f92b3b1c41dad561181f721a658c3b'
+digest = 'sha256:41985c3d8706619a67ee07d7a34ae5360e6bb8a5da75b0815a366de8522ed233'
 
 [[served]]
 name = 'basemind-tools'
@@ -136,13 +136,13 @@ digest = 'sha256:772854a122a129565f974e6c5ae84ef1169f7bc4f3a2068bfdc56b548c16169
 name = 'regen-audit'
 source = '.ai-rulez/skills/regen-audit/SKILL.md'
 commit = ''
-digest = 'sha256:eb0780c2dcb15be65d4e8e163f6560f7e0a0bd37e0e42f6716841fdacf6a5263'
+digest = 'sha256:54a025ac68591151b32a79b7c6380423d9f814162bb08a7ad6f883b8939f9c6b'
 
 [[served]]
 name = 'release-procedure'
 source = '.ai-rulez/skills/release-procedure/SKILL.md'
 commit = ''
-digest = 'sha256:46922fd2acbfc70d705b120a5e74f5c2c4ac3b553df5d62811daa2049fc66ed3'
+digest = 'sha256:5ee4fa84269e5bea3a1de3d87cf58feed88a202913b4d3527f4274f8a99f7c6e'
 
 [[served]]
 name = 'release-workflow'
@@ -232,7 +232,7 @@ digest = 'sha256:b15cd8562858cfd7c0b30acf4bf214cc27b1ecac5ff9bd3d69aef5a55b4ef6d
 kind = 'rule'
 id = 'file-modularization'
 path = 'rules/file-modularization.md'
-digest = 'sha256:5b7dc56de4c5711f38055869d4ecba26ac20f72aceb100d47f788657b3be59a6'
+digest = 'sha256:56fddeb24b95555435f08d09828eecfd3c84006821c821ec4184b8be8c79cb79'
 
 [[item]]
 kind = 'rule'
@@ -273,13 +273,13 @@ digest = 'sha256:f011dde132edde0f3c5b434c1b266f2d7b6d70bcf333d3dab7307d109262e9d
 kind = 'skill'
 id = 'regen-audit'
 path = 'skills/regen-audit'
-digest = 'sha256:4578f62640b1ab69cadf6f7ac22f39bf52ffea5e12f00eb3ad940f0f1e8cd8fc'
+digest = 'sha256:9bb8353bd951e8ced36a7e89bfdf3bd6950acc44fd596d979b923130351d16a9'
 
 [[item]]
 kind = 'skill'
 id = 'release-procedure'
 path = 'skills/release-procedure'
-digest = 'sha256:2ef26e3acf029282dece60d485a6487621c6b3138cc22b0e2a138952512df0f4'
+digest = 'sha256:1eef2f3fb541c682e37cd65ebfd64e14e3a6e357c35e112648c224bb2e8b8844'
 
 [[item]]
 kind = 'skill'

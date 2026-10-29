@@ -406,13 +406,13 @@ editor validation is still correct.
 
 ## Development
 
-This repository uses `task` for common workflows:
+This repository uses `mise` tasks for common workflows:
 
 ```bash
-task setup
-task build
-task test
-task lint
+mise run setup
+mise run build
+mise run test
+mise run lint
 ```
 
 The most useful targeted commands while working on Alef itself are:

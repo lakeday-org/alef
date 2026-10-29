@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replace go-task with mise tasks: alef's own tasks keep their names under `mise run`, CI invokes them through mise, and `Taskfile.yml`, `.task/` and the `task` tool pin are gone.
+- Drive native test fixtures through `mise run` with a fixture-scoped, trusted `mise.toml` that never merges a parent config.
+- Generated comments and docs name `mise run <task>` instead of `task <task>`.
+
 ## [0.115.5] - 2026-10-27
 
 ### Changed
